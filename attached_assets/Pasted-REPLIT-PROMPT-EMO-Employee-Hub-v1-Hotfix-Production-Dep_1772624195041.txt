@@ -1,0 +1,196 @@
+REPLIT PROMPT — EMO Employee Hub v1 Hotfix + Production Deploy (P0 Security + RBAC + Deploy)
+
+You are working on an existing codebase “Employee Hub” (Node backend + client). The current build is NOT safe for pilot due to:
+- Account takeover via forgot-password returning reset URL to anyone
+- Seed script creating default admin and fake employees in prod
+- Employee directory API exposed to all authenticated users (PII leak)
+- Manager scoping missing (approvals can be done for non-team members)
+- Weak/incorrect account provisioning (username collisions, shared default passwords)
+- Deployment failures (port binding/env validation)
+
+Your job: implement the fixes below, keep changes minimal, and make it deployable/stable for a v1 pilot.
+
+NON-NEGOTIABLES
+- Enforce server-side RBAC + scope checks on every endpoint
+- No demo credentials, no seed users in prod, no reset links exposed publicly
+- Always bind to process.env.PORT and 0.0.0.0
+- Add env validation on boot and clear startup logs
+
+──────────────────────────────────────────────────────────────────────────────
+1) FIX FORGOT PASSWORD / RESET FLOW (critical takeover fix)
+
+CURRENT BUG:
+- /api/auth/forgot-password returns a resetUrl, and the UI displays it.
+This allows anyone to reset anyone’s password.
+
+REQUIRED FIX:
+A) Public forgot-password endpoint:
+- POST /api/auth/forgot-password
+  - Input: { email }
+  - Response: ALWAYS { success: true } regardless of whether user exists
+  - Server should NOT return resetUrl or token
+  - Server should create a reset token if user exists, store hashed token + expiry in DB
+  - If SMTP configured, send email; if not, do nothing
+
+B) HR-only reset link generator endpoint:
+- POST /api/hr/users/:userId/generate-reset-link
+  - Auth: HR_ADMIN only (or SUPER_ADMIN/CEO if exists)
+  - Response: { resetUrl } (safe because HR-only)
+  - Audit log: who generated it + for which user + timestamp
+  - Token expiry: 2 hours
+
+C) UI changes:
+- Login page: keep “Forgot password” but DO NOT show resetUrl
+  - Show message: “If the account exists, you’ll receive instructions.”
+- Add an HR-only admin page action:
+  - From Employee Profile → “Generate password reset link” (HR only)
+  - Copy-to-clipboard link
+
+D) Security:
+- Tokens stored hashed (never store raw token)
+- Rate limit forgot-password endpoint
+
+──────────────────────────────────────────────────────────────────────────────
+2) DISABLE SEEDING IN PROD (no default admin, no fake employees)
+
+CURRENT BUG:
+- seed() runs on server boot and creates superadmin/Admin@123 and fake employees.
+
+REQUIRED FIX:
+- Remove seed() call from server startup.
+- Create a separate script: npm run seed
+- Guard seeding:
+  - Only run if NODE_ENV=development AND ALLOW_SEED=true
+- In production, system must start with NO users.
+- Add a “bootstrap” flow:
+  - If no users exist, allow creating the FIRST admin only using a one-time BOOTSTRAP_TOKEN env var.
+  - Endpoint: POST /api/auth/bootstrap (requires BOOTSTRAP_TOKEN header)
+  - After first admin created, bootstrap endpoint becomes disabled.
+
+──────────────────────────────────────────────────────────────────────────────
+3) LOCK DOWN EMPLOYEE DIRECTORY + PII SANITIZATION
+
+CURRENT BUG:
+- GET /api/employees returns all employees to any authenticated user.
+
+REQUIRED FIX:
+A) Permissions:
+- GET /api/employees
+  - HR roles only (HR_ADMIN/HR_OPS) OR return limited directory (name, dept, title) to employees.
+  - If you keep public directory: do NOT include phone, address, bank, PAN, Aadhaar, salary.
+- GET /api/employees/:id
+  - Employee can view ONLY their own record (limited fields)
+  - HR can view full record
+  - Manager can view direct reports (limited fields)
+
+B) Implement response sanitization:
+- create server/utils/sanitize.ts with:
+  - sanitizeEmployeeForRole(employee, viewerUser)
+  - sanitizeUserForRole(user, viewerUser)
+Ensure PII fields are removed/masked unless HR_ADMIN.
+
+C) Ensure every route uses sanitize before sending response.
+
+──────────────────────────────────────────────────────────────────────────────
+4) ENFORCE MANAGER SCOPING FOR APPROVALS (or disable manager actions in v1)
+
+CURRENT BUG:
+- Manager endpoints allow approving/rejecting requests not in their team.
+
+REQUIRED FIX:
+A) Add helper:
+- isDirectReport(managerUserId, employeeId) -> boolean
+Use employees.managerId chain.
+
+B) For all approval actions:
+- Leave approval endpoints:
+  - If role=MANAGER: only allow for direct reports
+  - Else if HR: allow
+- Attendance regularization approvals:
+  - Same scoping rule
+- Any “list pending approvals” for managers:
+  - Only return direct reports’ requests
+
+C) If manager approvals not used in v1:
+- Feature flag MANAGER_APPROVALS_ENABLED=false
+- When disabled:
+  - manager cannot approve; only HR_ADMIN/CEO can
+  - manager can see read-only “team visibility” only
+
+──────────────────────────────────────────────────────────────────────────────
+5) FIX ACCOUNT PROVISIONING (stop shared passwords / collisions)
+
+CURRENT BUG:
+- username derived from email local part; may collide.
+- password auto set to EMO@<year> which forces sharing.
+
+REQUIRED FIX:
+- Make login identifier = workEmail (unique)
+- User.username = employee.workEmail (store lowercase)
+- When HR creates employee:
+  - create user in status=INVITED with no password hash set
+  - generate invite token (2 hour expiry) OR long expiry (7 days) configurable
+  - HR can generate invite link (HR-only) and share
+- Employee sets password via invite link.
+- Remove any default password logic.
+
+Also enforce:
+- allowed email domains (emoenergy.in)
+- unique constraints on email
+
+──────────────────────────────────────────────────────────────────────────────
+6) DEPLOYMENT FIXES (must publish successfully)
+
+A) Server listen:
+- Bind HOST=0.0.0.0
+- PORT=process.env.PORT || 5000
+- Ensure start script points to correct built server output.
+
+B) Boot validation:
+- Validate required env vars:
+  - DATABASE_URL
+  - JWT_SECRET
+  - (optional) BOOTSTRAP_TOKEN
+  - (optional) STORAGE keys
+- If missing, log clear error and exit.
+
+C) Production secrets:
+- Ensure Replit Deployment uses Deployment Secrets (not only repl secrets):
+  - DATABASE_URL, JWT_SECRET, NODE_ENV=production
+
+D) Add startup logging + crash handlers:
+- unhandledRejection and uncaughtException logs
+
+──────────────────────────────────────────────────────────────────────────────
+7) CLEANUP
+- Remove any “Demo credentials” UI blocks
+- Remove any “EMO Solutions Pvt Ltd” string; use “EMO Energy” from a central config
+- Ensure no fake data is visible in prod
+
+──────────────────────────────────────────────────────────────────────────────
+DELIVERABLES / ACCEPTANCE TESTS (must pass)
+1) Security:
+- Public forgot-password never returns resetUrl and cannot reset someone else.
+- Only HR can generate reset links.
+- No default admin exists in prod; bootstrap creates first admin only with BOOTSTRAP_TOKEN.
+
+2) RBAC:
+- Employee cannot fetch /api/employees list or any other employee PII.
+- Manager cannot approve non-direct reports.
+
+3) Provisioning:
+- HR creates employee → invite link → employee sets password → can login.
+- No shared default passwords, no username collisions.
+
+4) Deploy:
+- App starts on PORT and publishes successfully.
+- Health endpoint returns OK (add GET /api/health).
+
+IMPLEMENTATION ORDER
+1) Remove seed-on-boot + add bootstrap endpoint
+2) Fix auth reset flow + HR-only link generation
+3) Lock down employee endpoints + add sanitization layer
+4) Add manager scoping + feature flag
+5) Fix provisioning
+6) Deploy hardening + scripts + health endpoint
+Return a summary of code changes and how to test each acceptance test.

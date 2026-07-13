@@ -1,0 +1,199 @@
+REPLIT PROMPT — EMO Employee Hub: Final Hardening + Feature Completion (Top 13+)
+
+You are working on an existing HR web app (“Employee Hub”) for EMO. The app already has basic modules (auth/RBAC, employee records, attendance, leave, settings). Your job is to implement the improvements below as a cohesive v1.0 release. Do NOT add demo shortcuts. Everything must be production-grade for a 200-person org.
+
+NON-NEGOTIABLES
+- Security: enforce RBAC + server-side authorization everywhere (never trust UI role checks).
+- Auditability: sensitive actions must write audit logs with actor + timestamp + reason.
+- Consistency: statuses and terminology must be consistent across UI/API/DB.
+- Deployment safe: app must start on process.env.PORT, bind 0.0.0.0, and validate env vars on boot.
+
+PRIORITY ORDER (build in this order): P0 → P1 → P2
+
+──────────────────────────────────────────────────────────────────────────────
+P0 (Release blockers)
+
+1) Remove all demo credentials + fake admin shortcuts
+- Remove any “demo creds”, hardcoded users, and seeded passwords from UI/README.
+- If you need sample data: keep it behind DEV-only seed scripts and never show passwords in UI.
+
+2) Branding cleanup
+- Replace any “EMO Solutions Pvt Ltd” text with “EMO Energy” (single source of truth).
+- Create a config file for brand name/logo and use it across UI.
+
+3) Identity + Employee ID + @emoenergy.in login provisioning (must be bulletproof)
+Goal: Employee login should be tied to work email identity, with invite/reset onboarding.
+Implement:
+- Enforce allowed email domain list (default: emoenergy.in) for employee logins.
+- Employee ID generation:
+  - Auto-generate employeeCode on employee creation (sequence-based: EMO-0001…)
+  - employeeCode must be immutable once assigned.
+- Account provisioning rules:
+  - HR creates Employee record with workEmail.
+  - System auto-creates User account in “Invited” status if not exists.
+  - Generate invite token (expiry) and send invite OR display link if email not configured.
+  - Employee sets password via invite link (same UX as “forgot password”).
+- Do NOT implement “auto login”. Implement: invite/reset = set password + then login.
+- On employee exit: auto-suspend user login.
+
+Acceptance:
+- A newly added employee can access the system only after invite/reset completes.
+- Work email is unique and is the primary username.
+
+4) Environment + deployment hardening
+- Server must listen on: PORT = process.env.PORT || 5000, host 0.0.0.0
+- Add boot-time env validation with clear errors:
+  - DATABASE_URL, JWT_SECRET, and any required config must be present.
+- Add global error handlers: unhandledRejection + uncaughtException logging.
+
+──────────────────────────────────────────────────────────────────────────────
+P1 (Core HR usability / operations)
+
+5) Employee profile management (HR/admin + self-service boundaries)
+Implement:
+- HR/Admin can fully edit employee records from an Employee Directory → Employee Profile page.
+- Employee self-service edit should be LIMITED (address, emergency contact, phone).
+- Add “Employment History Timeline” tab:
+  - changes to manager/department/band/designation/location should be effective-dated records.
+- Add field-level masking for sensitive fields (Aadhaar/bank) for non-HR roles.
+
+Acceptance:
+- HR can find any employee and edit from a single clear flow.
+- Employees cannot edit restricted fields.
+
+6) Shifts + Assignments + Timetable/Roster (multi-employee admin)
+Implement tables + UI:
+- Shifts: name, start/end, grace mins, weekly-off pattern, overtime rules (optional).
+- Shift Assignments (effective dated): employee_id, shift_id, effective_from/to.
+- Optional roster: per-date overrides for rotating shifts.
+UI:
+- Admin creates shifts.
+- Admin assigns shifts to one employee OR bulk assigns to many employees.
+- Roster/timetable view for week/month for HR and managers.
+Attendance:
+- Late/early must be computed using assigned shift for that day.
+
+7) Company-wide “Drive” (folders/files for org review)
+Implement:
+- Folder hierarchy + permissions:
+  - folders (parent/child)
+  - ACL by role and/or group (view/upload/manage)
+- Company documents separate from employee personal docs.
+- Features: upload, download, search, tags, optional versioning.
+- Support “Policy docs” here as well.
+
+Acceptance:
+- HR can publish files to company drive; employees can view based on permission.
+- Sensitive employee docs remain private.
+
+8) Onboarding module (checklists + accountability)
+Implement:
+- Onboarding templates: tasks owned by HR/IT/Manager with due dates.
+- Onboarding instances per employee auto-created when status = “Joining scheduled” / “Active”.
+- Views:
+  - HR onboarding dashboard (all joiners + task progress)
+  - Manager view (their owned tasks)
+  - Employee view (their tasks)
+
+Acceptance:
+- HR can run onboarding for 5–20 joiners without spreadsheets.
+
+9) Notifications (in-app required, email optional)
+In-app:
+- notifications table: user_id, type, title, body, link, read_at
+Triggers:
+- Leave applied → notify manager
+- Attendance regularization submitted → notify manager
+- Approval/rejection → notify employee
+Email:
+- If SMTP configured, send emails; else show “copy link” fallback.
+
+Acceptance:
+- Managers get an approvals queue + notifications.
+- Employees can see status changes without chasing HR.
+
+10) Status + approval logic (standardize + add timeline)
+Standardize statuses across attendance/leave:
+- Leave: Pending / Approved / Rejected / Cancelled
+- Regularization: Pending / Approved / Rejected / HR Overridden
+Add a status timeline with timestamps + actor notes.
+Important rule:
+- Once payroll for the month is locked, changes that affect LOP are blocked (or require HR unlock).
+
+Acceptance:
+- UI shows consistent chips and history everywhere.
+
+11) “Manager can edit state later” — implement safely
+Do NOT allow silent overwrites.
+Rules:
+- Manager can change decision ONLY while request is Pending.
+- After Approved/Rejected:
+  - Only HR can “Reopen” (mandatory reason + audit log + notification).
+  - Optional: allow manager reversal within a short window (e.g., 2 hours) WITH reason and HR notified.
+- Any override must be audited.
+
+Acceptance:
+- No approval flip-flops without traceability.
+
+──────────────────────────────────────────────────────────────────────────────
+P2 (Scale, governance, quality)
+
+12) Delegation / backup approver
+Implement:
+- Delegation table: from_user, to_user, scope (leave/attendance/expenses), start/end.
+- When manager is OOO, approvals route to delegate.
+- UI to set delegations (HR + manager self service).
+
+13) Bulk import/export + admin tooling
+Implement:
+- Bulk employee import CSV (validate + show row errors, no partial silent failures).
+- Bulk shift assignment import CSV.
+- Export:
+  - Employees list
+  - Attendance monthly report
+  - Leave report (balances + usage)
+- Add an “Admin Tools” page with templates for CSV formats.
+
+14) Policy acknowledgements (compliance-lite)
+Implement:
+- Policy docs (can live in Company Drive) with “Acknowledgement required” flag.
+- Track acknowledgements: employee_id, policy_id, acknowledged_at.
+- HR report: who hasn’t acknowledged.
+
+15) Audit logs & reason-required edits (finish properly)
+Implement:
+- Central audit_logs table:
+  - actor_user_id, action, entity, entity_id, before/after JSON, reason, timestamp
+Require audit + reason for:
+- Salary/CTC edits (if module exists)
+- Leave balance adjustments
+- Attendance manual overrides
+- Unlocking payroll/month locks (if exists)
+- Employee status changes (exit/suspend)
+
+16) Automated tests + basic QA checks (minimum)
+Add tests for:
+- EmployeeCode generation uniqueness
+- Invite/reset token expiry
+- Shift assignment effective-date resolution
+- Approval rules (pending-only manager edits, reopen flow)
+- RBAC “cannot access others’ data” checks
+
+DELIVERABLES
+- DB migrations for new tables + constraints.
+- Updated UI flows for HR/employee/manager.
+- Seed script for DEV only (no demo passwords in UI).
+- Updated README: setup, env vars, deploy notes.
+- A short “Release Checklist” doc:
+  - what to configure (SMTP optional)
+  - how to create first HR admin
+  - how to onboard employees
+  - how to set shifts and policies
+
+IMPLEMENTATION NOTES
+- Keep terminology consistent: “Pending” not “Unapproved”.
+- Prefer effective-dated tables for assignments (shift, manager, department).
+- Never allow edits that change payroll-impacting data after a lock without explicit HR override + audit.
+- Do not break existing attendance/leave flows; refactor carefully with migrations and feature flags if needed.
+
+Now implement these changes. Start with schema + migrations, then API endpoints, then UI, then tests, then deployment hardening. Provide a final summary of what changed and how to test each module end-to-end.

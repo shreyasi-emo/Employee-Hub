@@ -1,0 +1,182 @@
+PROMPT A — HR/Admin Workspace (ATS + HR Ops + Office Admin Ops) with CEO-Only Approvals (v1)
+
+CONTEXT
+We already have Employee Hub (Auth/RBAC, Employee directory, Attendance, Leave, Shifts, Onboarding, Company Drive, Notifications, Audit logs).
+Now add a restricted “HR/Admin Workspace” used by HR + Office Admin + select approvers. This workspace includes:
+1) Recruitment ATS (candidate lifecycle + interview + offers)
+2) HR Ops Control Room (HR internal tasks + calendar + lifecycle deadlines)
+3) Office Admin Ops (procurement requests processing, travel bookings, vendor registry, payment tracker, admin helpdesk queues)
+
+APPROVAL POLICY (v1 hard rule)
+- ALL approvals route to CEO_APPROVER in v1 (single final approver).
+- HR/Recruiter/Office Admin can create/prepare items, but cannot final-approve.
+- Implement the approvals engine so it can be changed later to manager-based or multi-step workflows by configuration (do not hardcode CEO-only into the schema; hardcode only into default config).
+
+ROLES (server-side enforced)
+- HR_ADMIN: full HR modules + configs
+- RECRUITER: ATS + candidate comms + scheduling
+- HR_OPS: onboarding/offboarding + lifecycle tracker + HR tasks/calendar
+- OFFICE_ADMIN: vendor/procurement/travel/payment tracker processing
+- CEO_APPROVER: final approvals inbox for ATS offers, requisitions, procurement, travel, payments
+- INTERVIEWER: view assigned interviews + submit feedback only
+- EMPLOYEE/MANAGER: no access to HR/Admin Workspace unless explicitly assigned (CEO/HR).
+
+NON-NEGOTIABLES
+- Add separate navigation entry “HR/Admin Workspace” visible only to HR/Office Admin/CEO roles.
+- Build ONE generic approval engine used by ATS + procurement + travel + payments.
+- Every entity has an immutable Timeline (event log) with actor/timestamp/action/comments.
+- Reopen/undo requires reason + audit log + notifications.
+- In-app notifications mandatory; email optional fallback.
+
+──────────────────────────────────────────────────────────────────────────────
+PLATFORM CAPABILITY: GENERIC APPROVAL ENGINE (must implement first)
+
+A) DATA MODEL
+- approval_workflows: workflow_id, name, entity_type (requisition/offer/purchase_request/travel_request/payment), is_active
+- approval_steps: step_id, workflow_id, step_order, approver_role (default CEO_APPROVER), required=true
+- approval_requests: id, entity_type, entity_id, workflow_id, current_step_order, status (Pending/Approved/Rejected/ChangesRequested/Cancelled), created_by, created_at
+- approval_decisions: decision_id, approval_request_id, step_order, actor_user_id, decision, comment, decided_at
+Rules:
+- Do not overwrite decisions; append immutable decision records.
+- Entity changes state only based on approval_requests status.
+
+B) API BEHAVIOR
+- Any “submit for approval” creates an approval_request.
+- CEO_APPROVER sees all pending items in a single inbox (filter by entity type).
+- Decision actions: Approve / Reject / RequestChanges (comment required for Reject/RequestChanges).
+- If RequestChanges: entity returns to Draft/NeedsChanges state; creator can resubmit (creates new approval_request or reuses with new cycle—choose one but ensure audit clarity).
+
+C) UI
+- CEO Inbox: unified approvals queue with detail view + decision buttons + timeline.
+- Creator view: shows status, comments, and resubmit button.
+
+──────────────────────────────────────────────────────────────────────────────
+MODULE 1: ATS RECRUITMENT (CEO-only approvals)
+
+A) DATA MODEL
+1) Vendor Registry (Agencies)
+- agencies: agency_id, name, contact person, phone, email, address, GSTIN(optional), notes, status Active/Inactive
+- agency docs folder link in Company Drive (restricted)
+
+2) Requisition
+- req_id, title, dept, location, band/seniority, employment_type, headcount
+- recruiter_id, hiring_team_users (optional watchers)
+- JD rich text + skills tags
+- status: Draft / Submitted / Approved(Open) / Rejected / OnHold / Closed / Filled
+- submission creates approval_request (entity_type=requisition)
+
+3) Candidate
+- candidate_id, name, email, phone, location, notice period, current_ctc, expected_ctc
+- source_type (Referral/Direct/JobBoard/Agency/Campus), agency_id nullable
+- resume_url + attachments
+- dedupe by email/phone; implement merge suggestion flow (HR_ADMIN can merge)
+
+4) Application (candidate ↔ requisition)
+- application_id, candidate_id, req_id
+- pipeline_stage_id, status Active/Rejected/Withdrawn/Hired
+- rejection_reason_code + text
+- last_activity_at, next_followup_at
+- timeline events: stage changes, comm logs, interview events, decisions
+
+5) Pipeline Stages (configurable; default provided)
+Sourced → HR Screen → HR Shortlist → Interview(s) → CEO Review → Offer Draft → Offer Sent → Offer Accepted → Joining Scheduled → Joined → Closed
+- stage SLA days for alerts
+
+6) Interviews + Feedback
+- interviews: application_id, round name, start/end, link/location, status
+- interviewer assignments
+- feedback scorecards: criteria + recommendation; lock after submit; HR_ADMIN can unlock with reason
+
+7) Offer
+- offer: offered role, joining date, manager, location, offered_ctc + optional breakup
+- offer_status: Draft / SubmittedForApproval / Approved / Rejected / Sent / Accepted / Declined / Withdrawn
+- offer submission creates approval_request (entity_type=offer)
+
+8) Prejoin & Conversion
+- prejoin checklist + docs tracking
+- On Joined:
+  - create Employee record + auto employeeCode
+  - create User (Invited) with @emoenergy.in
+  - trigger onboarding tasks instance
+  - link candidate/application history to Employee profile (HR-only “Hiring History” tab)
+
+B) WORKFLOWS
+- Recruiter creates requisition → Submit → CEO approves → status Open
+- Recruiter adds candidate → application created → pipeline movement
+- Interviews scheduled; feedback collected
+- Offer drafted → Submit → CEO approves → send offer letter → accept/decline
+- Offer accepted → prejoin → joined → employee created + invite + onboarding
+
+C) UI (minimum)
+- Requisitions list + create + submit + approval status
+- Requisition detail: pipeline kanban + filters + SLA alerts
+- Candidate profile: resume, timeline, comm log, linked applications
+- Interview scheduler + calendar + feedback forms
+- Offer builder + submit for CEO approval + offer letter generation
+- Analytics: funnel, time-in-stage, source performance, SLA breaches, recruiter workload
+
+D) NOTIFICATIONS
+- Candidate moved stage, interview assigned, feedback pending, offer approved/rejected, joining scheduled
+
+──────────────────────────────────────────────────────────────────────────────
+MODULE 2: HR OPS CONTROL ROOM
+
+A) FEATURES
+- HR team tasks board (Open/InProgress/Blocked/Done) with owners, due dates, reminders
+- HR calendar consolidating: interviews + onboarding + lifecycle deadlines
+- Employee lifecycle tracker: probation/confirmation due dates, document expiry, contract renewals, exits (if enabled)
+- Dashboards: overdue tasks, upcoming deadlines, candidates stuck in stage, approvals pending with CEO
+
+B) UI
+- HR tasks (my/team/overdue)
+- HR calendar (week/month)
+- lifecycle dashboard (due in 7/30/60 days)
+- candidate follow-up dashboard (next_followup_at)
+
+──────────────────────────────────────────────────────────────────────────────
+MODULE 3: OFFICE ADMIN OPS (CEO-only approvals)
+
+A) DATA MODEL
+1) Vendor Registry (general)
+- vendors: vendor_id, category (travel/procurement/office/IT/logistics/etc), contact info, GSTIN, payment terms, docs folder link, status
+- vendor bank details restricted to Office Admin + Finance
+
+2) Purchase Requests (PR) — processing side
+- purchase_requests: pr_id, requester, dept/cost_center, category, items (desc/qty/link), est_cost, needed_by_date
+- status: Draft/Submitted/PendingCEO/Approved/Rejected/Ordered/Received/Closed
+- Submit creates approval_request (entity_type=purchase_request)
+- After CEO approval, Office Admin can mark Ordered/Received and attach invoice/PO
+
+3) Travel Requests + Bookings
+- travel_requests: purpose, from/to, dates, preferences, est_budget
+- status: Draft/Submitted/PendingCEO/Approved/Rejected/Booked/Completed/Closed
+- Submit creates approval_request (entity_type=travel_request)
+- booking records: flight/train/hotel/cab, vendor, PNR/ticket, costs, invoices, payment reference
+
+4) Payment Tracker (Finance comms layer)
+- payments: related_entity, vendor_id, amount, due_date, invoices links
+- status: Requested/Submitted/PendingCEO/Approved/SentToFinance/Processing/Paid/Rejected/Hold
+- Submit creates approval_request (entity_type=payment)
+- Finance updates Processing/Paid and adds payment reference
+
+5) Admin Helpdesk Queue (Ops)
+- admin_tickets: category, description, priority, owner, status, SLA, comments, attachments
+
+B) UI
+- Office Admin dashboard: queues for PR, travel, tickets, payments
+- Vendor management
+- Booking management
+- Payment tracker with aging filters
+- CEO approvals inbox uses the generic engine (do not build separate approval views)
+
+──────────────────────────────────────────────────────────────────────────────
+GLOBAL REQUIREMENTS
+- Company Drive: store offer letters, invoices, tickets attachments with folder ACL.
+- Audit logs for: approvals decisions, reopens, offer edits after submission, vendor bank edits, payment status edits.
+- Exports: ATS reports, PR/travel/payment aging, vendor spend summary.
+- Tests: RBAC + approval engine + timeline immutability + conversion to employee.
+
+DELIVERABLES
+- HR/Admin Workspace fully working with ATS + HR Ops + Office Admin Ops
+- CEO inbox for all approvals across modules
+- Future-ready config to change workflow later (managers/multi-step) without schema rewrite

@@ -1,0 +1,483 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth, isHR } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { Clock, Plus, Trash2, Users, Calendar, X } from "lucide-react";
+import { format, addDays, startOfWeek } from "date-fns";
+
+const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function ShiftFormDialog({ open, onOpenChange, editShift }: { open: boolean; onOpenChange: (v: boolean) => void; editShift?: any }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [weeklyOff, setWeeklyOff] = useState<string[]>(editShift?.weeklyOff || ["saturday", "sunday"]);
+  const [form, setForm] = useState({
+    name: editShift?.name || "",
+    startTime: editShift?.startTime || "09:00",
+    endTime: editShift?.endTime || "18:00",
+    graceMinutes: editShift?.graceMinutes ?? 10,
+    description: editShift?.description || "",
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => editShift
+      ? apiRequest("PUT", `/api/shifts/${editShift.id}`, data)
+      : apiRequest("POST", "/api/shifts", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/shifts"] });
+      toast({ title: editShift ? "Shift updated" : "Shift created" });
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const toggleDay = (day: string) => {
+    setWeeklyOff(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{editShift ? "Edit Shift" : "Create Shift"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Shift Name *</label>
+            <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="mt-1" placeholder="e.g. General Shift" data-testid="input-shift-name" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium">Start Time *</label>
+              <Input type="time" value={form.startTime} onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))} className="mt-1" data-testid="input-shift-start" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">End Time *</label>
+              <Input type="time" value={form.endTime} onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))} className="mt-1" data-testid="input-shift-end" />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Grace Period (minutes)</label>
+            <Input type="number" value={form.graceMinutes} onChange={e => setForm(f => ({ ...f, graceMinutes: parseInt(e.target.value) || 0 }))} className="mt-1" min={0} max={60} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Weekly Off Days</label>
+            <div className="flex flex-wrap gap-1.5">
+              {DAYS.map((day, i) => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleDay(day)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${weeklyOff.includes(day) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}
+                  data-testid={`toggle-day-${day}`}
+                >
+                  {SHORT_DAYS[i]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Description</label>
+            <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="mt-1" placeholder="Optional notes" />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button
+              onClick={() => mutation.mutate({ ...form, weeklyOff })}
+              disabled={mutation.isPending || !form.name || !form.startTime || !form.endTime}
+              data-testid="button-submit-shift"
+            >
+              {mutation.isPending ? "Saving..." : editShift ? "Update" : "Create Shift"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AssignShiftDialog({ open, onOpenChange, employees, shifts }: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  employees: any[];
+  shifts: any[];
+}) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [form, setForm] = useState({ employeeId: "", shiftId: "", effectiveFrom: "", effectiveTo: "" });
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => bulkMode
+      ? apiRequest("POST", "/api/shift-assignments/bulk", { employeeIds: selectedEmployees, ...data })
+      : apiRequest("POST", "/api/shift-assignments", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/shift-assignments"] });
+      toast({ title: bulkMode ? `Shift assigned to ${selectedEmployees.length} employees` : "Shift assigned" });
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const toggleEmployee = (id: string) => {
+    setSelectedEmployees(prev => prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]);
+  };
+
+  const handleSubmit = () => {
+    const data = {
+      shiftId: form.shiftId,
+      effectiveFrom: form.effectiveFrom,
+      effectiveTo: form.effectiveTo || undefined,
+    };
+    if (bulkMode) {
+      if (selectedEmployees.length === 0) return toast({ title: "Select at least one employee", variant: "destructive" });
+      mutation.mutate(data);
+    } else {
+      mutation.mutate({ ...data, employeeId: form.employeeId });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Assign Shift</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${!bulkMode ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+              onClick={() => setBulkMode(false)}
+            >Single Employee</button>
+            <button
+              type="button"
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${bulkMode ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+              onClick={() => setBulkMode(true)}
+            >Bulk Assign</button>
+          </div>
+
+          {bulkMode ? (
+            <div>
+              <label className="text-sm font-medium">Select Employees ({selectedEmployees.length} selected)</label>
+              <div className="mt-1 border border-border rounded-md divide-y divide-border max-h-40 overflow-y-auto">
+                {employees.map(e => (
+                  <label key={e.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50">
+                    <input type="checkbox" checked={selectedEmployees.includes(e.id)} onChange={() => toggleEmployee(e.id)} className="rounded" />
+                    <span className="text-sm">{e.firstName} {e.lastName}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">{e.employeeCode}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="text-sm font-medium">Employee</label>
+              <Select value={form.employeeId} onValueChange={v => setForm(f => ({ ...f, employeeId: v }))}>
+                <SelectTrigger className="mt-1" data-testid="select-assign-employee">
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map(e => (
+                    <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.employeeCode})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div>
+            <label className="text-sm font-medium">Shift</label>
+            <Select value={form.shiftId} onValueChange={v => setForm(f => ({ ...f, shiftId: v }))}>
+              <SelectTrigger className="mt-1" data-testid="select-shift">
+                <SelectValue placeholder="Select shift" />
+              </SelectTrigger>
+              <SelectContent>
+                {shifts.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.name} ({s.startTime} – {s.endTime})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium">Effective From *</label>
+              <Input type="date" value={form.effectiveFrom} onChange={e => setForm(f => ({ ...f, effectiveFrom: e.target.value }))} className="mt-1" data-testid="input-effective-from" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Effective To</label>
+              <Input type="date" value={form.effectiveTo} onChange={e => setForm(f => ({ ...f, effectiveTo: e.target.value }))} className="mt-1" />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={mutation.isPending || !form.shiftId || !form.effectiveFrom}
+              data-testid="button-submit-assignment"
+            >
+              {mutation.isPending ? "Assigning..." : "Assign Shift"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function ShiftsPage() {
+  const { data: auth } = useAuth();
+  const user = auth?.user;
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [showCreate, setShowCreate] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
+  const [editShift, setEditShift] = useState<any>(null);
+
+  const { data: shifts = [], isLoading: shiftsLoading } = useQuery<any[]>({ queryKey: ["/api/shifts"] });
+  const { data: assignments = [], isLoading: assignLoading } = useQuery<any[]>({ queryKey: ["/api/shift-assignments"] });
+  const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"] });
+
+  const deleteShift = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/shifts/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/shifts"] }); toast({ title: "Shift deleted" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteAssignment = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/shift-assignments/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/shift-assignments"] }); toast({ title: "Assignment removed" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const hrUser = isHR(user!);
+
+  // Roster: current week
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  const getEmployeeAssignment = (empId: string, date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return assignments.find((a: any) => {
+      if (a.employeeId !== empId) return false;
+      if (a.effectiveFrom > dateStr) return false;
+      if (a.effectiveTo && a.effectiveTo < dateStr) return false;
+      return true;
+    });
+  };
+
+  return (
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Shifts & Assignments</h1>
+          <p className="text-sm text-muted-foreground">{shifts.length} shifts defined</p>
+        </div>
+        {hrUser && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowAssign(true)} data-testid="button-assign-shift">
+              <Users className="h-4 w-4 mr-2" /> Assign Shift
+            </Button>
+            <Button onClick={() => setShowCreate(true)} data-testid="button-create-shift">
+              <Plus className="h-4 w-4 mr-2" /> Create Shift
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <Tabs defaultValue="shifts">
+        <TabsList>
+          <TabsTrigger value="shifts" data-testid="tab-shifts">Shift Definitions</TabsTrigger>
+          <TabsTrigger value="assignments" data-testid="tab-assignments">Assignments</TabsTrigger>
+          <TabsTrigger value="roster" data-testid="tab-roster">Weekly Roster</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="shifts" className="mt-4">
+          {shiftsLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1,2,3].map(i => <Skeleton key={i} className="h-40" />)}
+            </div>
+          ) : shifts.length === 0 ? (
+            <div className="text-center py-16">
+              <Clock className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">No shifts defined</h3>
+              {hrUser && <Button className="mt-4" onClick={() => setShowCreate(true)}>Create First Shift</Button>}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {shifts.map((shift: any) => (
+                <Card key={shift.id} className="hover-elevate" data-testid={`shift-${shift.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Clock className="h-4 w-4 text-primary" />
+                      </div>
+                      {hrUser && (
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditShift(shift); setShowCreate(true); }} data-testid={`button-edit-shift-${shift.id}`}>
+                            <span className="text-xs">✏️</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                            onClick={() => window.confirm(`Delete "${shift.name}"?`) && deleteShift.mutate(shift.id)}
+                            data-testid={`button-delete-shift-${shift.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3">
+                      <p className="font-semibold text-foreground">{shift.name}</p>
+                      <p className="text-sm text-muted-foreground">{shift.startTime} – {shift.endTime}</p>
+                      {shift.graceMinutes > 0 && (
+                        <p className="text-xs text-muted-foreground">{shift.graceMinutes}min grace</p>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {DAYS.map((day, i) => (
+                        <span key={day} className={`text-xs px-1.5 py-0.5 rounded ${shift.weeklyOff?.includes(day) ? "bg-destructive/10 text-destructive" : "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"}`}>
+                          {SHORT_DAYS[i]}
+                        </span>
+                      ))}
+                    </div>
+                    {shift.description && <p className="text-xs text-muted-foreground mt-2">{shift.description}</p>}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="assignments" className="mt-4">
+          {assignLoading ? (
+            <div className="space-y-2">{[1,2,3,4].map(i => <Skeleton key={i} className="h-14" />)}</div>
+          ) : assignments.length === 0 ? (
+            <div className="text-center py-16">
+              <Users className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">No shift assignments</h3>
+              {hrUser && <Button className="mt-4" onClick={() => setShowAssign(true)}>Assign Shift</Button>}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Shift</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Effective From</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Effective To</th>
+                    {hrUser && <th className="w-10" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {assignments.map((a: any) => {
+                    const emp = employees.find((e: any) => e.id === a.employeeId);
+                    const shift = shifts.find((s: any) => s.id === a.shiftId);
+                    return (
+                      <tr key={a.id} className="hover:bg-muted/20 transition-colors" data-testid={`assignment-${a.id}`}>
+                        <td className="px-4 py-3">{emp ? `${emp.firstName} ${emp.lastName}` : a.employeeId}</td>
+                        <td className="px-4 py-3">
+                          {shift ? (
+                            <div>
+                              <span className="font-medium">{shift.name}</span>
+                              <span className="text-muted-foreground ml-2 text-xs">{shift.startTime}–{shift.endTime}</span>
+                            </div>
+                          ) : a.shiftId}
+                        </td>
+                        <td className="px-4 py-3">{a.effectiveFrom}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{a.effectiveTo || "—"}</td>
+                        {hrUser && (
+                          <td className="px-2 py-3">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                              onClick={() => deleteAssignment.mutate(a.id)}
+                              data-testid={`button-remove-assignment-${a.id}`}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="roster" className="mt-4">
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm min-w-[700px]">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground w-48">Employee</th>
+                  {weekDays.map(d => (
+                    <th key={d.toISOString()} className="px-3 py-3 text-center font-medium text-muted-foreground min-w-20">
+                      <div>{format(d, "EEE")}</div>
+                      <div className="text-xs font-normal">{format(d, "d MMM")}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {employees.map((emp: any) => (
+                  <tr key={emp.id} className="hover:bg-muted/20">
+                    <td className="px-4 py-2">
+                      <div className="font-medium text-sm">{emp.firstName} {emp.lastName}</div>
+                      <div className="text-xs text-muted-foreground">{emp.employeeCode}</div>
+                    </td>
+                    {weekDays.map(day => {
+                      const assignment = getEmployeeAssignment(emp.id, day);
+                      const shift = assignment ? shifts.find((s: any) => s.id === assignment.shiftId) : null;
+                      const dayName = DAYS[day.getDay()];
+                      const isOff = shift?.weeklyOff?.includes(dayName);
+                      return (
+                        <td key={day.toISOString()} className="px-2 py-2 text-center">
+                          {shift ? (
+                            isOff ? (
+                              <span className="text-xs text-muted-foreground">Off</span>
+                            ) : (
+                              <Badge className="text-xs bg-primary/10 text-primary hover:bg-primary/10 border-0">
+                                {shift.name.slice(0, 8)}
+                              </Badge>
+                            )
+                          ) : (
+                            <span className="text-xs text-muted-foreground/40">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">Week of {format(weekStart, "MMM d, yyyy")}</p>
+        </TabsContent>
+      </Tabs>
+
+      {showCreate && (
+        <ShiftFormDialog
+          open={showCreate}
+          onOpenChange={(v) => { setShowCreate(v); if (!v) setEditShift(null); }}
+          editShift={editShift}
+        />
+      )}
+      <AssignShiftDialog open={showAssign} onOpenChange={setShowAssign} employees={employees} shifts={shifts} />
+    </div>
+  );
+}

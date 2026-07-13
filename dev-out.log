@@ -1,0 +1,12 @@
+
+> rest-express@1.0.0 dev
+> cross-env NODE_ENV=development tsx server/index.ts
+
+12:03:24 PM [express] Starting EMO Employee Hub...
+[Scheduler] Monthly leave accrual cron registered (runs 1st of each month)
+[Scheduler] Zoho sync cron registered (every 2 minutes)
+12:03:25 PM [express] serving on port 5000
+12:04:01 PM [express] GET /api/auth/me 401 in 8ms :: {"error":"Not authenticated"}
+12:04:03 PM [express] GET /api/auth/google 500 in 2ms
+12:04:08 PM [express] GET /api/auth/me 401 in 2ms :: {"error":"Not authenticated"}
+12:05:12 PM [express] GET /api/auth/me 401 in 0ms :: {"error":"Not authenticated"}
