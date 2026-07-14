@@ -33,7 +33,6 @@ import {
   isSameMonth, isSameDay, addMonths, subMonths, addDays, startOfDay, endOfDay,
 } from "date-fns";
 
-const CAP = 4; // company car seats
 const WIN_START = 7;   // booking window 7:00 AM
 const WIN_END = 19;    // 7:00 PM
 const BLOCK = 3;       // intra-city bookings occupy 3-hour blocks

@@ -25,6 +25,16 @@ function requireCEO(req: Request, res: Response, next: NextFunction) {
   return res.status(403).json({ error: "CEO access required" });
 }
 
+// The vehicle booking window is evaluated in India Standard Time (UTC+5:30, no DST) so it
+// behaves identically regardless of the timezone the server process runs in.
+const IST_OFFSET_MS = 330 * 60000;
+// The UTC instant of a given IST wall-clock hour on the same IST calendar day as `ref`.
+function istBoundary(ref: Date, hour: number): Date {
+  const ist = new Date(ref.getTime() + IST_OFFSET_MS);
+  ist.setUTCHours(hour, 0, 0, 0);
+  return new Date(ist.getTime() - IST_OFFSET_MS);
+}
+
 export function registerV2Routes(app: Express) {
 
   // =========================================================================
@@ -172,8 +182,8 @@ export function registerV2Routes(app: Express) {
 
       // Booking window is fixed 7:00 AM – 7:00 PM.
       const W_START = 7, W_END = 19, BLOCK = 3;
-      const dayStart = new Date(start); dayStart.setHours(W_START, 0, 0, 0);
-      const dayEnd = new Date(start); dayEnd.setHours(W_END, 0, 0, 0);
+      const dayStart = istBoundary(start, W_START);
+      const dayEnd = istBoundary(start, W_END);
       if (start < dayStart || end > dayEnd) return res.status(400).json({ error: "Bookings must be between 7:00 AM and 7:00 PM." });
 
       const tripType = b.tripType === "inter_city" ? "inter_city" : "intra_city";
@@ -315,8 +325,8 @@ export function registerV2Routes(app: Express) {
       if (isNaN(+start) || isNaN(+end) || !(start < end)) return res.status(400).json({ error: "Please provide a valid start and end time." });
       if (start.getTime() < Date.now()) return res.status(400).json({ error: "Bookings can't start in the past — pick a future time." });
       const W_START = 7, W_END = 19, BLOCK = 3;
-      const dayStart = new Date(start); dayStart.setHours(W_START, 0, 0, 0);
-      const dayEnd = new Date(start); dayEnd.setHours(W_END, 0, 0, 0);
+      const dayStart = istBoundary(start, W_START);
+      const dayEnd = istBoundary(start, W_END);
       if (start < dayStart || end > dayEnd) return res.status(400).json({ error: "Bookings must be between 7:00 AM and 7:00 PM." });
       const attendees = Array.isArray(b.attendees) ? b.attendees : (bk.attendees as any[]) || [];
       const patch: any = {
@@ -397,13 +407,24 @@ export function registerV2Routes(app: Express) {
   // =========================================================================
   // Approval stages: submitted -> (Finance) finance_approved -> (CEO) approved
   // Finance does individual review; only the CEO gives final approval (super_admin excluded).
-  const FINANCE_ROLES = ["finance", "hr_admin"];
+  const FINANCE_ROLES = ["finance"];
   const CEO_FINAL_ROLES = ["ceo_approver"];
+
+  // The claim total is always derived from the line items server-side — never trust a
+  // client-sent total (the form auto-sums for UX, but the API can be called directly).
+  // Rounded to 2dp to match the numeric(12,2) column and avoid float drift.
+  const sumLines = (lines: any): string => {
+    const total = (Array.isArray(lines) ? lines : []).reduce((s: number, l: any) => s + (Number(l?.amount) || 0), 0);
+    return (Math.round(total * 100) / 100).toFixed(2);
+  };
+  // super_admin can act at either approval stage as an emergency override (normally it won't).
+  const canFinanceStage = (r: Request) => hasRole(r, "super_admin", ...FINANCE_ROLES);
+  const canCeoStage = (r: Request) => hasRole(r, "super_admin", ...CEO_FINAL_ROLES);
 
   app.get("/api/reimbursements", requireAuth, async (req, res) => {
     // Finance + CEO + admin can see all claims; everyone else sees only their own.
     // `?mine=true` forces own-only regardless of role (used by the My Requests page).
-    const isApprover = hasRole(req, "super_admin", "finance", "hr_admin", "ceo_approver");
+    const isApprover = hasRole(req, "super_admin", "finance", "ceo_approver");
     const mineOnly = req.query.mine === "true" || req.query.mine === "1";
     const filters: any = {};
     if (!isApprover || mineOnly) filters.requesterId = req.currentUser!.id;
@@ -414,7 +435,7 @@ export function registerV2Routes(app: Express) {
   app.get("/api/reimbursements/:id", requireAuth, async (req, res) => {
     const r = await storage.getReimbursement(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    const isApprover = hasRole(req, "super_admin", "finance", "hr_admin", "ceo_approver");
+    const isApprover = hasRole(req, "super_admin", "finance", "ceo_approver");
     if (!isApprover && r.requesterId !== req.currentUser!.id) return res.status(403).json({ error: "Forbidden" });
     res.json(r);
   });
@@ -441,10 +462,12 @@ export function registerV2Routes(app: Express) {
   app.post("/api/reimbursements", requireAuth, async (req, res) => {
     // Server stamps the claimant snapshot so it's authoritative for approvers.
     const ctx = await reimbursementContext(req.currentUser!.id, req.currentUser!.username);
-    const created = await storage.createReimbursement({ ...req.body, ...ctx, requesterId: req.currentUser!.id, status: "submitted" });
+    // Total is recomputed from the lines here so it can't be forged via a direct API call.
+    const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    const created = await storage.createReimbursement({ ...req.body, ...ctx, lines, totalAmount: sumLines(lines), requesterId: req.currentUser!.id, status: "submitted" });
     try {
       const amt = Number(created.totalAmount || 0).toLocaleString("en-IN");
-      await storage.notifyByRole(["finance", "hr_admin", "super_admin"], {
+      await storage.notifyByRole(["finance", "super_admin"], {
         type: "reimbursement_submitted", title: "New Reimbursement to Review",
         body: `${created.reference} (${ctx.employeeName || "Employee"}, ₹${amt}) submitted for finance review.`,
         link: "/my-approvals",
@@ -462,7 +485,7 @@ export function registerV2Routes(app: Express) {
     const note = req.body?.note || null;
 
     if (r.status === "submitted") {
-      if (!hasRole(req, ...FINANCE_ROLES)) return res.status(403).json({ error: "Finance approval required" });
+      if (!canFinanceStage(req)) return res.status(403).json({ error: "Finance approval required" });
       const updated = await storage.updateReimbursement(req.params.id, {
         status: "finance_approved", financeApprovedById: req.currentUser!.id, financeNote: note, financeDecisionAt: new Date(),
       });
@@ -474,7 +497,7 @@ export function registerV2Routes(app: Express) {
     }
 
     if (r.status === "finance_approved") {
-      if (!hasRole(req, ...CEO_FINAL_ROLES)) return res.status(403).json({ error: "CEO approval required" });
+      if (!canCeoStage(req)) return res.status(403).json({ error: "CEO approval required" });
       const updated = await storage.updateReimbursement(req.params.id, {
         status: "approved", approvedById: req.currentUser!.id, decisionNote: note,
       });
@@ -505,13 +528,13 @@ export function registerV2Routes(app: Express) {
     };
 
     if (r.status === "submitted") {
-      if (!hasRole(req, ...FINANCE_ROLES)) return res.status(403).json({ error: "Finance access required" });
+      if (!canFinanceStage(req)) return res.status(403).json({ error: "Finance access required" });
       const u = await storage.updateReimbursement(req.params.id, { status: "rejected", financeApprovedById: req.currentUser!.id, financeNote: note, financeDecisionAt: new Date(), decisionNote: note });
       await notifyRejected("Finance");
       return res.json(u);
     }
     if (r.status === "finance_approved") {
-      if (!hasRole(req, ...CEO_FINAL_ROLES)) return res.status(403).json({ error: "CEO access required" });
+      if (!canCeoStage(req)) return res.status(403).json({ error: "CEO access required" });
       const u = await storage.updateReimbursement(req.params.id, { status: "rejected", approvedById: req.currentUser!.id, decisionNote: note });
       await notifyRejected("CEO");
       return res.json(u);
@@ -538,9 +561,9 @@ export function registerV2Routes(app: Express) {
     const fields: string[] = Array.isArray(req.body?.fields) ? req.body.fields : [];
     const lines: number[] = Array.isArray(req.body?.lines) ? req.body.lines : [];
     if (r.status === "submitted") {
-      if (!hasRole(req, ...FINANCE_ROLES)) return res.status(403).json({ error: "Finance access required" });
+      if (!canFinanceStage(req)) return res.status(403).json({ error: "Finance access required" });
     } else if (r.status === "finance_approved") {
-      if (!hasRole(req, ...CEO_FINAL_ROLES)) return res.status(403).json({ error: "CEO access required" });
+      if (!canCeoStage(req)) return res.status(403).json({ error: "CEO access required" });
     } else {
       return res.status(400).json({ error: `Cannot request changes on a reimbursement in '${r.status}' state` });
     }
@@ -575,7 +598,7 @@ export function registerV2Routes(app: Express) {
     if (r.status !== "changes_requested") return res.status(400).json({ error: "Only claims with requested changes can be resubmitted." });
     const b = req.body || {};
     const lines = Array.isArray(b.lines) ? b.lines : r.lines;
-    const total = b.totalAmount != null ? String(b.totalAmount) : String((lines as any[]).reduce((s, l: any) => s + (Number(l.amount) || 0), 0));
+    const total = sumLines(lines); // always derived server-side — ignore any client-sent total
     // Carry the original snapshot + scope forward so the approver sees what changed.
     let prev: any = {};
     try { prev = JSON.parse(r.notes || "{}"); } catch {}
@@ -593,7 +616,7 @@ export function registerV2Routes(app: Express) {
       decisionNote: null,
     });
     try {
-      await storage.notifyByRole(["finance", "hr_admin", "super_admin"], {
+      await storage.notifyByRole(["finance", "super_admin"], {
         type: "reimbursement_submitted", title: "Reimbursement Resubmitted",
         body: `${r.reference} (${r.employeeName || "Employee"}) was updated and resubmitted for finance review.`,
         link: "/my-approvals",

@@ -80,8 +80,8 @@ export default function CompanyWorkspacePage() {
   const canTeam = isManager(user!);
   const role = user?.role;
   const isApprover = !!role && ["super_admin", "ceo_approver"].includes(role); // CEO-domain: service requests, logistics, vehicles
-  const canFinanceReimb = !!role && ["finance", "hr_admin"].includes(role);     // Finance-stage reimbursement review (individual only)
-  const canCeoReimb = role === "ceo_approver";                                   // final reimbursement approval (+ bulk) — CEO only
+  const canFinanceReimb = role === "finance" || role === "super_admin";         // Finance-stage review (finance; super_admin as emergency override)
+  const canCeoReimb = role === "ceo_approver" || role === "super_admin";         // final approval (+ bulk) — CEO; super_admin as emergency override
   const canReimbApprove = canFinanceReimb || canCeoReimb;
   const canApprove = isApprover || canReimbApprove;
 
