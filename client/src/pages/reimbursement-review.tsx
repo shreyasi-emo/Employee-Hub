@@ -18,8 +18,8 @@ export default function ReimbursementReviewPage() {
 
   const { data: reimb, isLoading } = useQuery<any>({ queryKey: [`/api/reimbursements/${id}`], enabled: !!id });
 
-  const canFinance = role === "finance" || role === "hr_admin";
-  const canCeo = role === "ceo_approver";
+  const canFinance = role === "finance" || role === "super_admin";
+  const canCeo = role === "ceo_approver" || role === "super_admin";
   const notOwn = reimb && reimb.requesterId !== auth?.user?.id;
   const canAct = !!reimb && !!notOwn && ((reimb.status === "submitted" && canFinance) || (reimb.status === "finance_approved" && canCeo));
 
