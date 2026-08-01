@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { storage, DEFAULT_LEAVE_BALANCES } from "./storage";
-import { hashPassword } from "./auth";
+import { hashPassword } from "./shared/auth";
 import {
   users, employees, departments, designations, leaveTypes,
   leaveBalances, holidays, statutoryConfig, announcements, assets, payrollRuns, payslips,

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateInput } from "@/components/datetime-field";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar as CalendarGrid } from "@/components/ui/calendar";
@@ -81,7 +82,7 @@ function HolidayDialog({ open, onOpenChange, holiday, defaultYear }: { open: boo
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Date *</Label>
-              <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} data-testid="input-holiday-date" />
+              <DateInput value={form.date} onChange={(v) => setForm((f) => ({ ...f, date: v }))} testId="input-holiday-date" />
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>

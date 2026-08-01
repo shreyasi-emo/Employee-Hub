@@ -43,6 +43,19 @@ const EMP_STATUSES = [
   { value: "exited", label: "Exited" },
 ];
 const GENDERS = [{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }];
+const SYSTEM_ROLES = [
+  { value: "employee", label: "Employee" },
+  { value: "manager", label: "Manager" },
+  { value: "hr_executive", label: "HR Executive" },
+  { value: "hr_admin", label: "HR Admin" },
+  { value: "hr_ops", label: "HR Ops" },
+  { value: "recruiter", label: "Recruiter" },
+  { value: "interviewer", label: "Interviewer" },
+  { value: "office_admin", label: "Office Admin" },
+  { value: "finance", label: "Finance" },
+  { value: "ceo_approver", label: "CEO Approver" },
+  { value: "super_admin", label: "Super Admin" },
+];
 const MARITAL = [{ value: "single", label: "Single" }, { value: "married", label: "Married" }, { value: "divorced", label: "Divorced" }, { value: "widowed", label: "Widowed" }];
 const typeLabel = (v: string) => EMP_TYPES.find((t) => t.value === v)?.label || v;
 const INSIGHT_COLORS = ["#206295", "#4BDCD9", "#425B8D", "#FFA962", "#FF6F62", "#6A7366", "#94A3B8", "#2F80B8"];
@@ -130,7 +143,7 @@ function SelectWithAddNew({ value, onChange, options, placeholder, onCreate, tes
 const emptyForm = {
   firstName: "", lastName: "", email: "", phone: "", dateOfBirth: "", gender: "", maritalStatus: "",
   joinDate: new Date().toISOString().split("T")[0], confirmationDate: "", employmentType: "full_time", employmentStatus: "active",
-  departmentId: "", designationId: "", managerId: "", workLocation: "", noticePeriodDays: "", probationDays: "",
+  departmentId: "", designationId: "", managerId: "", workLocation: "", noticePeriodDays: "", probationDays: "", systemRole: "employee",
   panNumber: "", aadhaarMasked: "", uan: "", pfEligible: true, esiEligible: false,
   bankName: "", bankAccountMasked: "", ifscCode: "", currentAddress: "", permanentAddress: "",
   emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelation: "",
@@ -139,7 +152,7 @@ const formSchema = z.object({
   firstName: z.string().min(1, "Required"), lastName: z.string().min(1, "Required"), email: z.string().email("Valid email required"),
   phone: z.string().optional(), dateOfBirth: z.string().optional(), gender: z.string().optional(), maritalStatus: z.string().optional(),
   joinDate: z.string().min(1, "Required"), confirmationDate: z.string().optional(), employmentType: z.string(), employmentStatus: z.string(),
-  departmentId: z.string().optional(), designationId: z.string().optional(), managerId: z.string().optional(), workLocation: z.string().optional(),
+  departmentId: z.string().optional(), designationId: z.string().optional(), managerId: z.string().optional(), workLocation: z.string().optional(), systemRole: z.string().optional(),
   noticePeriodDays: z.string().optional(), probationDays: z.string().optional(),
   panNumber: z.string().optional(), aadhaarMasked: z.string().optional(), uan: z.string().optional(),
   pfEligible: z.boolean(), esiEligible: z.boolean(),
@@ -172,6 +185,10 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { data: auth } = useAuth();
+  const viewerRole = auth?.user?.role;
+  const canManageRoles = !!auth?.user && (viewerRole === "super_admin" || isHR(auth.user));
+  const roleOptions = SYSTEM_ROLES.filter((r) => r.value !== "super_admin" || viewerRole === "super_admin");
   const isEdit = !!employee;
   const [created, setCreated] = useState<{ name: string; email: string } | null>(null);
   const [customLocations, setCustomLocations] = useState<string[]>(() => loadLocations());
@@ -260,6 +277,11 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
                 <FormField control={form.control} name="workLocation" render={({ field }) => (<FormItem><FormLabel>Location</FormLabel><SelectWithAddNew value={field.value} onChange={field.onChange} placeholder="Select location" testId="select-location" options={locations.map((l) => ({ value: l, label: l }))} onCreate={(name) => { if (!locations.includes(name)) { const next = [...customLocations, name]; setCustomLocations(next); try { localStorage.setItem(LOCATIONS_KEY, JSON.stringify(next)); } catch {} } return name; }} /></FormItem>)} />
                 <FormField control={form.control} name="managerId" render={({ field }) => (<FormItem><FormLabel>Manager</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger></FormControl><SelectContent>{managerOptions.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select></FormItem>)} />
               </div>
+              {canManageRoles && (
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField control={form.control} name="systemRole" render={({ field }) => (<FormItem><FormLabel>System Role</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger data-testid="select-system-role"><SelectValue placeholder="Employee" /></SelectTrigger></FormControl><SelectContent>{roleOptions.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent></Select><p className="text-[11px] text-muted-foreground mt-1">Controls what this person can access in the app.</p></FormItem>)} />
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={form.control} name="employmentType" render={({ field }) => (<FormItem><FormLabel>Employment Type</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{EMP_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                 <FormField control={form.control} name="employmentStatus" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{EMP_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select></FormItem>)} />

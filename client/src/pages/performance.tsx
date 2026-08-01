@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/datetime-field";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
@@ -158,7 +159,7 @@ function GoalDialog({ open, onClose, cycleId, goal, employees }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Due Date</Label>
-              <Input data-testid="input-goal-due" type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
+              <DateInput testId="input-goal-due" value={form.dueDate} onChange={v => setForm(f => ({ ...f, dueDate: v }))} />
             </div>
             <div>
               <Label>Status</Label>
@@ -801,11 +802,11 @@ function CyclesTab({ onSelectCycle }: { onSelectCycle: (id: string) => void }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Start Date *</Label>
-                <Input data-testid="input-cycle-start" type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} />
+                <DateInput testId="input-cycle-start" value={form.startDate} onChange={v => setForm(f => ({ ...f, startDate: v }))} />
               </div>
               <div>
                 <Label>End Date *</Label>
-                <Input data-testid="input-cycle-end" type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} />
+                <DateInput testId="input-cycle-end" value={form.endDate} onChange={v => setForm(f => ({ ...f, endDate: v }))} />
               </div>
             </div>
             <div className="space-y-2">

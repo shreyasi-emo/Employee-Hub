@@ -16,7 +16,11 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Plane, Plus, Calendar, Clock, Info, Search, FileText, CheckCircle2, XCircle, Pencil,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfDay } from "date-fns";
+import { DateField } from "@/components/datetime-field";
+
+// "yyyy-MM-dd" string → local Date (avoids the UTC shift of new Date("yyyy-MM-dd")).
+const parseYmd = (s?: string): Date | undefined => { if (!s) return undefined; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 
 const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
   pending: { label: "Pending", bg: "bg-[#FFA962]/20", text: "text-[#FFA962]" },
@@ -118,11 +122,21 @@ function ApplyLeaveDialog({ open, onOpenChange, employeeId, leaveTypes, leaveBal
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium">Start Date *</label>
-              <Input type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} className="mt-1" data-testid="input-start-date" />
+              <div className="mt-1">
+                <DateField value={parseYmd(form.startDate)} onChange={(d) => setForm((f) => ({ ...f, startDate: format(d, "yyyy-MM-dd"), endDate: f.endDate && f.endDate < format(d, "yyyy-MM-dd") ? format(d, "yyyy-MM-dd") : f.endDate }))} disabled={{ before: startOfDay(new Date()) }} testId="input-start-date" />
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium">End Date *</label>
-              <Input type="date" value={form.isHalfDay ? form.startDate : form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} disabled={form.isHalfDay} className="mt-1" data-testid="input-end-date" />
+              <div className="mt-1">
+                {form.isHalfDay ? (
+                  <Button type="button" variant="outline" disabled className="w-full justify-start font-normal">
+                    <Calendar className="h-4 w-4 mr-2 text-muted-foreground" /> {form.startDate ? format(parseYmd(form.startDate)!, "EEE, d MMM yyyy") : "Same day"}
+                  </Button>
+                ) : (
+                  <DateField value={parseYmd(form.endDate)} onChange={(d) => setForm((f) => ({ ...f, endDate: format(d, "yyyy-MM-dd") }))} disabled={{ before: startOfDay(parseYmd(form.startDate) || new Date()) }} testId="input-end-date" />
+                )}
+              </div>
             </div>
           </div>
 
@@ -371,6 +385,8 @@ export default function LeavePage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/leave-requests"] });
       qc.invalidateQueries({ queryKey: ["/api/leave-balances"] });
+      // Approved/cancelled leave changes the attendance calendar — refresh it too.
+      qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/attendance") });
       toast({ title: "Leave request updated" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -504,7 +520,7 @@ export default function LeavePage() {
             ) : (
               <div className="list-divider">
                 {teamRequests.map((req: any) => (
-                  <LeaveRequestRow key={req.id} request={req} leaveTypes={leaveTypes} employees={employees} canApprove
+                  <LeaveRequestRow key={req.id} request={req} leaveTypes={leaveTypes} employees={employees} canApprove={user?.role === "super_admin" || user?.role === "manager"}
                     onApprove={(id: string) => updateLeave.mutate({ id, status: "approved" })}
                     onReject={(id: string) => updateLeave.mutate({ id, status: "rejected" })} />
                 ))}
@@ -561,7 +577,7 @@ export default function LeavePage() {
             ) : (
               <div className="list-divider">
                 {leaveRequests.map((req: any) => (
-                  <LeaveRequestRow key={req.id} request={req} leaveTypes={leaveTypes} employees={employees} canApprove={req.status === "pending"}
+                  <LeaveRequestRow key={req.id} request={req} leaveTypes={leaveTypes} employees={employees} canApprove={(user?.role === "super_admin" || user?.role === "manager") && req.status === "pending"}
                     onApprove={(id: string) => updateLeave.mutate({ id, status: "approved" })}
                     onReject={(id: string) => updateLeave.mutate({ id, status: "rejected" })} />
                 ))}

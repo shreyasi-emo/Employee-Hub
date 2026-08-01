@@ -479,31 +479,44 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const y = parseInt(year as string) || new Date().getFullYear();
 
     // Check access
-    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "manager"];
+    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
     if (!allowedRoles.includes(req.currentUser!.role) && req.currentUser!.employeeId !== empId) {
       return res.status(403).json({ error: "Access denied" });
     }
-    res.json(await storage.getAttendanceRecords(empId, m, y));
+    const records = visibleAttendance(await storage.getAttendanceRecords(empId, m, y));
+    const from = `${y}-${String(m).padStart(2, "0")}-01`;
+    const to = `${y}-${String(m).padStart(2, "0")}-${String(getDaysInMonth(m, y)).padStart(2, "0")}`;
+    const leaves = await storage.getApprovedLeavesInRange(from, to, empId);
+    const existing = new Set(records.map((r: any) => `${r.employeeId}|${r.date}`));
+    res.json([...records, ...expandApprovedLeaveDays(leaves, from, to, existing)]);
   });
 
   // Org-wide monthly attendance (for summaries / side panel). HR/manager only.
   app.get("/api/attendance/month", requireAuth, async (req, res) => {
-    if (!["super_admin", "hr_admin", "hr_executive", "manager"].includes(req.currentUser!.role)) {
+    if (!["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"].includes(req.currentUser!.role)) {
       return res.status(403).json({ error: "Access denied" });
     }
     const m = parseInt(req.query.month as string) || new Date().getMonth() + 1;
     const y = parseInt(req.query.year as string) || new Date().getFullYear();
-    res.json(await storage.getMonthlyAttendance(m, y));
+    const records = visibleAttendance(await storage.getMonthlyAttendance(m, y));
+    const from = `${y}-${String(m).padStart(2, "0")}-01`;
+    const to = `${y}-${String(m).padStart(2, "0")}-${String(getDaysInMonth(m, y)).padStart(2, "0")}`;
+    const leaves = await storage.getApprovedLeavesInRange(from, to);
+    const existing = new Set(records.map((r: any) => `${r.employeeId}|${r.date}`));
+    res.json([...records, ...expandApprovedLeaveDays(leaves, from, to, existing)]);
   });
 
   // Org-wide attendance within a date range. HR/manager only.
   app.get("/api/attendance/range", requireAuth, async (req, res) => {
-    if (!["super_admin", "hr_admin", "hr_executive", "manager"].includes(req.currentUser!.role)) {
+    if (!["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"].includes(req.currentUser!.role)) {
       return res.status(403).json({ error: "Access denied" });
     }
     const { from, to } = req.query;
     if (!from || !to) return res.status(400).json({ error: "from and to are required" });
-    res.json(await storage.getAttendanceInRange(from as string, to as string));
+    const records = visibleAttendance(await storage.getAttendanceInRange(from as string, to as string));
+    const leaves = await storage.getApprovedLeavesInRange(from as string, to as string);
+    const existing = new Set(records.map((r: any) => `${r.employeeId}|${r.date}`));
+    res.json([...records, ...expandApprovedLeaveDays(leaves, from as string, to as string, existing)]);
   });
 
   app.post("/api/attendance", requireAuth, requireHR, async (req, res) => {
@@ -524,6 +537,210 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       await log(req, "ATTENDANCE_OVERRIDE", "attendance", rec.id, null, rec, reason);
     }
     res.json(rec);
+  });
+
+  // Self-service: mark yourself "On Duty" (out for official work) for today.
+  // No approval — it just records today's status + notifies your manager. On-duty details
+  // (purpose / location / expected return / remarks) are stored as JSON in `notes`.
+  app.post("/api/attendance/on-duty", requireAuth, async (req, res) => {
+    const empId = req.currentUser!.employeeId;
+    if (!empId) return res.status(400).json({ error: "No employee record is linked to your account." });
+    const { purpose, location, expectedReturn, remarks } = req.body || {};
+    if (!purpose || !String(purpose).trim()) return res.status(400).json({ error: "Please choose a purpose for the on-duty trip." });
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    // If Expected Return falls on a later date, the trip spans multiple days — mark each working
+    // day from today through the return date as On Duty (subsequent days show as calendar labels).
+    const spanEnd = expectedReturn ? String(expectedReturn).slice(0, 10) : dateStr;
+    // Cap the span so a far-off return date can't create an unbounded run of records.
+    const MAX_SPAN_DAYS = 14;
+    const spanCap = new Date(now.getFullYear(), now.getMonth(), now.getDate() + MAX_SPAN_DAYS);
+    if (spanEnd > dateStr && new Date(`${spanEnd}T00:00:00`) > spanCap) {
+      return res.status(400).json({ error: `On Duty can span at most ${MAX_SPAN_DAYS} days.` });
+    }
+    const meta = {
+      kind: "on_duty",
+      purpose: String(purpose).trim(),
+      location: location ? String(location).trim() : null,
+      expectedReturn: expectedReturn || null,
+      remarks: remarks ? String(remarks).trim() : null,
+      spanStart: dateStr,
+      spanEnd: spanEnd > dateStr ? spanEnd : dateStr,
+    };
+    // Today's record carries the check-in time; subsequent days are markers only.
+    const rec = await storage.upsertAttendance({
+      employeeId: empId, date: dateStr, status: "on_duty", source: "manual",
+      checkIn: now, notes: JSON.stringify(meta),
+    } as any);
+    if (meta.spanEnd > dateStr) {
+      const cur = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(`${meta.spanEnd}T00:00:00`);
+      cur.setDate(cur.getDate() + 1);
+      while (cur <= end) {
+        const wd = cur.getDay();
+        if (wd !== 0 && wd !== 6) {
+          const ds = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
+          await storage.upsertAttendance({ employeeId: empId, date: ds, status: "on_duty", source: "manual", checkIn: null, notes: JSON.stringify({ ...meta, marker: true }) } as any);
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+    await log(req, "MARK_ON_DUTY", "attendance", rec.id, null, rec);
+    // Notify the employee's manager (best-effort).
+    try {
+      const emp = await storage.getEmployee(empId);
+      if (emp?.managerId) {
+        const nm = `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "A team member";
+        await storage.notifyEmployee(emp.managerId, {
+          type: "info", title: "Team member on duty",
+          body: `${nm} marked On Duty — ${meta.purpose}${meta.location ? " · " + meta.location : ""}.`,
+          link: "/attendance",
+        });
+      }
+    } catch { /* best-effort */ }
+    res.json(rec);
+  });
+
+  // End an active On-Duty trip: stamp today's record as ended and drop any future span markers.
+  app.post("/api/attendance/on-duty/end", requireAuth, async (req, res) => {
+    const empId = req.currentUser!.employeeId;
+    if (!empId) return res.status(400).json({ error: "No employee record is linked to your account." });
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const todayRec = await storage.getAttendanceByDate(empId, todayStr);
+    if (todayRec?.status === "on_duty") {
+      let meta: any; try { meta = JSON.parse(todayRec.notes || "{}"); } catch { meta = {}; }
+      meta.endedAt = now.toISOString();
+      await storage.upsertAttendance({ employeeId: empId, date: todayStr, status: "on_duty", source: todayRec.source, checkIn: todayRec.checkIn, notes: JSON.stringify(meta) } as any);
+    }
+    // Remove future on-duty markers of the span — sweep this month + the next two (covers the capped span).
+    for (let k = 0; k < 3; k++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + k, 1);
+      const recs = await storage.getAttendanceRecords(empId, d.getMonth() + 1, d.getFullYear());
+      for (const r of recs as any[]) if (r.status === "on_duty" && r.date > todayStr) await storage.deleteAttendanceByDate(empId, r.date);
+    }
+    await log(req, "END_ON_DUTY", "attendance", todayRec?.id, todayRec, null);
+    res.json({ ok: true });
+  });
+
+  // Self-service: request Work From Home for a day (today .. +5). Needs manager approval, but
+  // auto-approves if not actioned by 24h before the WFH date. Stored as an attendance record
+  // (status "wfh") whose `notes` carries the approval state.
+  app.post("/api/attendance/wfh", requireAuth, async (req, res) => {
+    const empId = req.currentUser!.employeeId;
+    if (!empId) return res.status(400).json({ error: "No employee record is linked to your account." });
+    const { date, endDate, reason, duration } = req.body || {};
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Please pick a valid date." });
+    if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return res.status(400).json({ error: "Invalid end date." });
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const parse = (s: string) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    // Max = the 5th working day (Mon–Fri) ahead of today.
+    const maxD = new Date(today); let bd = 0;
+    while (bd < 5) { maxD.setDate(maxD.getDate() + 1); const w = maxD.getDay(); if (w !== 0 && w !== 6) bd++; }
+    const startD = parse(date);
+    const endD = endDate ? parse(endDate) : startD;
+    if (endD < startD) return res.status(400).json({ error: "End date can't be before the start date." });
+    if (startD < today || endD > maxD) return res.status(400).json({ error: "WFH can be requested for today up to 5 working days ahead." });
+    const isRange = endD > startD;
+    // Working days in the range (weekends skipped).
+    const days: string[] = [];
+    for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+      const w = d.getDay(); if (w === 0 || w === 6) continue;
+      days.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+    }
+    if (!days.length) return res.status(400).json({ error: "Pick at least one working day (weekends aren't allowed)." });
+    // Conflict guards across every day — a holiday or an approved leave blocks the whole request.
+    const holsSet = new Set<string>();
+    for (const yr of Array.from(new Set(days.map((d) => parseInt(d.slice(0, 4)))))) (await storage.getHolidays(yr) as any[]).forEach((h) => holsSet.add(h.date));
+    for (const ds of days) {
+      if (holsSet.has(ds)) return res.status(400).json({ error: `${ds} is a public holiday.` });
+      const ov = await storage.getApprovedLeavesInRange(ds, ds, empId);
+      if ((ov as any[]).length) return res.status(400).json({ error: `You have approved leave on ${ds}.` });
+    }
+    const now = new Date();
+    // Duration only applies to a single day; a range is always full days.
+    const dur = isRange ? "full" : (["full", "first_half", "second_half"].includes(duration) ? duration : "full");
+    let firstRec: any = null;
+    for (const ds of days) {
+      const autoApproveAt = new Date(parse(ds).getTime() - 24 * 60 * 60 * 1000);
+      const approval = now >= autoApproveAt ? "approved" : "pending";
+      const meta: any = {
+        kind: "wfh", approval, duration: dur,
+        reason: reason ? String(reason).trim() : null,
+        requestedAt: now.toISOString(), autoApproveAt: autoApproveAt.toISOString(),
+        decidedAt: approval === "approved" ? now.toISOString() : null,
+        decidedBy: approval === "approved" ? "auto" : null,
+      };
+      if (isRange) { meta.rangeStart = days[0]; meta.rangeEnd = days[days.length - 1]; }
+      const rec = await storage.upsertAttendance({ employeeId: empId, date: ds, status: "wfh", source: "manual", checkIn: null, notes: JSON.stringify(meta) } as any);
+      if (!firstRec) firstRec = rec;
+    }
+    await log(req, "WFH_REQUEST", "attendance", firstRec?.id, null, firstRec);
+    const rangeLabel = isRange ? `${days[0]} to ${days[days.length - 1]}` : days[0];
+    try {
+      const emp = await storage.getEmployee(empId);
+      const nm = `${emp?.firstName || ""} ${emp?.lastName || ""}`.trim() || "A team member";
+      if (emp?.managerId) await storage.notifyEmployee(emp.managerId, { type: "info", title: "WFH request to review", body: `${nm} requested WFH (${rangeLabel})${reason ? " — " + String(reason).trim() : ""}. Approve or reject it in Attendance.`, link: "/attendance" });
+      await storage.notifyByRole(["hr_admin", "hr_executive"], { type: "info", title: "WFH request", body: `${nm} requested WFH (${rangeLabel}).`, link: "/attendance" });
+    } catch { /* best-effort */ }
+    res.json(firstRec);
+  });
+
+  // Manager/HR decision on a pending WFH request (identified by employee + date).
+  app.patch("/api/attendance/wfh", requireAuth, async (req, res) => {
+    const { employeeId, date, decision } = req.body || {};
+    if (!employeeId || !date || !["approved", "rejected"].includes(decision)) return res.status(400).json({ error: "employeeId, date and a valid decision are required." });
+    const viewer = req.currentUser!;
+    // Only the employee's direct manager or a Super Admin can decide. HR/CEO are view-only.
+    let canDecide = viewer.role === "super_admin";
+    if (!canDecide && viewer.role === "manager" && viewer.employeeId) {
+      const reports = await storage.getEmployeesByManager(viewer.employeeId);
+      canDecide = reports.some((e) => e.id === employeeId);
+    }
+    if (!canDecide) return res.status(403).json({ error: "Only the employee's manager or a Super Admin can decide this request." });
+    const rec = await storage.getAttendanceByDate(employeeId, date);
+    if (!rec) return res.status(404).json({ error: "WFH request not found." });
+    let meta: any; try { meta = JSON.parse(rec.notes || "{}"); } catch { meta = {}; }
+    if (meta.kind !== "wfh") return res.status(400).json({ error: "Not a WFH request." });
+    if (meta.approval !== "pending" || new Date() >= new Date(meta.autoApproveAt)) return res.status(400).json({ error: "This request can no longer be decided (already resolved or auto-approved)." });
+    meta.approval = decision; meta.decidedAt = new Date().toISOString(); meta.decidedBy = viewer.id;
+    const updated = await storage.upsertAttendance({ employeeId, date, status: "wfh", source: rec.source, checkIn: rec.checkIn, notes: JSON.stringify(meta) } as any);
+    await log(req, "WFH_DECISION", "attendance", rec.id, rec, updated, decision);
+    try {
+      const empUser = (await storage.getAllUsers()).find((u) => u.employeeId === employeeId);
+      if (empUser) await storage.createNotification({ userId: empUser.id, type: `wfh_${decision}`, title: `WFH ${decision}`, body: `Your WFH request for ${date} was ${decision}.`, link: "/attendance" });
+    } catch { /* best-effort */ }
+    res.json(updated);
+  });
+
+  // Pending WFH requests a manager/HR can act on (their team; HR = everyone). Only truly-pending
+  // ones (not yet within the 24h auto-approve window) are returned.
+  app.get("/api/attendance/wfh-pending", requireAuth, async (req, res) => {
+    const viewer = req.currentUser!;
+    // Only actionable roles get the queue: Super Admin (all) or a manager (their reports).
+    if (!(viewer.role === "super_admin" || viewer.role === "manager")) return res.json([]);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const from = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const toD = new Date(today); toD.setDate(toD.getDate() + 6);
+    const to = `${toD.getFullYear()}-${String(toD.getMonth() + 1).padStart(2, "0")}-${String(toD.getDate()).padStart(2, "0")}`;
+    const recs = await storage.getWfhInRange(from, to);
+    let allowIds: Set<string> | null = null;
+    if (viewer.role === "manager" && viewer.employeeId) {
+      allowIds = new Set((await storage.getEmployeesByManager(viewer.employeeId)).map((e) => e.id));
+    }
+    const now = new Date();
+    const out: any[] = [];
+    for (const r of recs) {
+      let meta: any; try { meta = JSON.parse(r.notes || "{}"); } catch { continue; }
+      if (meta.kind !== "wfh" || meta.approval !== "pending") continue;
+      if (new Date(meta.autoApproveAt) <= now) continue; // already auto-approved
+      if (allowIds && !allowIds.has(r.employeeId)) continue;
+      out.push({ ...r, meta });
+    }
+    res.json(out);
   });
 
   // ===== REGULARIZATION =====
@@ -565,7 +782,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.put("/api/regularizations/:id", requireAuth, async (req, res) => {
     const { status, approvalNotes } = req.body;
     const viewer = req.currentUser!;
-    const managerAndAbove = ["super_admin", "hr_admin", "hr_executive", "manager"];
+    const managerAndAbove = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
     if (!managerAndAbove.includes(viewer.role)) {
       return res.status(403).json({ error: "Access denied" });
     }
@@ -710,17 +927,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     const request = await storage.createLeaveRequest(parsed.data as any);
 
-    // Notify manager + HR
+    // Auto-approve immediately if the leave starts within 24h (mirrors WFH). Balance was just
+    // checked above, so sufficiency holds.
+    const startMs = new Date(`${request.startDate}T00:00:00`).getTime();
+    const autoApprove = startMs - 24 * 60 * 60 * 1000 <= Date.now();
+    let finalReq: any = request;
+    if (autoApprove) {
+      finalReq = await storage.updateLeaveRequest(request.id, { status: "approved" as any, approvalNotes: "Auto-approved (starts within 24h)" });
+      await storage.deductLeaveOnApproval(request);
+    }
+
+    // Notify manager + HR (+ the employee if it was auto-approved)
     try {
       const employee = await storage.getEmployee(empId);
       const who = employee ? `${employee.firstName} ${employee.lastName}` : "An employee";
-      const body = `${who} applied for leave (${leaveType?.name || "leave"}) from ${request.startDate} to ${request.endDate}`;
-      const payload = { type: "leave_applied", title: "Leave Request", body, link: "/leave" };
+      const range = `${request.startDate} to ${request.endDate}`;
+      if (autoApprove) {
+        const u = (await storage.getAllUsers()).find((x) => x.employeeId === empId);
+        if (u) await storage.createNotification({ userId: u.id, type: "leave_approved", title: "Leave auto-approved", body: `Your leave (${range}) was auto-approved — it starts within 24h.`, link: "/leave" });
+      }
+      const body = `${who} ${autoApprove ? "took" : "applied for"} leave (${leaveType?.name || "leave"}) ${range}`;
+      const payload = { type: "leave_applied", title: autoApprove ? "Leave (auto-approved)" : "Leave Request", body, link: "/leave" };
       if (employee?.managerId) await storage.notifyEmployee(employee.managerId, payload);
       await storage.notifyByRole(["hr_admin", "hr_executive"], payload);
     } catch {}
 
-    res.json(request);
+    res.json(finalReq);
   });
 
   app.put("/api/leave-requests/:id", requireAuth, async (req, res) => {
@@ -729,20 +961,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!leaveReq) return res.status(404).json({ error: "Not found" });
 
     const viewer = req.currentUser!;
-    const managerRoles = ["super_admin", "hr_admin", "hr_executive", "manager"];
     const isSelf = viewer.employeeId === leaveReq.employeeId;
 
     if (status === "cancelled" && !isSelf) {
       return res.status(403).json({ error: "Can only cancel own requests" });
     }
-    if (["approved", "rejected"].includes(status) && !managerRoles.includes(viewer.role)) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-    if (["approved", "rejected"].includes(status) && viewer.role === "manager" && viewer.employeeId) {
-      const directReports = await storage.getEmployeesByManager(viewer.employeeId);
-      const isDirectReport = directReports.some(e => e.id === leaveReq.employeeId);
-      if (!isDirectReport) {
-        return res.status(403).json({ error: "Can only approve requests from your direct reports" });
+    // Approval/rejection is the employee's direct manager or a Super Admin only.
+    // HR and CEO are notified and can view, but cannot action leave requests.
+    if (["approved", "rejected"].includes(status)) {
+      let canDecide = viewer.role === "super_admin";
+      if (!canDecide && viewer.role === "manager" && viewer.employeeId) {
+        const directReports = await storage.getEmployeesByManager(viewer.employeeId);
+        canDecide = directReports.some(e => e.id === leaveReq.employeeId);
+      }
+      if (!canDecide) return res.status(403).json({ error: "Only the employee's manager or a Super Admin can decide this request." });
+      // Don't let an approval push a paid balance negative (create-time guard can be stale).
+      if (status === "approved" && !(await storage.isLeaveBalanceSufficient(leaveReq))) {
+        return res.status(400).json({ error: "Not enough leave balance to approve this request." });
       }
     }
 
@@ -752,33 +987,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       approvedBy: ["approved", "rejected"].includes(status) ? req.currentUser!.id : undefined,
     });
 
-    // Update leave balance if approved
+    // Deduct balance + write the ledger on approval.
     if (status === "approved") {
-      const year = new Date(leaveReq.startDate).getFullYear();
-      const bal = await storage.getLeaveBalance(leaveReq.employeeId, leaveReq.leaveTypeId, year);
-      const current = parseFloat(bal?.closingBalance?.toString() || "0");
-      const days = parseFloat(leaveReq.totalDays.toString());
-      const newBalance = current - days;
-      await storage.upsertLeaveBalance({
-        employeeId: leaveReq.employeeId,
-        leaveTypeId: leaveReq.leaveTypeId,
-        year,
-        openingBalance: bal?.openingBalance?.toString() || "0",
-        accrued: bal?.accrued?.toString() || "0",
-        taken: String(parseFloat(bal?.taken?.toString() || "0") + days),
-        adjusted: bal?.adjusted?.toString() || "0",
-        closingBalance: String(newBalance),
-      });
-      await storage.addLeaveLedgerEntry({
-        employeeId: leaveReq.employeeId,
-        leaveTypeId: leaveReq.leaveTypeId,
-        transactionType: "debit",
-        days: leaveReq.totalDays.toString(),
-        balanceAfter: String(newBalance),
-        referenceId: leaveReq.id,
-        notes: `Leave request ${leaveReq.id} approved`,
-        createdBy: req.currentUser!.id,
-      });
+      await storage.deductLeaveOnApproval(leaveReq, req.currentUser!.id);
     }
 
     // Notify employee of decision
@@ -799,6 +1010,50 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
 
     res.json(updated);
+  });
+
+  // End an approved leave from today (employee coming back early). Trims the tail — or cancels the
+  // whole leave if today is its start — and restores the balance for the un-taken days.
+  app.post("/api/leave-requests/:id/end", requireAuth, async (req, res) => {
+    const lr = await storage.getLeaveRequest(req.params.id);
+    if (!lr) return res.status(404).json({ error: "Not found" });
+    if (req.currentUser!.employeeId !== lr.employeeId) return res.status(403).json({ error: "You can only end your own leave." });
+    if (lr.status !== "approved") return res.status(400).json({ error: "Only an approved leave can be ended." });
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    if (todayStr > lr.endDate) return res.status(400).json({ error: "This leave has already ended." });
+    // Working days being given back: from max(today, start) .. endDate inclusive.
+    const fromStr = todayStr < lr.startDate ? lr.startDate : todayStr;
+    let restore = 0;
+    for (let d = new Date(`${fromStr}T00:00:00`), e = new Date(`${lr.endDate}T00:00:00`); d <= e; d.setDate(d.getDate() + 1)) {
+      const wd = d.getDay(); if (wd !== 0 && wd !== 6) restore++;
+    }
+    // New end = day before `fromStr`. If that's before the start, the whole leave is cancelled.
+    const dayBefore = new Date(`${fromStr}T00:00:00`); dayBefore.setDate(dayBefore.getDate() - 1);
+    const newEnd = `${dayBefore.getFullYear()}-${pad(dayBefore.getMonth() + 1)}-${pad(dayBefore.getDate())}`;
+    const cancelWhole = newEnd < lr.startDate;
+    const total = parseFloat(lr.totalDays.toString());
+    // Cap restore to what was actually deducted; whole-cancel restores everything.
+    const restoreDays = cancelWhole ? total : Math.min(restore, total);
+    if (cancelWhole) await storage.updateLeaveRequest(lr.id, { status: "cancelled" as any, totalDays: "0" as any });
+    else await storage.updateLeaveRequest(lr.id, { endDate: newEnd, totalDays: String(Math.max(0, total - restoreDays)) as any });
+    if (restoreDays > 0) {
+      const year = new Date(lr.startDate).getFullYear();
+      const bal = await storage.getLeaveBalance(lr.employeeId, lr.leaveTypeId, year);
+      const newClosing = parseFloat(bal?.closingBalance?.toString() || "0") + restoreDays;
+      await storage.upsertLeaveBalance({
+        employeeId: lr.employeeId, leaveTypeId: lr.leaveTypeId, year,
+        openingBalance: bal?.openingBalance?.toString() || "0",
+        accrued: bal?.accrued?.toString() || "0",
+        taken: String(Math.max(0, parseFloat(bal?.taken?.toString() || "0") - restoreDays)),
+        adjusted: bal?.adjusted?.toString() || "0",
+        closingBalance: String(newClosing),
+      } as any);
+      await storage.addLeaveLedgerEntry({ employeeId: lr.employeeId, leaveTypeId: lr.leaveTypeId, transactionType: "adjustment", days: String(restoreDays), balanceAfter: String(newClosing), referenceId: lr.id, notes: `Leave ${lr.id} ended early — ${restoreDays}d returned` } as any);
+    }
+    await log(req, "END_LEAVE", "leave_request", lr.id, lr, { endedAt: todayStr, restoreDays });
+    res.json({ ok: true, restoreDays, cancelled: cancelWhole });
   });
 
   // ===== LEAVE LEDGER =====
@@ -1394,7 +1649,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/shift-assignments", requireAuth, async (req, res) => {
     const { employeeId } = req.query;
-    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "manager"];
+    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
     if (!hrRoles.includes(req.currentUser!.role) && req.currentUser!.employeeId !== employeeId) {
       return res.status(403).json({ error: "Access denied" });
     }
@@ -1425,7 +1680,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ===== EMPLOYMENT HISTORY =====
   app.get("/api/employees/:id/history", requireAuth, async (req, res) => {
-    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "manager"];
+    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
     if (!allowedRoles.includes(req.currentUser!.role) && req.currentUser!.employeeId !== req.params.id) {
       return res.status(403).json({ error: "Access denied" });
     }
@@ -1467,7 +1722,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/onboarding/instances", requireAuth, async (req, res) => {
-    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "manager"];
+    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
     if (hrRoles.includes(req.currentUser!.role)) {
       res.json(await storage.getOnboardingInstances());
     } else {
@@ -2225,6 +2480,53 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
 function getDaysInMonth(month: number, year: number): number {
   return new Date(year, month, 0).getDate();
+}
+
+// A rejected WFH request is "not happening" — the UI hides it and it must NOT occupy the day
+// (otherwise it blocks an approved-leave overlay from showing). Drop these from attendance payloads.
+function isRejectedWfh(r: any): boolean {
+  if (r?.status !== "wfh") return false;
+  try { return JSON.parse(r.notes || "{}").approval === "rejected"; } catch { return false; }
+}
+function visibleAttendance(records: any[]): any[] {
+  return (records || []).filter((r) => !isRejectedWfh(r));
+}
+
+// Expand approved leave requests into synthetic per-day attendance entries within [from, to].
+// Weekends are skipped, and any day that already has a real attendance record is left untouched
+// (the real record wins). This keeps the attendance calendar in sync with approved leaves without
+// duplicating/persisting rows — so cancelling or rejecting a leave instantly removes it from view.
+function expandApprovedLeaveDays(leaves: any[], from: string, to: string, existing: Set<string>) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const parse = (s: string) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const out: any[] = [];
+  for (const lr of leaves) {
+    const startStr = lr.startDate < from ? from : lr.startDate;
+    const endStr = lr.endDate > to ? to : lr.endDate;
+    const end = parse(endStr);
+    for (let d = parse(startStr); d <= end; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+      const wd = d.getDay();
+      if (wd === 0 || wd === 6) continue; // leave doesn't mark weekends
+      const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const key = `${lr.employeeId}|${date}`;
+      if (existing.has(key)) continue; // explicit attendance record takes precedence
+      existing.add(key);
+      out.push({
+        id: `leave-${lr.id}-${date}`,
+        employeeId: lr.employeeId,
+        date,
+        status: lr.isHalfDay ? "half_day" : "leave",
+        source: "leave",
+        checkIn: null,
+        checkOut: null,
+        notes: lr.isHalfDay ? "Half-day leave" : "Approved leave",
+        leaveRequestId: lr.id,
+        createdAt: lr.createdAt ?? null,
+        updatedAt: lr.updatedAt ?? null,
+      });
+    }
+  }
+  return out;
 }
 
 function countWeekends(month: number, year: number): number {

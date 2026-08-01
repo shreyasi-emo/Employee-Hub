@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/datetime-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -97,7 +98,7 @@ function AssetFormFields({ form, setForm, employees }: { form: any; setForm: any
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-sm font-medium">Purchase Date</label>
-          <Input type="date" value={form.purchaseDate} onChange={e => setForm((f: any) => ({ ...f, purchaseDate: e.target.value }))} className="mt-1" />
+          <DateInput value={form.purchaseDate} onChange={v => setForm((f: any) => ({ ...f, purchaseDate: v }))} className="mt-1" />
         </div>
         <div>
           <label className="text-sm font-medium">Purchase Value (₹)</label>

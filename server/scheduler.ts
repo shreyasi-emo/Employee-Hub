@@ -89,7 +89,53 @@ export async function dailyPeopleNotifications() {
   }
 }
 
+// Auto-approve requests the manager hasn't actioned by 24h before the date (mirrors the
+// employee-facing rule). Runs on a short interval so approvals never sit stale.
+export async function autoApproveOverdue() {
+  const now = new Date();
+  const cutoff = now.getTime() + 24 * 60 * 60 * 1000; // "within 24h of the date"
+  // ---- Leaves: pending → approved (deduct balance) ----
+  try {
+    const pending = await storage.getLeaveRequests(undefined, "pending");
+    for (const lr of pending as any[]) {
+      const startMs = new Date(`${lr.startDate}T00:00:00`).getTime();
+      if (startMs > cutoff) continue; // still more than 24h away
+      if (!(await storage.isLeaveBalanceSufficient(lr))) continue; // never auto-approve into a negative paid balance
+      await storage.updateLeaveRequest(lr.id, { status: "approved" as any, approvalNotes: "Auto-approved (no manager action within 24h)" });
+      await storage.deductLeaveOnApproval(lr);
+      try {
+        const emp = await storage.getEmployee(lr.employeeId);
+        const u = emp ? (await storage.getAllUsers()).find((x: any) => x.employeeId === emp.id) : null;
+        if (u) await storage.createNotification({ userId: u.id, type: "leave_approved", title: "Leave auto-approved", body: `Your leave from ${lr.startDate} to ${lr.endDate} was auto-approved (no manager action within 24h).`, link: "/leave" });
+      } catch { /* best-effort */ }
+    }
+  } catch (err) { console.error("[Scheduler] Leave auto-approve error:", err); }
+
+  // ---- WFH: pending attendance records → approved ----
+  try {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const d0 = new Date(now); const from = `${d0.getFullYear()}-${pad(d0.getMonth() + 1)}-${pad(d0.getDate())}`;
+    const d1 = new Date(now); d1.setDate(d1.getDate() + 7); const to = `${d1.getFullYear()}-${pad(d1.getMonth() + 1)}-${pad(d1.getDate())}`;
+    const recs = await storage.getWfhInRange(from, to);
+    for (const r of recs as any[]) {
+      let meta: any; try { meta = JSON.parse(r.notes || "{}"); } catch { continue; }
+      if (meta.kind !== "wfh" || meta.approval !== "pending") continue;
+      if (!meta.autoApproveAt || new Date(meta.autoApproveAt).getTime() > now.getTime()) continue;
+      meta.approval = "approved"; meta.decidedAt = now.toISOString(); meta.decidedBy = "auto";
+      await storage.upsertAttendance({ employeeId: r.employeeId, date: r.date, status: "wfh", source: r.source, checkIn: r.checkIn, notes: JSON.stringify(meta) } as any);
+      try {
+        const u = (await storage.getAllUsers()).find((x: any) => x.employeeId === r.employeeId);
+        if (u) await storage.createNotification({ userId: u.id, type: "wfh_approved", title: "WFH auto-approved", body: `Your WFH request for ${r.date} was auto-approved (no manager action within 24h).`, link: "/attendance" });
+      } catch { /* best-effort */ }
+    }
+  } catch (err) { console.error("[Scheduler] WFH auto-approve error:", err); }
+}
+
 export function startScheduler() {
+  // Auto-approve overdue WFH/Leave — every 15 minutes (IST, matching the rest of the schedule).
+  cron.schedule("*/15 * * * *", async () => { try { await autoApproveOverdue(); } catch (e) { console.error("[Scheduler] auto-approve error:", e); } }, { timezone: "Asia/Kolkata" });
+  console.log("[Scheduler] Auto-approve (WFH/Leave 24h) cron registered (every 15 min)");
+
   // Birthdays & anniversaries — every day at 8:00 AM IST
   cron.schedule("0 8 * * *", dailyPeopleNotifications, { timezone: "Asia/Kolkata" });
   console.log("[Scheduler] Daily birthday/anniversary cron registered (08:00 IST)");

@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/datetime-field";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -428,15 +429,7 @@ function CalendarCard({ holidayDates, upcomingHolidays, employees }: {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="ev-date">Date</Label>
-                <Input
-                  id="ev-date"
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  onClick={(e) => { try { (e.currentTarget as HTMLInputElement).showPicker?.(); } catch {} }}
-                  className="cursor-pointer"
-                  data-testid="input-event-date"
-                />
+                <DateInput value={form.date} onChange={(v) => setForm({ ...form, date: v })} testId="input-event-date" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="ev-time">Time</Label>

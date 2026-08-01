@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/datetime-field";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -134,8 +135,7 @@ function RaiseMovementDialog({ open, onOpenChange, locations }: any) {
             </div>
             <div>
               <label className="text-sm font-medium">Needed by</label>
-              <Input type="date" value={form.requestedDate || ""}
-                onChange={e => setForm((f: any) => ({ ...f, requestedDate: e.target.value }))} />
+              <DateInput value={form.requestedDate || ""} onChange={v => setForm((f: any) => ({ ...f, requestedDate: v }))} />
             </div>
           </div>
 

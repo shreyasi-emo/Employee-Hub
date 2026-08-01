@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
+import { DateInput } from "@/components/datetime-field";
 import { Plus, Building2, ShoppingCart, Car, CreditCard, Send, UserCheck, Plane, Hotel } from "lucide-react";
 import { format } from "date-fns";
 
@@ -478,7 +479,7 @@ export default function OfficeAdminPage() {
             <div className="space-y-1.5"><Label>Description / Notes *</Label><Textarea rows={2} {...prForm.register("notes", { required: true })} data-testid="textarea-pr-notes" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Estimated Cost (₹)</Label><Input type="number" min="0" {...prForm.register("estimatedCost")} data-testid="input-pr-cost" /></div>
-              <div className="space-y-1.5"><Label>Needed By</Label><Input type="date" {...prForm.register("neededByDate")} data-testid="input-pr-needed" /></div>
+              <div className="space-y-1.5"><Label>Needed By</Label><Controller control={prForm.control} name="neededByDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-pr-needed" />} /></div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowPRForm(false)}>Cancel</Button>
@@ -501,8 +502,8 @@ export default function OfficeAdminPage() {
               <div className="space-y-1.5"><Label>To City *</Label><Input {...trForm.register("toCity", { required: true })} data-testid="input-tr-to" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Travel Date *</Label><Input type="date" {...trForm.register("travelDate", { required: true })} data-testid="input-tr-travel-date" /></div>
-              <div className="space-y-1.5"><Label>Return Date</Label><Input type="date" {...trForm.register("returnDate")} data-testid="input-tr-return" /></div>
+              <div className="space-y-1.5"><Label>Travel Date *</Label><Controller control={trForm.control} name="travelDate" rules={{ required: true }} render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-tr-travel-date" />} /></div>
+              <div className="space-y-1.5"><Label>Return Date</Label><Controller control={trForm.control} name="returnDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-tr-return" />} /></div>
             </div>
             <div className="space-y-1.5"><Label>Preferences</Label><Textarea rows={2} {...trForm.register("preferences")} placeholder="Mode of travel, hotel, dietary..." data-testid="textarea-tr-prefs" /></div>
             <div className="space-y-1.5"><Label>Budget (₹)</Label><Input type="number" min="0" {...trForm.register("estimatedBudget")} data-testid="input-tr-budget" /></div>
@@ -616,8 +617,8 @@ export default function OfficeAdminPage() {
                 <div className="space-y-1.5"><Label>Hotel Name *</Label><Input {...bookingForm.register("providerName", { required: true })} placeholder="e.g. Taj Hotel" data-testid="input-booking-hotel" /></div>
                 <div className="space-y-1.5"><Label>Booking Reference *</Label><Input {...bookingForm.register("pnrOrTicket", { required: true })} placeholder="e.g. HTL-456789" data-testid="input-booking-ref" /></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><Label>Check-in Date</Label><Input type="date" {...bookingForm.register("checkInDate")} data-testid="input-booking-checkin" /></div>
-                  <div className="space-y-1.5"><Label>Check-out Date</Label><Input type="date" {...bookingForm.register("checkOutDate")} data-testid="input-booking-checkout" /></div>
+                  <div className="space-y-1.5"><Label>Check-in Date</Label><Controller control={bookingForm.control} name="checkInDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-booking-checkin" />} /></div>
+                  <div className="space-y-1.5"><Label>Check-out Date</Label><Controller control={bookingForm.control} name="checkOutDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-booking-checkout" />} /></div>
                 </div>
               </>
             )}

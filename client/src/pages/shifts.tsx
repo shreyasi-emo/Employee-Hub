@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/datetime-field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -215,11 +216,11 @@ function AssignShiftDialog({ open, onOpenChange, employees, shifts }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium">Effective From *</label>
-              <Input type="date" value={form.effectiveFrom} onChange={e => setForm(f => ({ ...f, effectiveFrom: e.target.value }))} className="mt-1" data-testid="input-effective-from" />
+              <DateInput value={form.effectiveFrom} onChange={v => setForm(f => ({ ...f, effectiveFrom: v }))} className="mt-1" testId="input-effective-from" />
             </div>
             <div>
               <label className="text-sm font-medium">Effective To</label>
-              <Input type="date" value={form.effectiveTo} onChange={e => setForm(f => ({ ...f, effectiveTo: e.target.value }))} className="mt-1" />
+              <DateInput value={form.effectiveTo} onChange={v => setForm(f => ({ ...f, effectiveTo: v }))} className="mt-1" />
             </div>
           </div>
 

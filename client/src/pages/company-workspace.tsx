@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { DateInput } from "@/components/datetime-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -1052,7 +1053,7 @@ function PurchaseForm({ open, onClose }: { open: boolean; onClose: () => void })
             ))}
             <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => append({ description: "", qty: 1, estimatedCost: "", link: "" })}><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item</Button>
           </div>
-          <div className="space-y-1.5"><Label>Needed By Date</Label><Input type="date" {...form.register("neededByDate")} /></div>
+          <div className="space-y-1.5"><Label>Needed By Date</Label><Controller control={form.control} name="neededByDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} />} /></div>
           <div className="space-y-1.5"><Label>Notes / Justification</Label><Textarea rows={2} {...form.register("notes")} placeholder="Why is this needed?" /></div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
@@ -1086,8 +1087,8 @@ function TravelForm({ open, onClose }: { open: boolean; onClose: () => void }) {
             <div className="space-y-1.5"><Label>To City *</Label><Input {...form.register("toCity", { required: true })} placeholder="e.g. Mumbai" /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label>Travel Date *</Label><Input type="date" {...form.register("travelDate", { required: true })} /></div>
-            <div className="space-y-1.5"><Label>Return Date</Label><Input type="date" {...form.register("returnDate")} /></div>
+            <div className="space-y-1.5"><Label>Travel Date *</Label><Controller control={form.control} name="travelDate" rules={{ required: true }} render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} />} /></div>
+            <div className="space-y-1.5"><Label>Return Date</Label><Controller control={form.control} name="returnDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} />} /></div>
           </div>
           <div className="space-y-1.5"><Label>Preferences / Constraints</Label><Textarea rows={2} {...form.register("preferences")} placeholder="Mode, hotel preferences, dietary needs…" /></div>
           <div className="space-y-1.5"><Label>Estimated Budget (₹)</Label><Input type="number" min="0" {...form.register("estimatedBudget")} placeholder="0" /></div>
