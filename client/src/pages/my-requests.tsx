@@ -14,7 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { DateInput } from "@/components/datetime-field";
 import {
   Plus, ShoppingCart, Car, TicketIcon, Send, Receipt, ChevronLeft, ChevronRight,
   MessageSquare, ChevronDown, ChevronUp, Trash2, FileText,
@@ -1091,7 +1092,7 @@ export default function MyRequestsPage() {
 
             <div className="space-y-1.5">
               <Label>Needed By Date</Label>
-              <Input type="date" {...prForm.register("neededByDate")} data-testid="input-pr-needed-by" />
+              <Controller control={prForm.control} name="neededByDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-pr-needed-by" />} />
             </div>
             <div className="space-y-1.5">
               <Label>Notes / Justification</Label>
@@ -1126,8 +1127,8 @@ export default function MyRequestsPage() {
               <div className="space-y-1.5"><Label>To City *</Label><Input {...trForm.register("toCity", { required: true })} placeholder="e.g. Mumbai" className={trErrors.toCity ? ERR_BORDER : ""} data-testid="input-tr-to" /><FieldError show={trErrors.toCity} msg="To city is required" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Travel Date *</Label><Input type="date" {...trForm.register("travelDate", { required: true })} className={trErrors.travelDate ? ERR_BORDER : ""} data-testid="input-tr-date" /><FieldError show={trErrors.travelDate} msg="Travel date is required" /></div>
-              <div className="space-y-1.5"><Label>Return Date</Label><Input type="date" {...trForm.register("returnDate")} data-testid="input-tr-return" /></div>
+              <div className="space-y-1.5"><Label>Travel Date *</Label><Controller control={trForm.control} name="travelDate" rules={{ required: true }} render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} className={trErrors.travelDate ? ERR_BORDER : ""} testId="input-tr-date" />} /><FieldError show={trErrors.travelDate} msg="Travel date is required" /></div>
+              <div className="space-y-1.5"><Label>Return Date</Label><Controller control={trForm.control} name="returnDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-tr-return" />} /></div>
             </div>
             <div className="space-y-1.5">
               <Label>Preferences / Constraints</Label>

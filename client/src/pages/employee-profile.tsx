@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
+import { DateInput } from "@/components/datetime-field";
 import {
   ChevronLeft, Mail, Phone, MapPin, Calendar, Briefcase, Building2,
   Edit, Plus, DollarSign, FileText, Package, Clock, Shield,
@@ -81,7 +82,7 @@ function AddSalaryDialog({ open, onOpenChange, employeeId }: {
         <form onSubmit={form.handleSubmit(d => mutation.mutate(d))} className="space-y-4">
           <div>
             <label className="text-sm font-medium">Effective From *</label>
-            <Input {...form.register("effectiveFrom")} type="date" className="mt-1" />
+            <div className="mt-1"><Controller control={form.control} name="effectiveFrom" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} />} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

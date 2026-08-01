@@ -250,6 +250,10 @@ export const storage = {
     return rec;
   },
 
+  async deleteAttendanceByDate(employeeId: string, date: string) {
+    await db.delete(attendanceRecords).where(and(eq(attendanceRecords.employeeId, employeeId), eq(attendanceRecords.date, date)));
+  },
+
   async getTeamAttendance(managerEmployeeId: string, month: number, year: number) {
     const teamMembers = await db.select().from(employees).where(eq(employees.managerId, managerEmployeeId));
     const results = [];
@@ -375,6 +379,49 @@ export const storage = {
   async getLeaveRequest(id: string) {
     const [req] = await db.select().from(leaveRequests).where(eq(leaveRequests.id, id));
     return req;
+  },
+
+  // Approved leave requests that overlap [from, to] (optionally for one employee).
+  // Used to overlay leave days onto the attendance calendar so the two modules stay in sync.
+  async getApprovedLeavesInRange(from: string, to: string, employeeId?: string) {
+    const conds = [eq(leaveRequests.status, "approved" as any), lte(leaveRequests.startDate, to), gte(leaveRequests.endDate, from)];
+    if (employeeId) conds.push(eq(leaveRequests.employeeId, employeeId));
+    return db.select().from(leaveRequests).where(and(...conds));
+  },
+
+  // Is there enough balance to approve this leave? Unpaid types are always allowed.
+  async isLeaveBalanceSufficient(lr: any): Promise<boolean> {
+    const lt = (await this.getLeaveTypes()).find((t) => t.id === lr.leaveTypeId);
+    if (!lt?.isPaid) return true;
+    const year = new Date(lr.startDate).getFullYear();
+    const bal = await this.getLeaveBalance(lr.employeeId, lr.leaveTypeId, year);
+    return parseFloat(bal?.closingBalance?.toString() || "0") >= parseFloat(lr.totalDays.toString());
+  },
+
+  // Deduct a leave's days from the balance + write the ledger debit (shared by manual approve,
+  // auto-approve-on-create, and the cron). Returns the new closing balance.
+  async deductLeaveOnApproval(lr: any, createdBy?: string): Promise<number> {
+    const year = new Date(lr.startDate).getFullYear();
+    const bal = await this.getLeaveBalance(lr.employeeId, lr.leaveTypeId, year);
+    const days = parseFloat(lr.totalDays.toString());
+    const newBalance = parseFloat(bal?.closingBalance?.toString() || "0") - days;
+    await this.upsertLeaveBalance({
+      employeeId: lr.employeeId, leaveTypeId: lr.leaveTypeId, year,
+      openingBalance: bal?.openingBalance?.toString() || "0",
+      accrued: bal?.accrued?.toString() || "0",
+      taken: String(parseFloat(bal?.taken?.toString() || "0") + days),
+      adjusted: bal?.adjusted?.toString() || "0",
+      closingBalance: String(newBalance),
+    } as any);
+    await this.addLeaveLedgerEntry({ employeeId: lr.employeeId, leaveTypeId: lr.leaveTypeId, transactionType: "debit", days: lr.totalDays.toString(), balanceAfter: String(newBalance), referenceId: lr.id, notes: `Leave ${lr.id} approved`, createdBy } as any);
+    return newBalance;
+  },
+
+  // WFH attendance records (approval state lives in notes) within a date range — for the
+  // manager's pending-approval list.
+  async getWfhInRange(from: string, to: string) {
+    return db.select().from(attendanceRecords)
+      .where(and(eq(attendanceRecords.status, "wfh" as any), gte(attendanceRecords.date, from), lte(attendanceRecords.date, to)));
   },
 
   async createLeaveRequest(data: InsertLeaveRequest) {

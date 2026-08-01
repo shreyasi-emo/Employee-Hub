@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/datetime-field";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -116,12 +117,9 @@ function AddAnnouncementDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             </div>
             <div>
               <label className="text-sm font-medium">Expires At</label>
-              <Input
-                type="date"
-                value={form.expiresAt}
-                onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))}
-                className="mt-1"
-              />
+              <div className="mt-1">
+                <DateInput value={form.expiresAt} onChange={v => setForm(f => ({ ...f, expiresAt: v }))} />
+              </div>
             </div>
           </div>
           <div className="flex justify-end gap-2">

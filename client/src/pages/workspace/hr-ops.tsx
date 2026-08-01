@@ -14,7 +14,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
+import { DateInput } from "@/components/datetime-field";
 import { Plus, CheckSquare, Trash2, ClipboardList, TicketIcon, CheckCircle2, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -438,7 +439,7 @@ export default function HRopsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Due Date</Label>
-                <Input type="date" {...taskForm.register("dueDate")} data-testid="input-task-due" />
+                <Controller control={taskForm.control} name="dueDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-task-due" />} />
               </div>
             </div>
             <DialogFooter>

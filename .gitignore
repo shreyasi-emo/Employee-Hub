@@ -28,5 +28,8 @@ server/public
 vite.config.ts.*
 *.tar.gz
 
+# Local API smoke-test output
+scratchpad/
+
 # Replit prompt/screenshot dumps (not used by the app)
 attached_assets/

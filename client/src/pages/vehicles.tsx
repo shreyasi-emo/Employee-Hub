@@ -21,8 +21,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EmployeePicker } from "@/components/employee-picker";
 import { GlassBackButton } from "@/components/glass-back-button";
+import { DateRangePicker, CalCaption } from "@/components/date-range-picker";
+import { TimeField } from "@/components/datetime-field";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigation } from "react-day-picker";
 import {
   Car, Plus, Users, User, Check, X, ChevronLeft, ChevronRight, ChevronDown, MapPin,
   Clock, ShieldCheck, Settings, Ban, CircleDashed, CircleCheck, AlertTriangle, Info,
@@ -593,56 +594,7 @@ function BookingDateField({ value, onChange }: { value: { from?: Date; to?: Date
   );
 }
 
-// "HH:mm" → "h:mm a" label (works for any time, not just the preset slots).
-const hmLabel = (v: string) => { if (!v) return ""; const [h, m] = v.split(":").map(Number); if (isNaN(h) || isNaN(m)) return v; return format(new Date(2000, 0, 1, h, m), "h:mm a"); };
-// Parse a free-typed time ("9", "9:15", "9 am", "2:30 pm", "14:30") → "HH:mm", or null if unparseable.
-function parseTime(raw: string): string | null {
-  const s = (raw || "").trim().toLowerCase();
-  const m = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
-  if (!m) return null;
-  let h = parseInt(m[1], 10); const min = m[2] ? parseInt(m[2], 10) : 0; const ap = m[3];
-  if (min > 59 || h > 23) return null;
-  if (ap === "pm" && h < 12) h += 12;
-  if (ap === "am" && h === 12) h = 0;
-  if (h > 23) return null;
-  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-}
-
-// Time field — editable combobox: pick from the clean 30-min list OR type any time manually.
-function TimeField({ value, onChange, min, max, placeholder = "Select time" }: { value: string; onChange: (v: string) => void; min?: string; max?: string; placeholder?: string }) {
-  const [open, setOpen] = useState(false);
-  const [text, setText] = useState(hmLabel(value));
-  useEffect(() => { setText(hmLabel(value)); }, [value]);
-  const opts = TIME_SLOTS.filter((t) => (!min || t.value > min) && (!max || t.value <= max));
-  const commit = (raw: string) => { const hm = parseTime(raw); if (hm) { onChange(hm); return true; } return false; };
-  return (
-    <div className="relative">
-      <Clock className="h-4 w-4 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-      <Input
-        value={text}
-        className="pl-8"
-        placeholder={placeholder}
-        data-testid="veh-time"
-        onFocus={() => setOpen(true)}
-        onChange={(e) => { setText(e.target.value); if (!open) setOpen(true); }}
-        onBlur={() => { window.setTimeout(() => setOpen(false), 120); if (!commit(text)) setText(hmLabel(value)); }}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(text); setOpen(false); (e.currentTarget as HTMLInputElement).blur(); } else if (e.key === "Escape") { setOpen(false); } }}
-      />
-      {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-popover shadow-md p-1.5">
-          <ScrollArea className="h-56">
-            <div className="space-y-0.5 pr-2">
-              {opts.length === 0 ? <p className="text-xs text-muted-foreground px-2 py-2">No times available</p> :
-                opts.map((t) => (
-                  <button key={t.value} type="button" onMouseDown={(e) => { e.preventDefault(); onChange(t.value); setOpen(false); }} className={`w-full text-left rounded-[10px] px-3 py-1.5 text-sm ${value === t.value ? "btn-primary-gradient text-white" : "text-foreground hover-elevate"}`}>{t.label}</button>
-                ))}
-            </div>
-          </ScrollArea>
-        </div>
-      )}
-    </div>
-  );
-}
+// Date + time form fields (TimeField) now live in the shared @/components/datetime-field.
 
 // Fair company-car assignment: cover `pax` seats using the available vehicles, favouring
 // (1) capacity match — least wasted seats, (2) load balance — least-booked driver/vehicle first,
@@ -962,8 +914,8 @@ function BookingForm({ open, onClose, prefillSlot, vehicleId: seedVehicleId, com
               </div>
               <div className="space-y-1.5"><Label>Date</Label><BookingDateField value={dateRange} onChange={setDateRange} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5"><Label>Start Time <span className="text-muted-foreground font-normal">(7 AM–7 PM)</span></Label><TimeField value={startHM} onChange={(v) => { setStartHM(v); if (sameDay && endHM && endHM <= v) setEndHM(""); }} max="18:30" placeholder="Start" /></div>
-                <div className="space-y-1.5"><Label>End Time</Label><TimeField value={endHM} onChange={setEndHM} min={sameDay ? startHM : undefined} placeholder="End" /></div>
+                <div className="space-y-1.5"><Label>Start Time <span className="text-muted-foreground font-normal">(7 AM–7 PM)</span></Label><TimeField value={startHM} onChange={(v) => { setStartHM(v); if (sameDay && endHM && endHM <= v) setEndHM(""); }} max="18:30" placeholder="Start" slots={TIME_SLOTS} testId="veh-time" /></div>
+                <div className="space-y-1.5"><Label>End Time</Label><TimeField value={endHM} onChange={setEndHM} min={sameDay ? startHM : undefined} placeholder="End" slots={TIME_SLOTS} testId="veh-time" /></div>
               </div>
               {start && end && start < end && !inWindow && (
                 <p className="text-[11px] text-[#FF6F62]">Bookings must be within 7:00 AM – 7:00 PM.</p>
@@ -1423,49 +1375,7 @@ function MiniBooking({ b, canCancel, onCancel, onOpen }: any) {
   );
 }
 
-// "‹ June 2026 ›" calendar caption — same control used on the Attendance/Dashboard date pickers.
-function CalCaption({ displayMonth }: { displayMonth: Date }) {
-  const { goToMonth, nextMonth, previousMonth } = useNavigation();
-  return (
-    <div className="flex items-center justify-center gap-3 pt-1 pb-2">
-      <button type="button" disabled={!previousMonth} onClick={() => previousMonth && goToMonth(previousMonth)} className="p-1 rounded-md hover-elevate disabled:opacity-30" aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></button>
-      <span className="text-sm font-semibold min-w-[8.5rem] text-center">{format(displayMonth, "MMMM yyyy")}</span>
-      <button type="button" disabled={!nextMonth} onClick={() => nextMonth && goToMonth(nextMonth)} className="p-1 rounded-md hover-elevate disabled:opacity-30" aria-label="Next month"><ChevronRight className="h-4 w-4" /></button>
-    </div>
-  );
-}
-
-// Notion-style date picker: single date by default, with an "End date" toggle for a range.
-// (Reused verbatim from the Attendance page's custom range filter.)
-function CustomRangePopover({ value, onChange }: { value: { from?: Date; to?: Date }; onChange: (v: { from?: Date; to?: Date }) => void }) {
-  const [endDate, setEndDate] = useState(!!(value.from && value.to && +value.from !== +value.to));
-  const hasRange = endDate && value.to && value.from && +value.to !== +value.from;
-  const label = value.from
-    ? hasRange ? `${format(value.from!, "MMM d")} – ${format(value.to!, "MMM d, yyyy")}` : format(value.from, "MMM d, yyyy")
-    : "Pick date";
-  return (
-    <Popover modal>
-      <PopoverTrigger asChild>
-        <Button variant="secondary" size="sm" className="h-9" data-testid="usage-custom-range"><CalendarDays className="h-4 w-4 mr-1.5" /> {label}</Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex-1 text-sm font-medium px-3 py-1.5 rounded-[12px] border border-border text-center">{value.from ? format(value.from, "MMM d, yyyy") : "Start date"}</div>
-          {endDate && (<><span className="text-muted-foreground text-xs">→</span><div className="flex-1 text-sm font-medium px-3 py-1.5 rounded-[12px] border border-border text-center">{hasRange ? format(value.to!, "MMM d, yyyy") : "End date"}</div></>)}
-        </div>
-        {endDate ? (
-          <RangeCalendar mode="range" selected={value as any} onSelect={(r: any) => onChange(r ?? {})} defaultMonth={value.from} components={{ Caption: CalCaption }} />
-        ) : (
-          <RangeCalendar mode="single" selected={value.from} onSelect={(d: any) => d && onChange({ from: d, to: d })} defaultMonth={value.from} components={{ Caption: CalCaption }} />
-        )}
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
-          <span className="text-sm font-medium">End date</span>
-          <Switch checked={endDate} onCheckedChange={(c) => { setEndDate(c); if (!c && value.from) onChange({ from: value.from, to: value.from }); else if (c && value.from) onChange({ from: value.from, to: undefined }); }} data-testid="usage-switch-end-date" />
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
+// Date-range picker + CalCaption now come from the shared @/components/date-range-picker.
 
 // ============================ Track Usage side panel (HR) ============================
 // Slide-in Sheet (same primitive as Workforce Insights). Two views inside one panel:
@@ -1548,7 +1458,7 @@ function TrackUsagePanel({ open, onOpenChange, employees, bookings, vehicles, de
                     <SelectItem value="custom">Custom Date Range</SelectItem>
                   </SelectContent>
                 </Select>
-                {period === "custom" && <CustomRangePopover value={customRange} onChange={setCustomRange} />}
+                {period === "custom" && <DateRangePicker value={customRange} onChange={setCustomRange} triggerClassName="h-9" testId="usage-custom-range" />}
                 <Select value={dept} onValueChange={setDept}>
                   <SelectTrigger className="w-auto h-9 text-xs gap-1.5 ml-auto" data-testid="usage-dept"><SelectValue placeholder="Department" /></SelectTrigger>
                   <SelectContent>
