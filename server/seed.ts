@@ -6,6 +6,14 @@ import {
   leaveBalances, holidays, statutoryConfig, announcements, assets, payrollRuns, payslips,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
+import { randomBytes } from "crypto";
+
+// Seed accounts share one password, supplied via the SEED_PASSWORD env var.
+// If unset, a random one is generated and printed once — so no credential is
+// ever hardcoded in source (previous hardcoded demo passwords were removed after
+// a secret-scanning alert on the public repo).
+const SEED_PASSWORD = process.env.SEED_PASSWORD || randomBytes(9).toString("base64url");
+const seedPw = () => hashPassword(SEED_PASSWORD);
 
 export async function seed() {
   // Check if already seeded
@@ -36,7 +44,7 @@ export async function seed() {
   // Create Super Admin user first (no employee record)
   const superAdminUser = await storage.createUser({
     username: "superadmin",
-    password: hashPassword("Admin@123"),
+    password: seedPw(),
     role: "super_admin",
   });
 
@@ -295,7 +303,7 @@ export async function seed() {
   for (const { emp, role, username } of employeeData) {
     const user = await storage.createUser({
       username,
-      password: hashPassword("EMO@2024"),
+      password: seedPw(),
       role,
       employeeId: emp.id,
     });
@@ -365,14 +373,14 @@ export async function seed() {
     employeeCode: "EMO0F1", firstName: "Neha", lastName: "Verma", email: "finance@emoenergy.in",
     joinDate: `${currentYear}-01-01`, employmentType: "full_time", employmentStatus: "active", departmentId: financeDept?.id ?? null,
   }).returning();
-  const financeUser = await storage.createUser({ username: "finance@emoenergy.in", password: hashPassword("Finance@123"), role: "finance", employeeId: financeEmp.id, isActive: true, accountStatus: "active" } as any);
+  const financeUser = await storage.createUser({ username: "finance@emoenergy.in", password: seedPw(), role: "finance", employeeId: financeEmp.id, isActive: true, accountStatus: "active" } as any);
   await db.update(employees).set({ userId: financeUser.id }).where(eq(employees.id, financeEmp.id));
 
   const [ceoEmp] = await db.insert(employees).values({
     employeeCode: "EMO0C1", firstName: "Rajesh", lastName: "Khanna", email: "ceo@emoenergy.in",
     joinDate: `${currentYear}-01-01`, employmentType: "full_time", employmentStatus: "active",
   }).returning();
-  const ceoUser = await storage.createUser({ username: "ceo@emoenergy.in", password: hashPassword("Ceo@123"), role: "ceo_approver", employeeId: ceoEmp.id, isActive: true, accountStatus: "active" } as any);
+  const ceoUser = await storage.createUser({ username: "ceo@emoenergy.in", password: seedPw(), role: "ceo_approver", employeeId: ceoEmp.id, isActive: true, accountStatus: "active" } as any);
   await db.update(employees).set({ userId: ceoUser.id }).where(eq(employees.id, ceoEmp.id));
 
   // MVP: legacy role profiles (recruiter / hr_ops / office_admin / interviewer)
@@ -548,10 +556,11 @@ export async function seed() {
   // Single shared company vehicle for the /vehicles hybrid booking flow.
   await storage.createCompanyVehicle({ name: "Company Car", model: "Toyota Innova Crysta", registrationNo: "MH-01-AB-1234", baseLocation: "Head Office", status: "active" });
 
-  console.log("Seeding complete! MVP demo accounts:");
-  console.log("  Super Admin : superadmin              / Admin@123");
-  console.log("  HR          : priya.nair              / EMO@2024");
-  console.log("  Finance     : finance@emoenergy.in    / Finance@123");
-  console.log("  CEO         : ceo@emoenergy.in        / Ceo@123");
-  console.log("  Employee    : sneha.patel             / EMO@2024");
+  console.log("Seeding complete! MVP demo accounts (all share one password):");
+  console.log(`  Password    : ${SEED_PASSWORD} ${process.env.SEED_PASSWORD ? "(from SEED_PASSWORD env var)" : "(randomly generated — set SEED_PASSWORD to choose your own)"}`);
+  console.log("  Super Admin : superadmin");
+  console.log("  HR          : priya.nair");
+  console.log("  Finance     : finance@emoenergy.in");
+  console.log("  CEO         : ceo@emoenergy.in");
+  console.log("  Employee    : sneha.patel");
 }

@@ -10,16 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiRequest } from "@/lib/queryClient";
 import { Building2 } from "lucide-react";
 
-// MVP demo accounts — one per role. Selecting one auto-fills the credentials so
-// testers can sign in with a click. These map to the accounts created by the
-// seed (see server/seed.ts). Username/password login is temporary scaffolding
-// for internal testing; Google SSO replaces it later.
+// MVP demo accounts — one per role. Selecting one fills the username; the tester
+// enters the shared demo password (set via SEED_PASSWORD when the DB was seeded).
+// No passwords are stored here — they must never ship in the client bundle.
+// Username/password login is temporary scaffolding; Google SSO replaces it later.
 const DEMO_ACCOUNTS = [
-  { role: "Super Admin", name: "Super Admin", username: "superadmin", password: "Admin@123" },
-  { role: "HR", name: "Priya Nair", username: "priya.nair", password: "EMO@2024" },
-  { role: "Finance", name: "Neha Verma", username: "finance@emoenergy.in", password: "Finance@123" },
-  { role: "CEO", name: "Rajesh Khanna", username: "ceo@emoenergy.in", password: "Ceo@123" },
-  { role: "Employee", name: "Sneha Patel", username: "sneha.patel", password: "EMO@2024" },
+  { role: "Super Admin", name: "Super Admin", username: "superadmin" },
+  { role: "HR", name: "Priya Nair", username: "priya.nair" },
+  { role: "Finance", name: "Neha Verma", username: "finance@emoenergy.in" },
+  { role: "CEO", name: "Rajesh Khanna", username: "ceo@emoenergy.in" },
+  { role: "Employee", name: "Sneha Patel", username: "sneha.patel" },
 ];
 
 export default function LoginPage() {
@@ -32,10 +32,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   function pickProfile(username: string) {
-    const acct = DEMO_ACCOUNTS.find((a) => a.username === username);
+    // Fill the username only; the tester types the shared demo password.
     setProfile(username);
     setEmail(username);
-    setPassword(acct?.password ?? "");
     setError("");
   }
 
@@ -80,7 +79,7 @@ export default function LoginPage() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-muted-foreground">Auto-fills the fields below — then click Sign In.</p>
+            <p className="text-[11px] text-muted-foreground">Fills the username — enter the demo password, then Sign In.</p>
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
