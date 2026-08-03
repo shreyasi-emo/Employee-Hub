@@ -278,15 +278,17 @@ export async function seed() {
     emergencyContactRelation: "Father",
   }).returning();
 
-  // Create user accounts for employees
+  // Create user accounts for employees.
+  // MVP: only the 5 active roles are assigned (super_admin, hr_admin, finance,
+  // ceo_approver, employee). Former manager / hr_executive users become employees.
   const employeeData = [
-    { emp: emp1[0], role: "manager" as const, username: "arjun.sharma" },
+    { emp: emp1[0], role: "employee" as const, username: "arjun.sharma" },
     { emp: emp2[0], role: "hr_admin" as const, username: "priya.nair" },
-    { emp: emp3[0], role: "manager" as const, username: "rahul.gupta" },
+    { emp: emp3[0], role: "employee" as const, username: "rahul.gupta" },
     { emp: emp4[0], role: "employee" as const, username: "sneha.patel" },
     { emp: emp5[0], role: "finance" as const, username: "vikram.singh" },
-    { emp: emp6[0], role: "hr_executive" as const, username: "ananya.reddy" },
-    { emp: emp7[0], role: "manager" as const, username: "karthik.menon" },
+    { emp: emp6[0], role: "employee" as const, username: "ananya.reddy" },
+    { emp: emp7[0], role: "employee" as const, username: "karthik.menon" },
     { emp: emp8[0], role: "employee" as const, username: "divya.krishnan" },
   ];
 
@@ -373,27 +375,10 @@ export async function seed() {
   const ceoUser = await storage.createUser({ username: "ceo@emoenergy.in", password: hashPassword("Ceo@123"), role: "ceo_approver", employeeId: ceoEmp.id, isActive: true, accountStatus: "active" } as any);
   await db.update(employees).set({ userId: ceoUser.id }).where(eq(employees.id, ceoEmp.id));
 
-  // Remaining role profiles so every role has a quick login
-  const opsDeptForRoles = (await storage.getDepartments());
-  const extraRoleProfiles = [
-    { code: "EMO0R1", role: "recruiter", first: "Riya", last: "Kapoor", username: "recruiter@emoenergy.in", dept: "Human Resources" },
-    { code: "EMO0O1", role: "hr_ops", first: "Sameer", last: "Joshi", username: "hrops@emoenergy.in", dept: "Human Resources" },
-    { code: "EMO0A1", role: "office_admin", first: "Pooja", last: "Iyer", username: "officeadmin@emoenergy.in", dept: "Operations" },
-    { code: "EMO0I1", role: "interviewer", first: "Karan", last: "Malhotra", username: "interviewer@emoenergy.in", dept: "Engineering" },
-  ];
-  const extraEmps: any[] = [];
-  for (const p of extraRoleProfiles) {
-    const dept = opsDeptForRoles.find((d: any) => d.name === p.dept);
-    const [emp] = await db.insert(employees).values({
-      employeeCode: p.code, firstName: p.first, lastName: p.last, email: p.username,
-      joinDate: `${currentYear}-01-01`, employmentType: "full_time", employmentStatus: "active", departmentId: dept?.id ?? null,
-    }).returning();
-    const u = await storage.createUser({ username: p.username, password: hashPassword("Emo@12345"), role: p.role as any, employeeId: emp.id, isActive: true, accountStatus: "active" } as any);
-    await db.update(employees).set({ userId: u.id }).where(eq(employees.id, emp.id));
-    extraEmps.push(emp);
-  }
+  // MVP: legacy role profiles (recruiter / hr_ops / office_admin / interviewer)
+  // are intentionally not seeded — only the 5 active roles exist.
 
-  for (const emp_ of [...allEmployees, adminEmp, financeEmp, ceoEmp, ...extraEmps]) {
+  for (const emp_ of [...allEmployees, adminEmp, financeEmp, ceoEmp]) {
     for (const lt of allLeaveTypes) {
       const bal = balances[lt.code] || 0;
       if (bal > 0) {
@@ -563,7 +548,10 @@ export async function seed() {
   // Single shared company vehicle for the /vehicles hybrid booking flow.
   await storage.createCompanyVehicle({ name: "Company Car", model: "Toyota Innova Crysta", registrationNo: "MH-01-AB-1234", baseLocation: "Head Office", status: "active" });
 
-  console.log("Seeding complete!");
-  console.log("Super Admin: username=superadmin, password=Admin@123");
-  console.log("Employee accounts: username=<firstname.lastname>, password=EMO@2024");
+  console.log("Seeding complete! MVP demo accounts:");
+  console.log("  Super Admin : superadmin              / Admin@123");
+  console.log("  HR          : priya.nair              / EMO@2024");
+  console.log("  Finance     : finance@emoenergy.in    / Finance@123");
+  console.log("  CEO         : ceo@emoenergy.in        / Ceo@123");
+  console.log("  Employee    : sneha.patel             / EMO@2024");
 }

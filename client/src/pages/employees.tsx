@@ -43,17 +43,12 @@ const EMP_STATUSES = [
   { value: "exited", label: "Exited" },
 ];
 const GENDERS = [{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }];
+// MVP: only the 5 active roles are assignable (Superadmin, CEO, HR, Finance, Employee).
 const SYSTEM_ROLES = [
   { value: "employee", label: "Employee" },
-  { value: "manager", label: "Manager" },
-  { value: "hr_executive", label: "HR Executive" },
-  { value: "hr_admin", label: "HR Admin" },
-  { value: "hr_ops", label: "HR Ops" },
-  { value: "recruiter", label: "Recruiter" },
-  { value: "interviewer", label: "Interviewer" },
-  { value: "office_admin", label: "Office Admin" },
+  { value: "hr_admin", label: "HR" },
   { value: "finance", label: "Finance" },
-  { value: "ceo_approver", label: "CEO Approver" },
+  { value: "ceo_approver", label: "CEO" },
   { value: "super_admin", label: "Super Admin" },
 ];
 const MARITAL = [{ value: "single", label: "Single" }, { value: "married", label: "Married" }, { value: "divorced", label: "Divorced" }, { value: "widowed", label: "Widowed" }];

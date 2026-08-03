@@ -34,11 +34,16 @@ export interface AuthState {
   devRole?: UserRole | null; // role currently being impersonated, if any
 }
 
-// Roles that exist in the DB enum (note: "logistics" is UI-only, not a valid DB role)
-export const ALL_ROLES: UserRole[] = [
-  "super_admin", "hr_admin", "hr_executive", "finance", "manager", "employee",
-  "recruiter", "hr_ops", "office_admin", "ceo_approver", "interviewer",
+// MVP roles: the only roles assignable / visible in the UI for this build.
+// The DB enum still contains the legacy roles (kept for data compatibility),
+// but they are intentionally not surfaced anywhere. Mapping to labels:
+// Superadmin=super_admin, HR=hr_admin, Finance=finance, CEO=ceo_approver, Employee=employee.
+export const ASSIGNABLE_ROLES: UserRole[] = [
+  "super_admin", "hr_admin", "finance", "ceo_approver", "employee",
 ];
+
+// Back-compat alias — everything that used to list every role now uses the MVP set.
+export const ALL_ROLES: UserRole[] = ASSIGNABLE_ROLES;
 
 export function useAuth() {
   return useQuery<AuthState | null>({
@@ -117,18 +122,20 @@ export function getRoleBadgeColor(role: UserRole): string {
 
 export function getRoleLabel(role: UserRole): string {
   const labels: Record<string, string> = {
+    // MVP roles
     super_admin: "Super Admin",
-    hr_admin: "HR Admin",
+    hr_admin: "HR",
+    finance: "Finance",
+    ceo_approver: "CEO",
+    employee: "Employee",
+    // Legacy roles (kept in the enum for data compatibility; not surfaced in the MVP UI)
     hr_executive: "HR Executive",
     hr_ops: "HR Ops",
-    finance: "Finance",
     manager: "Manager",
     recruiter: "Recruiter",
     office_admin: "Office Admin",
-    ceo_approver: "CEO / Approver",
     interviewer: "Interviewer",
     logistics: "Logistics",
-    employee: "Employee",
   };
   return labels[role] || role;
 }

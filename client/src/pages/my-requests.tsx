@@ -627,7 +627,10 @@ export default function MyRequestsPage() {
   // Tab comes from the clean path (/my-requests/<tab>); query is only used for the auto-open flag.
   const params = new URLSearchParams(location.split("?")[1] || "");
   const pathTab = location.replace(/\?.*$/, "").replace(/^\/my-requests\/?/, "");
-  const initTab = pathTab || params.get("tab") || "purchases";
+  // MVP: purchase / travel / ticket tabs are hidden; default to reimbursements.
+  const HIDDEN_TABS = ["purchases", "travels", "tickets"];
+  const requestedTab = pathTab || params.get("tab") || "reimbursements";
+  const initTab = HIDDEN_TABS.includes(requestedTab) ? "reimbursements" : requestedTab;
   const autoNew = params.get("new") === "true";
 
   const [tab, setTab] = useState(initTab);
@@ -930,24 +933,12 @@ export default function MyRequestsPage() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-foreground">My Requests</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Track all your purchase, travel, support and reimbursement requests</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Track and raise your reimbursement claims</p>
         </div>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => { setTab(v); navigate(`/my-requests/${v}`); }} data-testid="tabs-my-requests">
         <TabsList>
-          <TabsTrigger value="purchases">
-            <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
-            Purchases {(purchases as any[]).length > 0 && `(${(purchases as any[]).length})`}
-          </TabsTrigger>
-          <TabsTrigger value="travels">
-            <Car className="h-3.5 w-3.5 mr-1.5" />
-            Travel {(travels as any[]).length > 0 && `(${(travels as any[]).length})`}
-          </TabsTrigger>
-          <TabsTrigger value="tickets">
-            <TicketIcon className="h-3.5 w-3.5 mr-1.5" />
-            Tickets {(tickets as any[]).length > 0 && `(${(tickets as any[]).length})`}
-          </TabsTrigger>
           <TabsTrigger value="reimbursements">
             <Receipt className="h-3.5 w-3.5 mr-1.5" />
             Reimbursements {(reimbursements as any[]).length > 0 && `(${(reimbursements as any[]).length})`}
@@ -957,57 +948,6 @@ export default function MyRequestsPage() {
             Drafts {drafts.length > 0 && `(${drafts.length})`}
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="purchases" className="mt-4 space-y-5">
-          {controls(
-            <Button size="sm" onClick={() => { setEditingDraftId(null); prForm.reset(); setShowPRForm(true); }} data-testid="button-new-purchase">
-              <Plus className="h-4 w-4 mr-1.5" /> New Purchase Request
-            </Button>
-          )}
-          {loadPR ? <Skeleton className="h-24 w-full" /> :
-            fPurchases.length === 0 ? renderEmpty((purchases as any[]).length === 0 ? "No purchase requests yet." : "No purchase requests match this filter.") :
-            view === "table" ? <RequestTable type="purchase" items={fPurchases} onOpen={(it) => setDetail({ type: "purchase", item: it })} /> :
-            <div className="space-y-3">
-              {fPurchases.map(p => (
-                <RequestCard key={p.id} item={p} type="purchase" onOpen={(it) => setDetail({ type: "purchase", item: it })} />
-              ))}
-            </div>
-          }
-        </TabsContent>
-
-        <TabsContent value="travels" className="mt-4 space-y-5">
-          {controls(
-            <Button size="sm" onClick={() => { setEditingDraftId(null); trForm.reset(); setShowTRForm(true); }} data-testid="button-new-travel">
-              <Plus className="h-4 w-4 mr-1.5" /> New Travel Request
-            </Button>
-          )}
-          {loadTR ? <Skeleton className="h-24 w-full" /> :
-            fTravels.length === 0 ? renderEmpty((travels as any[]).length === 0 ? "No travel requests yet." : "No travel requests match this filter.") :
-            view === "table" ? <RequestTable type="travel" items={fTravels} onOpen={(it) => setDetail({ type: "travel", item: it })} /> :
-            <div className="space-y-3">
-              {fTravels.map(t => (
-                <RequestCard key={t.id} item={t} type="travel" onOpen={(it) => setDetail({ type: "travel", item: it })} />
-              ))}
-            </div>
-          }
-        </TabsContent>
-
-        <TabsContent value="tickets" className="mt-4 space-y-5">
-          {controls(
-            <Button size="sm" onClick={() => { setEditingDraftId(null); ticketForm.reset(); setShowTicketForm(true); }} data-testid="button-new-ticket">
-              <Plus className="h-4 w-4 mr-1.5" /> Raise Ticket
-            </Button>
-          )}
-          {loadTickets ? <Skeleton className="h-24 w-full" /> :
-            fTickets.length === 0 ? renderEmpty((tickets as any[]).length === 0 ? "No tickets yet." : "No tickets match this filter.") :
-            view === "table" ? <RequestTable type="ticket" items={fTickets} onOpen={(it) => setDetail({ type: "ticket", item: it })} /> :
-            <div className="space-y-3">
-              {fTickets.map(t => (
-                <RequestCard key={t.id} item={t} type="ticket" onOpen={(it) => setDetail({ type: "ticket", item: it })} />
-              ))}
-            </div>
-          }
-        </TabsContent>
 
         <TabsContent value="reimbursements" className="mt-4 space-y-5">
           {controls(

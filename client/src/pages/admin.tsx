@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth, isHR, isAdmin, getRoleLabel } from "@/lib/auth";
+import { useAuth, isHR, isAdmin, getRoleLabel, ASSIGNABLE_ROLES } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -433,7 +433,7 @@ function UsersSection() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["super_admin", "hr_admin", "hr_executive", "finance", "manager", "employee"].map(r => (
+                      {ASSIGNABLE_ROLES.map(r => (
                         <SelectItem key={r} value={r} className="text-xs">{getRoleLabel(r as any)}</SelectItem>
                       ))}
                     </SelectContent>

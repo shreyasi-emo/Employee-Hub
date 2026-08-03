@@ -10,24 +10,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiRequest } from "@/lib/queryClient";
 import { Building2 } from "lucide-react";
 
-// TEMPORARY (dev only): quick-login profiles — one per role. Selecting one
-// auto-fills the email + password so you just click Sign In.
-const DEV_PROFILES = [
-  { role: "Super Admin", name: "Super Admin", username: "superadmin" },
-  { role: "HR Admin", name: "Priya Nair", username: "priya.nair" },
-  { role: "HR Executive", name: "Ananya Reddy", username: "ananya.reddy" },
-  { role: "HR Ops", name: "Sameer Joshi", username: "hrops@emoenergy.in" },
-  { role: "Recruiter", name: "Riya Kapoor", username: "recruiter@emoenergy.in" },
-  { role: "Interviewer", name: "Karan Malhotra", username: "interviewer@emoenergy.in" },
-  { role: "Finance", name: "Neha Verma", username: "finance@emoenergy.in" },
-  { role: "CEO Approver", name: "Rajesh Khanna", username: "ceo@emoenergy.in" },
-  { role: "Office Admin", name: "Pooja Iyer", username: "officeadmin@emoenergy.in" },
-  { role: "Manager", name: "Arjun Sharma", username: "arjun.sharma" },
-  { role: "Employee", name: "Sneha Patel", username: "sneha.patel" },
+// MVP demo accounts — one per role. Selecting one auto-fills the credentials so
+// testers can sign in with a click. These map to the accounts created by the
+// seed (see server/seed.ts). Username/password login is temporary scaffolding
+// for internal testing; Google SSO replaces it later.
+const DEMO_ACCOUNTS = [
+  { role: "Super Admin", name: "Super Admin", username: "superadmin", password: "Admin@123" },
+  { role: "HR", name: "Priya Nair", username: "priya.nair", password: "EMO@2024" },
+  { role: "Finance", name: "Neha Verma", username: "finance@emoenergy.in", password: "Finance@123" },
+  { role: "CEO", name: "Rajesh Khanna", username: "ceo@emoenergy.in", password: "Ceo@123" },
+  { role: "Employee", name: "Sneha Patel", username: "sneha.patel", password: "EMO@2024" },
 ];
 
 export default function LoginPage() {
-  // TEMPORARY: Bypassed Google SSO for local UI development
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const [email, setEmail] = useState("");
@@ -37,9 +32,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   function pickProfile(username: string) {
+    const acct = DEMO_ACCOUNTS.find((a) => a.username === username);
     setProfile(username);
     setEmail(username);
-    setPassword("password");
+    setPassword(acct?.password ?? "");
     setError("");
   }
 
@@ -48,11 +44,12 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await apiRequest("POST", "/api/auth/dev-login", { email, password });
+      // Real credential login — works in production (unlike the dev-login bypass).
+      await apiRequest("POST", "/api/auth/login", { username: email, password });
       await qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
       navigate("/dashboard");
     } catch (err: any) {
-      setError(err?.message || 'Sign in failed. Use the password "password".');
+      setError(err?.message || "Sign in failed. Check your username and password.");
     } finally {
       setLoading(false);
     }
@@ -72,13 +69,13 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* TEMPORARY (dev only): quick-login profile picker */}
+          {/* Demo-account quick login (internal testing). */}
           <div className="space-y-2 rounded-[16px] border border-dashed border-border p-3">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Quick login (dev)</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Demo accounts</Label>
             <Select value={profile} onValueChange={pickProfile}>
-              <SelectTrigger data-testid="select-dev-profile"><SelectValue placeholder="Select a role / profile…" /></SelectTrigger>
+              <SelectTrigger data-testid="select-dev-profile"><SelectValue placeholder="Select a role…" /></SelectTrigger>
               <SelectContent>
-                {DEV_PROFILES.map((p) => (
+                {DEMO_ACCOUNTS.map((p) => (
                   <SelectItem key={p.username} value={p.username}>{p.role} — {p.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -86,7 +83,6 @@ export default function LoginPage() {
             <p className="text-[11px] text-muted-foreground">Auto-fills the fields below — then click Sign In.</p>
           </div>
 
-          {/* TEMPORARY: Bypassed Google SSO for local UI development */}
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email / Username</Label>
@@ -125,8 +121,8 @@ export default function LoginPage() {
           </form>
 
           <p className="text-xs text-muted-foreground text-center">
-            Local development login. Use any email with the password{" "}
-            <span className="font-mono">password</span>.
+            Internal testing sign-in. Pick a demo account above, or enter your
+            username and password.
           </p>
         </CardContent>
       </Card>

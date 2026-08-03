@@ -1,0 +1,30 @@
+# Netlify configuration for the Employee Hub MVP.
+#
+# The client is a static SPA served from the CDN (dist/public). The entire
+# Express API runs as a single serverless function (netlify/functions-dist/api.cjs),
+# pre-bundled by `npm run build:netlify`.
+
+[build]
+  command = "npm run build:netlify"
+  publish = "dist/public"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  # Ship the already-bundled, self-contained function as-is.
+  directory = "netlify/functions-dist"
+  node_bundler = "none"
+
+# All /api/* traffic goes to the Express function (which mounts routes under /api/*).
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+# SPA fallback: every other path serves the built index.html (client-side routing).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
