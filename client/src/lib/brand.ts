@@ -1,5 +1,5 @@
 export const BRAND = {
-  APP_NAME: "EMO HRIS",
+  APP_NAME: "Employee Hub",
   COMPANY_NAME: "EMO Energy",
   TAGLINE: "Human Resource Information System",
   EMAIL_DOMAIN: "emoenergy.in",

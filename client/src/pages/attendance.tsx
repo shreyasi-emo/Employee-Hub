@@ -41,18 +41,21 @@ const STATES = [
   { key: "present", label: "Present", color: "#206295" },  // brand blue
   { key: "wfh", label: "WFH", color: "#0E7C7B" },           // dark teal
   { key: "on_duty", label: "On Duty", color: "#4A90C2" },   // lighter brand blue (distinct from Present)
-  { key: "half_day", label: "Half Day", color: "#F59E0B" }, // brand amber
+  { key: "half_day", label: "Half Day", color: "#6A7366" }, // grey-green (swapped with leave)
   { key: "absent", label: "Absent", color: "#FF6F62" },     // coral
-  { key: "leave", label: "Leave", color: "#6A7366" },       // grey-green
+  { key: "leave", label: "Leave", color: "#F59E0B" },       // brand amber (swapped with half day)
 ] as const;
 const STATE_KEYS = STATES.map((s) => s.key);
 const STATE_COLOR: Record<string, string> = { attendancePct: "#206295" };
 STATES.forEach((s) => { STATE_COLOR[s.key] = s.color; });
 // Readable label text colors — darker variants for the statuses whose brand color is too light
 // to read on a white/tinted cell; the rest keep their own (dark-enough) brand color.
-const LABEL_COLOR: Record<string, string> = { wfh: "#0E7C7B", half_day: "#B45309", absent: "#C43D30", holiday: "#5B6B7A" };
+const LABEL_COLOR: Record<string, string> = { wfh: "#0E7C7B", half_day: "#4F5A4B", leave: "#B45309", absent: "#C43D30", holiday: "#5B6B7A" };
 // Contrasting text color for a solid fill: white on dark colors, dark grey on light ones.
 const textOn = (hex: string) => { const h = hex.replace("#", ""); const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16); const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255; return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.65 ? "#FFFFFF" : "#374151"; };
+// Blend a hex color toward white by (1 - alpha) — the visual result of an alpha fill over a light card.
+const blendWhite = (hex: string, alpha: number) => { const h = hex.replace("#", ""); const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16); const mix = (c: number) => Math.round(c * alpha + 255 * (1 - alpha)); const to = (c: number) => mix(c).toString(16).padStart(2, "0"); return `#${to((n >> 16) & 255)}${to((n >> 8) & 255)}${to(n & 255)}`; };
+const TODAY_FILL_ALPHA = 0.5;
 
 function initials(first?: string, last?: string) {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
@@ -798,8 +801,8 @@ function EmployeeAttendanceView() {
                   {notPresentFiltered.map((e: any) => {
                     const status = viewStatus.get(e.id)!;
                     const badgeStyle = {
-                      half_day: { backgroundColor: "rgba(255,169,98,0.18)", color: "#B5611A" },
-                      leave: { backgroundColor: "rgba(106,115,102,0.18)", color: "#4F5A4B" },
+                      half_day: { backgroundColor: "rgba(106,115,102,0.18)", color: "#4F5A4B" },
+                      leave: { backgroundColor: "rgba(255,169,98,0.18)", color: "#B5611A" },
                       absent: { backgroundColor: "rgba(255,111,98,0.15)", color: "#C24A3E" },
                     }[status] || { backgroundColor: "rgba(148,163,184,0.18)", color: "#64748B" };
                     return (
@@ -1289,12 +1292,12 @@ function MyAttendanceView() {
                   const showLabel = !!color && filterMatch && inM;   // a status label to show
                   const showFill = showLabel && !isFut;              // future planned days = label only, no fill
                   const todaySolid = isToday && !!color && !pendingWfh; // today is a solid filled box
-                  const solidText = todaySolid ? textOn(color!) : undefined;
+                  const solidText = todaySolid ? textOn(blendWhite(color!, TODAY_FILL_ALPHA)) : undefined;
                   const label = pendingWfh ? "WFH · Pending" : statusLabelOf(st || undefined);
                   return (
                     <button key={day.toISOString()} onClick={() => setSelected(day)}
                       className={`min-h-[72px] rounded-lg border p-1.5 text-left flex flex-col transition-colors hover-elevate ${isSel ? "ring-2 ring-[#206295] ring-offset-2 ring-offset-background" : (isToday && !todaySolid) ? "ring-2 ring-[#206295]" : ""} ${inM ? (isWeekend ? "bg-muted/30 border-border/60" : "bg-background border-border/80") : "bg-muted/30 border-transparent text-muted-foreground/50"}`}
-                      style={todaySolid ? { backgroundColor: color!, borderColor: color! } : (showFill ? { backgroundColor: `${color}33` } : undefined)}
+                      style={todaySolid ? { backgroundColor: `${color}80`, borderColor: color! } : (showFill ? { backgroundColor: `${color}33` } : undefined)}
                       data-testid={`myatt-day-${format(day, "yyyy-MM-dd")}`}>
                       <span className="self-start text-sm font-semibold" style={solidText ? { color: solidText } : undefined}>{format(day, "d")}</span>
                       {showLabel && (showFill
