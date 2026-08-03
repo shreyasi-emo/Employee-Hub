@@ -6,6 +6,14 @@ import {
   leaveBalances, holidays, statutoryConfig, announcements, assets, payrollRuns, payslips,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
+import { randomBytes } from "crypto";
+
+// Seed accounts share one password, supplied via the SEED_PASSWORD env var.
+// If unset, a random one is generated and printed once — so no credential is
+// ever hardcoded in source (previous hardcoded demo passwords were removed after
+// a secret-scanning alert on the public repo).
+const SEED_PASSWORD = process.env.SEED_PASSWORD || randomBytes(9).toString("base64url");
+const seedPw = () => hashPassword(SEED_PASSWORD);
 
 export async function seed() {
   // Check if already seeded
@@ -36,7 +44,7 @@ export async function seed() {
   // Create Super Admin user first (no employee record)
   const superAdminUser = await storage.createUser({
     username: "superadmin",
-    password: hashPassword("Admin@123"),
+    password: seedPw(),
     role: "super_admin",
   });
 
@@ -293,7 +301,7 @@ export async function seed() {
   for (const { emp, role, username } of employeeData) {
     const user = await storage.createUser({
       username,
-      password: hashPassword("EMO@2024"),
+      password: seedPw(),
       role,
       employeeId: emp.id,
     });
@@ -363,14 +371,14 @@ export async function seed() {
     employeeCode: "EMO0F1", firstName: "Neha", lastName: "Verma", email: "finance@emoenergy.in",
     joinDate: `${currentYear}-01-01`, employmentType: "full_time", employmentStatus: "active", departmentId: financeDept?.id ?? null,
   }).returning();
-  const financeUser = await storage.createUser({ username: "finance@emoenergy.in", password: hashPassword("Finance@123"), role: "finance", employeeId: financeEmp.id, isActive: true, accountStatus: "active" } as any);
+  const financeUser = await storage.createUser({ username: "finance@emoenergy.in", password: seedPw(), role: "finance", employeeId: financeEmp.id, isActive: true, accountStatus: "active" } as any);
   await db.update(employees).set({ userId: financeUser.id }).where(eq(employees.id, financeEmp.id));
 
   const [ceoEmp] = await db.insert(employees).values({
     employeeCode: "EMO0C1", firstName: "Rajesh", lastName: "Khanna", email: "ceo@emoenergy.in",
     joinDate: `${currentYear}-01-01`, employmentType: "full_time", employmentStatus: "active",
   }).returning();
-  const ceoUser = await storage.createUser({ username: "ceo@emoenergy.in", password: hashPassword("Ceo@123"), role: "ceo_approver", employeeId: ceoEmp.id, isActive: true, accountStatus: "active" } as any);
+  const ceoUser = await storage.createUser({ username: "ceo@emoenergy.in", password: seedPw(), role: "ceo_approver", employeeId: ceoEmp.id, isActive: true, accountStatus: "active" } as any);
   await db.update(employees).set({ userId: ceoUser.id }).where(eq(employees.id, ceoEmp.id));
 
   // Remaining role profiles so every role has a quick login
@@ -388,7 +396,7 @@ export async function seed() {
       employeeCode: p.code, firstName: p.first, lastName: p.last, email: p.username,
       joinDate: `${currentYear}-01-01`, employmentType: "full_time", employmentStatus: "active", departmentId: dept?.id ?? null,
     }).returning();
-    const u = await storage.createUser({ username: p.username, password: hashPassword("Emo@12345"), role: p.role as any, employeeId: emp.id, isActive: true, accountStatus: "active" } as any);
+    const u = await storage.createUser({ username: p.username, password: seedPw(), role: p.role as any, employeeId: emp.id, isActive: true, accountStatus: "active" } as any);
     await db.update(employees).set({ userId: u.id }).where(eq(employees.id, emp.id));
     extraEmps.push(emp);
   }
@@ -564,6 +572,9 @@ export async function seed() {
   await storage.createCompanyVehicle({ name: "Company Car", model: "Toyota Innova Crysta", registrationNo: "MH-01-AB-1234", baseLocation: "Head Office", status: "active" });
 
   console.log("Seeding complete!");
-  console.log("Super Admin: username=superadmin, password=Admin@123");
-  console.log("Employee accounts: username=<firstname.lastname>, password=EMO@2024");
+  console.log(`All seeded accounts use this password: ${SEED_PASSWORD}`);
+  console.log(process.env.SEED_PASSWORD
+    ? "(from the SEED_PASSWORD env var)"
+    : "(randomly generated — set SEED_PASSWORD before seeding to choose your own)");
+  console.log("Super Admin username: superadmin · employees: <firstname.lastname>");
 }
