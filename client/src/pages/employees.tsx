@@ -20,6 +20,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
   Search, Users, Briefcase, Building2, UserPlus, CheckCircle2, X, MapPin, Calendar,
@@ -828,27 +829,23 @@ export default function EmployeesPage() {
           {filtered.map((emp) => <EmployeeCard key={emp.id} employee={emp} departments={departments} designations={designations} selectionMode={selectionMode} selected={selected.has(emp.id)} onToggle={() => toggleSel(emp.id)} />)}
         </div>
       ) : (
-        <Card className="border-0"><CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="text-left text-xs text-muted-foreground">
-              {selectionMode && <th className="p-3 w-8"><Checkbox checked={allSelected} onCheckedChange={toggleAll} /></th>}
-              <th className="p-3">Name</th><th className="p-3">Dept</th><th className="p-3">Designation</th><th className="p-3">Location</th><th className="p-3">Type</th><th className="p-3">Join Date</th><th className="p-3">Status</th>
-            </tr></thead>
-            <tbody className="list-divider">
-              {filtered.map((e) => (
-                <tr key={e.id} className="hover-elevate cursor-pointer" onClick={() => (selectionMode ? toggleSel(e.id) : navigate(`/employees/${e.id}`))} data-testid={`employee-row-${e.id}`}>
-                  {selectionMode && <td className="p-3"><Checkbox checked={selected.has(e.id)} onClick={(ev) => ev.stopPropagation()} onCheckedChange={() => toggleSel(e.id)} /></td>}
-                  <td className="p-3"><div className="flex items-center gap-2"><Avatar className="h-7 w-7"><AvatarFallback className="text-[10px]" style={{ backgroundColor: `${avatarColor(e.id)}26`, color: avatarColor(e.id) }}>{initials(e.firstName, e.lastName)}</AvatarFallback></Avatar><div><p className="font-medium text-foreground">{e.firstName} {e.lastName}</p><p className="text-xs text-muted-foreground">{e.employeeCode}</p></div></div></td>
-                  <td className="p-3 text-muted-foreground">{departments.find((d) => d.id === e.departmentId)?.name || "—"}</td>
-                  <td className="p-3 text-muted-foreground">{designations.find((d) => d.id === e.designationId)?.name || "—"}</td>
-                  <td className="p-3 text-muted-foreground">{e.workLocation || "—"}</td>
-                  <td className="p-3 text-muted-foreground">{typeLabel(e.employmentType)}</td>
-                  <td className="p-3 text-muted-foreground">{e.joinDate ? format(new Date(e.joinDate), "dd MMM yyyy") : "—"}</td>
-                  <td className="p-3"><Badge className={`text-xs ${statusColors[e.employmentStatus] || statusColors.inactive}`}>{e.employmentStatus.replace("_", " ")}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <Card className="border-0"><CardContent className="p-0">
+          <DataTable
+            columns={[
+              ...(selectionMode ? [{ key: "__sel", header: <Checkbox checked={allSelected} onCheckedChange={toggleAll} />, render: (e: any) => <Checkbox checked={selected.has(e.id)} onClick={(ev: any) => ev.stopPropagation()} onCheckedChange={() => toggleSel(e.id)} /> }] as DataTableColumn<any>[] : []),
+              { key: "name", header: "Name", render: (e: any) => <div className="flex items-center gap-2"><Avatar className="h-7 w-7"><AvatarFallback className="text-[10px]" style={{ backgroundColor: `${avatarColor(e.id)}26`, color: avatarColor(e.id) }}>{initials(e.firstName, e.lastName)}</AvatarFallback></Avatar><div><p className="font-medium text-foreground">{e.firstName} {e.lastName}</p><p className="text-xs text-muted-foreground">{e.employeeCode}</p></div></div> },
+              { key: "dept", header: "Dept", cellClassName: "text-muted-foreground", render: (e: any) => departments.find((d) => d.id === e.departmentId)?.name || "—" },
+              { key: "designation", header: "Designation", cellClassName: "text-muted-foreground", render: (e: any) => designations.find((d) => d.id === e.designationId)?.name || "—" },
+              { key: "location", header: "Location", cellClassName: "text-muted-foreground", render: (e: any) => e.workLocation || "—" },
+              { key: "type", header: "Type", cellClassName: "text-muted-foreground", render: (e: any) => typeLabel(e.employmentType) },
+              { key: "joinDate", header: "Join Date", cellClassName: "text-muted-foreground", render: (e: any) => e.joinDate ? format(new Date(e.joinDate), "dd MMM yyyy") : "—" },
+              { key: "status", header: "Status", render: (e: any) => <Badge className={`text-xs ${statusColors[e.employmentStatus] || statusColors.inactive}`}>{e.employmentStatus.replace("_", " ")}</Badge> },
+            ]}
+            rows={filtered}
+            getRowKey={(e: any) => e.id}
+            onRowClick={(e: any) => (selectionMode ? toggleSel(e.id) : navigate(`/employees/${e.id}`))}
+            testIdPrefix="employee-row"
+          />
         </CardContent></Card>
       )}
 

@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DataTable } from "@/components/data-table";
 import { useToast } from "@/hooks/use-toast";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { DateInput } from "@/components/datetime-field";
@@ -285,27 +286,24 @@ export default function CompanyWorkspacePage() {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Recent Activities</h2>
           <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" /> showing last 7 days</span>
         </div>
-        <Card className="border-0"><CardContent className="p-0 overflow-x-auto">
+        <Card className="border-0"><CardContent className="p-0">
           {recent.length === 0 ? (
             <div className="text-center py-12"><ClipboardList className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">No activity in the last 7 days.</p></div>
           ) : (
-            <table className="w-full text-sm">
-              <thead><tr className="text-left text-xs text-muted-foreground">
-                <th className="p-3">Requester</th><th className="p-3">Type</th><th className="p-3">Details</th><th className="p-3">Status</th><th className="p-3">Approved By</th><th className="p-3">Date</th>
-              </tr></thead>
-              <tbody className="list-divider">
-                {recent.map((r: any) => (
-                  <tr key={`${r.type}-${r.id}`} className="hover-elevate cursor-pointer" onClick={() => setDetail(r)} data-testid={`activity-${r.id}`}>
-                    <td className="p-3 text-foreground">{r.requester}</td>
-                    <td className="p-3 text-muted-foreground">{r.type}</td>
-                    <td className="p-3 text-foreground/80 max-w-[18rem] truncate">{r.details}</td>
-                    <td className="p-3"><Badge className={`text-xs ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge></td>
-                    <td className="p-3 text-muted-foreground">{r.approvedBy}</td>
-                    <td className="p-3 text-muted-foreground whitespace-nowrap">{fmtDate(r.date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={[
+                { key: "requester", header: "Requester", cellClassName: "text-foreground" },
+                { key: "type", header: "Type", cellClassName: "text-muted-foreground" },
+                { key: "details", header: "Details", cellClassName: "text-foreground/80 max-w-[18rem] truncate" },
+                { key: "status", header: "Status", render: (r: any) => <Badge className={`text-xs ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge> },
+                { key: "approvedBy", header: "Approved By", cellClassName: "text-muted-foreground" },
+                { key: "date", header: "Date", cellClassName: "text-muted-foreground", render: (r: any) => fmtDate(r.date) },
+              ]}
+              rows={recent}
+              getRowKey={(r: any) => `${r.type}-${r.id}`}
+              onRowClick={(r: any) => setDetail(r)}
+              testIdPrefix="activity"
+            />
           )}
         </CardContent></Card>
       </div>
@@ -581,23 +579,17 @@ function ListApprovals({ allItems, isPending, dateOf, render, navigate, reviewHr
         sorted.length === 0 ? (
           <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{emptyCompleted}{hasRange ? " in this date range" : ""}.</p></div>
         ) : (
-          <div className="card-surface rounded-2xl overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground text-left">
-                  {columns.map((c) => <th key={c.label} className={`px-4 py-2.5 font-medium whitespace-nowrap ${c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : ""}`}>{c.label}</th>)}
-                  <th className="px-4 py-2.5 font-medium text-center">View</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {pageItems.map((x: any) => (
-                  <tr key={x.id} className="hover-elevate cursor-pointer" onClick={() => navigate(reviewHref(x))} data-testid={`completed-row-${x.id}`}>
-                    {columns.map((c) => <td key={c.label} className={`px-4 py-3 ${c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : ""}`}>{c.cell(x)}</td>)}
-                    <td className="px-4 py-3 text-center"><Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); navigate(reviewHref(x)); }} data-testid={`view-row-${x.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="card-surface rounded-2xl">
+            <DataTable
+              columns={[
+                ...columns.map((c: any) => ({ key: c.label, header: c.label, align: c.align, render: (x: any) => c.cell(x) })),
+                { key: "__view", header: "View", align: "center" as const, render: (x: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); navigate(reviewHref(x)); }} data-testid={`view-row-${x.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Button> },
+              ]}
+              rows={pageItems}
+              getRowKey={(x: any) => x.id}
+              onRowClick={(x: any) => navigate(reviewHref(x))}
+              testIdPrefix="completed-row"
+            />
           </div>
         )
       )}
@@ -836,37 +828,24 @@ function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { 
         sorted.length === 0 ? (
           <div className="card-surface rounded-2xl p-10 text-center text-sm text-muted-foreground">No completed reimbursements{range.from || range.to ? " in this date range" : ""}.</div>
         ) : (
-          <div className="card-surface rounded-2xl overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground text-left">
-                  <th className="px-4 py-2.5 font-medium">Reference</th>
-                  <th className="px-4 py-2.5 font-medium">Requester</th>
-                  <th className="px-4 py-2.5 font-medium">Category</th>
-                  <th className="px-4 py-2.5 font-medium text-right">Amount</th>
-                  <th className="px-4 py-2.5 font-medium whitespace-nowrap">Submitted</th>
-                  <th className="px-4 py-2.5 font-medium whitespace-nowrap">Decision Date</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 font-medium">Approved By</th>
-                  <th className="px-4 py-2.5 font-medium text-center">View</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {pageItems.map((r: any) => (
-                  <tr key={r.id} className="hover-elevate cursor-pointer" onClick={() => openDetail(r)} data-testid={`completed-reimb-${r.id}`}>
-                    <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap">{r.reference}</td>
-                    <td className="px-4 py-3 text-foreground">{r.employeeName || "—"}<span className="text-muted-foreground"> ({r.employeeCode || "—"})</span></td>
-                    <td className="px-4 py-3 text-muted-foreground capitalize">{r.category || "—"}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-foreground whitespace-nowrap">{money(r.totalAmount)}</td>
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{r.createdAt ? format(new Date(r.createdAt), "dd MMM yyyy") : "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{r.updatedAt ? format(new Date(r.updatedAt), "dd MMM yyyy") : "—"}</td>
-                    <td className="px-4 py-3"><Badge className={`text-xs ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge></td>
-                    <td className="px-4 py-3 text-muted-foreground">{approvedByName(r)}</td>
-                    <td className="px-4 py-3 text-center"><Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={() => openDetail(r)} data-testid={`view-completed-${r.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="card-surface rounded-2xl">
+            <DataTable
+              columns={[
+                { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground" },
+                { key: "requester", header: "Requester", render: (r: any) => <span className="text-foreground">{r.employeeName || "—"}<span className="text-muted-foreground"> ({r.employeeCode || "—"})</span></span> },
+                { key: "category", header: "Category", cellClassName: "text-muted-foreground capitalize", render: (r: any) => r.category || "—" },
+                { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (r: any) => money(r.totalAmount) },
+                { key: "submitted", header: "Submitted", cellClassName: "text-muted-foreground", render: (r: any) => r.createdAt ? format(new Date(r.createdAt), "dd MMM yyyy") : "—" },
+                { key: "decision", header: "Decision Date", cellClassName: "text-muted-foreground", render: (r: any) => r.updatedAt ? format(new Date(r.updatedAt), "dd MMM yyyy") : "—" },
+                { key: "status", header: "Status", render: (r: any) => <Badge className={`text-xs ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge> },
+                { key: "approvedBy", header: "Approved By", cellClassName: "text-muted-foreground", render: (r: any) => approvedByName(r) },
+                { key: "__view", header: "View", align: "center", render: (r: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); openDetail(r); }} data-testid={`view-completed-${r.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Button> },
+              ]}
+              rows={pageItems}
+              getRowKey={(r: any) => r.id}
+              onRowClick={(r: any) => openDetail(r)}
+              testIdPrefix="completed-reimb"
+            />
           </div>
         )
       )}

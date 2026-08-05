@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth, isHR, isManager } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/data-table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -340,6 +341,11 @@ export default function LeavePage() {
 
   const [showApply, setShowApply] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
+  // Deep-link support: /leave?action=apply (used by the dashboard's Apply Leave button) opens the form.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("action") === "apply") setShowApply(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [activeTab, setActiveTab] = useState("my-leaves");
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [search, setSearch] = useState("");
@@ -467,7 +473,7 @@ export default function LeavePage() {
           </div>
 
           {/* Table */}
-          <Card className="border-0"><CardContent className="p-0 overflow-x-auto">
+          <Card className="border-0"><CardContent className="p-0">
             {lrLoading ? (
               <div className="p-4"><Skeleton className="h-32 w-full" /></div>
             ) : filteredMy.length === 0 ? (
@@ -477,34 +483,19 @@ export default function LeavePage() {
                 {myYear.length === 0 && <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowApply(true)}>Apply for Leave</Button>}
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead><tr className="text-left text-xs text-muted-foreground">
-                  <th className="p-3">Leave Type</th><th className="p-3">Dates</th><th className="p-3">Days</th><th className="p-3">Reason</th><th className="p-3">Status</th><th className="p-3 text-right">Action</th>
-                </tr></thead>
-                <tbody className="list-divider">
-                  {filteredMy.map((r: any) => {
-                    const lt = leaveTypes.find((l: any) => l.id === r.leaveTypeId);
-                    const sc = statusConfig[r.status] || statusConfig.pending;
-                    return (
-                      <tr key={r.id} className="hover-elevate" data-testid={`leave-row-${r.id}`}>
-                        <td className="p-3"><span className="flex items-center gap-1.5 text-foreground"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: lt?.color || "#206295" }} />{lt?.name || "—"}</span></td>
-                        <td className="p-3 text-muted-foreground whitespace-nowrap">
-                          {format(new Date(r.startDate), "MMM d")}
-                          {r.startDate !== r.endDate ? ` – ${format(new Date(r.endDate), "MMM d, yyyy")}` : `, ${format(new Date(r.startDate), "yyyy")}`}
-                        </td>
-                        <td className="p-3 text-muted-foreground">{r.totalDays}d</td>
-                        <td className="p-3 text-muted-foreground max-w-[16rem] truncate">{r.reason || "—"}</td>
-                        <td className="p-3"><Badge className={`text-xs ${sc.bg} ${sc.text}`}>{sc.label}</Badge></td>
-                        <td className="p-3 text-right">
-                          {canCancel(r) ? (
-                            <Button size="sm" variant="outline" className="h-7 text-xs text-[#FF6F62] border-[#FF6F62]/30" onClick={() => updateLeave.mutate({ id: r.id, status: "cancelled" })} data-testid={`button-cancel-leave-${r.id}`}>Cancel</Button>
-                          ) : <span className="text-xs text-muted-foreground">—</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DataTable
+                columns={[
+                  { key: "type", header: "Leave Type", render: (r: any) => { const lt = leaveTypes.find((l: any) => l.id === r.leaveTypeId); return <span className="flex items-center gap-1.5 text-foreground"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: lt?.color || "#206295" }} />{lt?.name || "—"}</span>; } },
+                  { key: "dates", header: "Dates", cellClassName: "text-muted-foreground", render: (r: any) => <>{format(new Date(r.startDate), "MMM d")}{r.startDate !== r.endDate ? ` – ${format(new Date(r.endDate), "MMM d, yyyy")}` : `, ${format(new Date(r.startDate), "yyyy")}`}</> },
+                  { key: "days", header: "Days", cellClassName: "text-muted-foreground", render: (r: any) => `${r.totalDays}d` },
+                  { key: "reason", header: "Reason", cellClassName: "text-muted-foreground max-w-[16rem] truncate", render: (r: any) => r.reason || "—" },
+                  { key: "status", header: "Status", render: (r: any) => { const sc = statusConfig[r.status] || statusConfig.pending; return <Badge className={`text-xs ${sc.bg} ${sc.text}`}>{sc.label}</Badge>; } },
+                  { key: "action", header: "Action", align: "right", render: (r: any) => canCancel(r) ? <Button size="sm" variant="outline" className="h-7 text-xs text-[#FF6F62] border-[#FF6F62]/30" onClick={() => updateLeave.mutate({ id: r.id, status: "cancelled" })} data-testid={`button-cancel-leave-${r.id}`}>Cancel</Button> : <span className="text-xs text-muted-foreground">—</span> },
+                ]}
+                rows={filteredMy}
+                getRowKey={(r: any) => r.id}
+                testIdPrefix="leave-row"
+              />
             )}
           </CardContent></Card>
         </div>

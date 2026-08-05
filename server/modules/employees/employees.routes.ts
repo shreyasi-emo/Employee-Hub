@@ -29,7 +29,13 @@ export function registerEmployeeRoutes(app: Express) {
     if (!user.employeeId) return res.status(404).json({ error: "No linked employee record" });
     const emp = await storage.getEmployee(user.employeeId);
     if (!emp) return res.status(404).json({ error: "Employee not found" });
-    res.json(emp);
+    // Resolve the reporting manager's display name (server-side, so the client never needs the directory).
+    let managerName: string | null = null;
+    if (emp.managerId) {
+      const mgr = await storage.getEmployee(emp.managerId);
+      if (mgr) managerName = `${mgr.firstName || ""} ${mgr.lastName || ""}`.trim() || null;
+    }
+    res.json({ ...emp, managerName });
   });
 
   app.put("/api/employees/me", requireAuth, async (req, res) => {
