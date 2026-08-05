@@ -5,6 +5,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/data-table";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -103,39 +104,22 @@ const searchText = (type: string, it: any): string =>
 // Clean table view of requests for the current tab.
 function RequestTable({ type, items, onOpen }: { type: string; items: any[]; onOpen: (it: any) => void }) {
   return (
-    <div className="card-surface rounded-[16px] overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground text-left">
-            <th className="px-4 py-2.5 font-medium">Request</th>
-            <th className="px-4 py-2.5 font-medium">Details</th>
-            <th className="px-4 py-2.5 font-medium">Status</th>
-            <th className="px-4 py-2.5 font-medium text-right">Amount</th>
-            <th className="px-4 py-2.5 font-medium whitespace-nowrap">Submitted on</th>
-            <th className="px-4 py-2.5 font-medium whitespace-nowrap">Last Updated</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/50">
-          {items.map((it) => {
-            const sub = submittedInfo(type, it);
-            return (
-            <tr key={it.id} className={`hover-elevate cursor-pointer ${it.status === "changes_requested" ? "bg-[#FF6F62]/[0.06]" : ""}`} onClick={() => onOpen(it)} data-testid={`row-${type}-${it.id}`}>
-              <td className="px-4 py-3 font-medium text-foreground">{titleOf(type, it)}</td>
-              <td className="px-4 py-3 text-muted-foreground max-w-[18rem] truncate">{subOf(type, it) || "—"}</td>
-              <td className="px-4 py-3">{type === "reimbursement" ? <StatusBadge status={it.status} /> : <Badge className={`text-xs ${statusClass(it.status)}`}>{statusLabel(it.status)}</Badge>}</td>
-              <td className="px-4 py-3 text-right font-semibold text-foreground whitespace-nowrap">{amountOf(type, it) ? money(amountOf(type, it)) : "—"}</td>
-              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                <div className="flex flex-col">
-                  <SubmittedLabel info={sub} className="text-[10px] uppercase tracking-wide text-muted-foreground" />
-                  <span>{formatDate(sub.date)}</span>
-                </div>
-              </td>
-              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{it.updatedAt ? formatDate(it.updatedAt) : "—"}</td>
-            </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="card-surface rounded-[16px]">
+      <DataTable
+        columns={[
+          { key: "request", header: "Request", cellClassName: "font-medium text-foreground", render: (it: any) => titleOf(type, it) },
+          { key: "details", header: "Details", cellClassName: "text-muted-foreground max-w-[18rem] truncate", render: (it: any) => subOf(type, it) || "—" },
+          { key: "status", header: "Status", render: (it: any) => type === "reimbursement" ? <StatusBadge status={it.status} /> : <Badge className={`text-xs ${statusClass(it.status)}`}>{statusLabel(it.status)}</Badge> },
+          { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (it: any) => amountOf(type, it) ? money(amountOf(type, it)) : "—" },
+          { key: "submitted", header: "Submitted on", cellClassName: "text-muted-foreground", render: (it: any) => { const sub = submittedInfo(type, it); return <div className="flex flex-col"><SubmittedLabel info={sub} className="text-[10px] uppercase tracking-wide text-muted-foreground" /><span>{formatDate(sub.date)}</span></div>; } },
+          { key: "updated", header: "Last Updated", cellClassName: "text-muted-foreground", render: (it: any) => it.updatedAt ? formatDate(it.updatedAt) : "—" },
+        ]}
+        rows={items}
+        getRowKey={(it: any) => it.id}
+        onRowClick={(it: any) => onOpen(it)}
+        rowClassName={(it: any) => it.status === "changes_requested" ? "bg-[#FF6F62]/[0.06]" : ""}
+        testIdPrefix={`row-${type}`}
+      />
     </div>
   );
 }

@@ -21,9 +21,11 @@ import {
   CheckCircle2, XCircle, AlertCircle, ArrowRight, Megaphone,
   Building2, UserCheck, ClipboardList, ShoppingCart, Car, Plus,
   ChevronLeft, ChevronRight, CalendarDays, Check, X, Pencil, Trash2, UserPlus,
+  Route, Home, Hash, Briefcase, Mail, Search, Bell,
 } from "lucide-react";
 import { Calendar as CalendarWidget } from "@/components/ui/calendar";
 import { useNavigation } from "react-day-picker";
+import { ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format } from "date-fns";
 
 interface Stats {
@@ -230,6 +232,10 @@ function loadEvents(): DashEvent[] {
 }
 
 const HOLIDAY_COLOR = "#FF6F62";
+// My-Attendance donut colours (aligned with the Attendance page's state palette).
+const ATT_COLORS: Record<string, string> = {
+  present: "#206295", wfh: "#0E7C7B", on_duty: "#4A90C2", half_day: "#6A7366", leave: "#953229", absent: "#FF6F62",
+};
 // Per-name attendee palette so different people get teal / grey / coral DPs & chips
 const NAME_PALETTE = [
   { avatar: "rgba(75, 220, 217, 0.35)", text: "#1F8F8C", chip: "rgba(75, 220, 217, 0.15)" },   // teal (#4BDCD9)
@@ -242,10 +248,13 @@ function nameColor(name: string) {
   return NAME_PALETTE[h % NAME_PALETTE.length];
 }
 
-function CalendarCard({ holidayDates, upcomingHolidays, employees }: {
+function CalendarCard({ holidayDates, upcomingHolidays, employees, readOnly = false, bookingDates = [], upcomingBookings = [] }: {
   holidayDates: Date[];
   upcomingHolidays: any[];
   employees: any[];
+  readOnly?: boolean;
+  bookingDates?: Date[];
+  upcomingBookings?: any[];
 }) {
   const blankForm = { title: "", description: "", date: "", time: "", attendees: [] as string[] };
   const [events, setEvents] = useState<DashEvent[]>(() => loadEvents());
@@ -326,11 +335,13 @@ function CalendarCard({ holidayDates, upcomingHolidays, employees }: {
 
   return (
     <Card className="border-0 lg:h-[25rem] lg:col-span-2 flex flex-col" style={CARD_STYLE}>
-      <CardHeader className="pb-2 flex flex-row items-center justify-between gap-1">
+      <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
         <CardTitle className="text-base font-semibold">Calendar</CardTitle>
-        <Button variant="secondary" size="sm" className="text-xs rounded-[12px]" onClick={openAdd} data-testid="button-add-event">
-          <Plus className="h-3.5 w-3.5 mr-1" /> Add Event
-        </Button>
+        {!readOnly && (
+          <Button variant="secondary" size="sm" className="text-xs rounded-[12px]" onClick={openAdd} data-testid="button-add-event">
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add Event
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="px-5 pb-4 flex-1 min-h-0">
         <div className="flex flex-col lg:flex-row h-full">
@@ -342,16 +353,18 @@ function CalendarCard({ holidayDates, upcomingHolidays, employees }: {
               className="w-full h-full p-0"
               classNames={calClassNames}
               components={{ Caption: CalCaption }}
-              modifiers={{ holiday: holidayDates, event: eventDates }}
+              modifiers={{ holiday: holidayDates, event: readOnly ? [] : eventDates, booking: bookingDates }}
               modifiersStyles={{
                 holiday: { backgroundColor: "rgba(255,111,98,0.15)", color: HOLIDAY_COLOR, fontWeight: 600 },
                 event: { backgroundColor: "rgba(32,98,149,0.15)", color: "#206295", fontWeight: 600 },
+                booking: { backgroundColor: "rgba(14,124,123,0.15)", color: "#0E7C7B", fontWeight: 600 },
               }}
             />
           </div>
 
           {/* Vertical separator + events/holidays list */}
           <div className="lg:w-64 lg:flex-shrink-0 lg:border-l lg:border-border lg:pl-5 pr-2 mt-4 lg:mt-0 overflow-y-auto">
+            {!readOnly && (<>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Upcoming Events</p>
             {upcomingEvents.length === 0 ? (
               <p className="text-xs text-muted-foreground mb-4">No upcoming events yet. Use “Add Event” to create one.</p>
@@ -382,6 +395,26 @@ function CalendarCard({ holidayDates, upcomingHolidays, employees }: {
                   </button>
                 ))}
               </div>
+            )}
+            </>)}
+
+            {upcomingBookings.length > 0 && (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#0E7C7B" }}>Upcoming Bookings</p>
+                <div className="space-y-2 mb-4">
+                  {upcomingBookings.map((b: any) => (
+                    <div key={b.id} className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-[12px] flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(14,124,123,0.12)" }}>
+                        <Car className="h-4 w-4" style={{ color: "#0E7C7B" }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{b.purpose || "Car booking"}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(b.startTime), "EEE, d MMM · h:mm a")}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
 
             <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "rgb(89, 97, 105)" }}>Upcoming Holidays</p>
@@ -619,6 +652,131 @@ function CalendarCard({ holidayDates, upcomingHolidays, employees }: {
   );
 }
 
+// ===== Quick Actions (last row, all dashboards) — important features NOT already on the dashboard =====
+const QUICK_ACTIONS = [
+  { label: "Book a Car", desc: "Company vehicles", href: "/vehicles", icon: Car, color: "bg-[#206295]/15 text-[#206295]" },
+  { label: "Company Workspace", desc: "Services & requests", href: "/company-workspace", icon: Building2, color: "bg-[#4BDCD9]/25 text-[#0E7C7B]" },
+  { label: "Request Logistics", desc: "Couriers & moves", href: "/logistics", icon: Route, color: "bg-[#206295]/15 text-[#206295]" },
+  { label: "View Payslips", desc: "Salary & payroll", href: "/payroll", icon: DollarSign, color: "bg-[#4BDCD9]/25 text-[#0E7C7B]" },
+];
+
+function QuickActionsRow() {
+  return (
+    <div>
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Quick Actions</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {QUICK_ACTIONS.map((a) => (
+          <a key={a.href} href={a.href} className="block" data-testid={`quick-${a.label.toLowerCase().replace(/\s+/g, "-")}`}>
+            <Card className="border-0 card-hover h-full" style={CARD_STYLE}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className={`p-2.5 rounded-lg flex-shrink-0 ${a.color}`}><a.icon className="h-5 w-5" /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground truncate">{a.label}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{a.desc}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </CardContent>
+            </Card>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Brand palette for department chips in the directory (stable per department id).
+const DEPT_CHIP_COLORS = ["#206295", "#0E7C7B", "#4A90C2", "#6A7366", "#953229", "#425B8D"];
+const deptChipColor = (id?: string | null) => {
+  if (!id) return "#94A3B8";
+  let h = 0; for (const ch of id) h += ch.charCodeAt(0);
+  return DEPT_CHIP_COLORS[h % DEPT_CHIP_COLORS.length];
+};
+
+// "Meet the Team" — safe, searchable coworker directory (sanitized fields only; no click-through to
+// full profiles, which stay blocked server-side). Avatar-forward card grid.
+function MeetTheTeamCard({ employees, departments, designations, meId }: { employees: any[]; departments: any[]; designations: any[]; meId?: string }) {
+  const [q, setQ] = useState("");
+  const deptName = (id?: string) => (departments as any[]).find((d) => d.id === id)?.name;
+  const desigName = (id?: string) => (designations as any[]).find((d) => d.id === id)?.name;
+  const initials = (e: any) => `${e.firstName?.[0] || ""}${e.lastName?.[0] || ""}`.toUpperCase();
+  const term = q.trim().toLowerCase();
+  const list = (employees as any[])
+    .filter((e) => e.employmentStatus !== "exited")
+    .filter((e) => !term || `${e.firstName} ${e.lastName} ${deptName(e.departmentId) || ""} ${desigName(e.designationId) || ""} ${e.employeeCode || ""}`.toLowerCase().includes(term))
+    .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+  return (
+    <Card className="border-0 lg:col-span-3 lg:h-[26rem] flex flex-col" style={CARD_STYLE}>
+      <CardHeader className="pt-4 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 space-y-0">
+        <CardTitle className="text-base font-semibold flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Meet the Team <span className="text-xs font-normal text-muted-foreground">{list.length}</span></CardTitle>
+        <div className="relative w-full sm:w-56">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, team, role…" className="pl-9 h-9" data-testid="input-team-search" />
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-4 flex-1 min-h-0">
+        {list.length === 0 ? (
+          <div className="h-full flex items-center justify-center"><p className="text-sm text-muted-foreground">No one matches your search.</p></div>
+        ) : (
+          <ScrollArea className="h-full -mr-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 pr-2">
+              {list.map((e) => {
+                const c = deptChipColor(e.departmentId);
+                const isYou = meId && e.id === meId;
+                return (
+                  <div key={e.id} className="flex items-center gap-3 rounded-xl border border-border/60 p-2.5 hover-elevate" data-testid={`coworker-${e.id}`}>
+                    <Avatar className="h-10 w-10 flex-shrink-0">
+                      {(e.profilePhoto || e.avatarUrl) && <AvatarImage src={e.profilePhoto || e.avatarUrl} />}
+                      <AvatarFallback className="text-xs font-semibold" style={{ backgroundColor: `${c}1F`, color: c }}>{initials(e)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground truncate">{e.firstName} {e.lastName}{isYou ? <span className="text-[10px] font-normal text-muted-foreground"> (You)</span> : null}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{desigName(e.designationId) || "—"}</p>
+                      {e.departmentId && <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: `${c}1F`, color: c }}>{deptName(e.departmentId)}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// "Recent Activity" — the current user's notification feed (approvals, decisions, reminders…).
+function RecentActivityCard() {
+  const { data: notifications = [] } = useQuery<any[]>({ queryKey: ["/api/notifications"] });
+  const items = (notifications as any[]).slice(0, 15);
+  return (
+    <Card className="border-0 lg:h-[26rem] flex flex-col" style={CARD_STYLE}>
+      <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
+        <CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
+      </CardHeader>
+      <CardContent className="px-4 pb-4 flex-1 min-h-0">
+        {items.length === 0 ? (
+          <div className="h-full flex items-center justify-center"><p className="text-sm text-muted-foreground">Nothing recent</p></div>
+        ) : (
+          <ScrollArea className="h-full -mr-2">
+            <div className="list-divider pr-2">
+              {items.map((n: any) => (
+                <div key={n.id} className="flex gap-2.5 py-2.5">
+                  <span className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 mt-0.5"><Bell className="h-3.5 w-3.5" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium text-foreground leading-snug">{n.title}</p>
+                    {n.body && <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{n.body}</p>}
+                    {n.createdAt && <p className="text-[10px] text-muted-foreground/80 mt-0.5">{format(new Date(n.createdAt), "d MMM, h:mm a")}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DashboardPage() {
   const { data: auth } = useAuth();
   const user = auth?.user;
@@ -633,7 +791,7 @@ export default function DashboardPage() {
   const { data: leaveRequests = [] } = useQuery<any[]>({ queryKey: ["/api/leave-requests"] });
   const { data: employees = [] } = useQuery<any[]>({
     queryKey: ["/api/employees"],
-    enabled: isHR(user!) || isManager(user!),
+    enabled: !!user, // used by the "Meet the Team" directory (sanitized list) + admin panels
   });
   const { data: leaveTypes = [] } = useQuery<any[]>({ queryKey: ["/api/leave-types"] });
   const { data: myAttendance = [] } = useQuery<any[]>({
@@ -647,12 +805,16 @@ export default function DashboardPage() {
   const { data: myPayslips = [] } = useQuery<any[]>({
     queryKey: ["/api/payslips/me"],
   });
+  const { data: myEmp } = useQuery<any>({ queryKey: ["/api/employees/me"], enabled: !!emp });
+  const { data: departments = [] } = useQuery<any[]>({ queryKey: ["/api/departments"], enabled: !!user });
+  const { data: designations = [] } = useQuery<any[]>({ queryKey: ["/api/designations"], enabled: !!user });
+  const { data: allBookings = [] } = useQuery<any[]>({ queryKey: ["/api/vehicles/bookings"], enabled: !!user, retry: false });
 
   // Service-request counts + calendar data for the admin dashboard layout
   const showAdminLayout = isHR(user!) || isManager(user!);
   const { data: requestSummary } = useQuery<any>({
     queryKey: ["/api/my-requests/summary"],
-    enabled: showAdminLayout,
+    enabled: !!user,
   });
   // /api/team-requests returns an object: { purchases, travels, tickets, teamMembers }
   const { data: teamRequests } = useQuery<any>({
@@ -662,7 +824,7 @@ export default function DashboardPage() {
   });
   const { data: holidays = [] } = useQuery<any[]>({
     queryKey: [`/api/holidays?year=${currentYear}`],
-    enabled: showAdminLayout,
+    enabled: !!user,
   });
 
   const purchasePending = requestSummary?.purchases?.pending ?? 0;
@@ -690,16 +852,87 @@ export default function DashboardPage() {
 
   const displayName = emp ? emp.firstName : user?.username || "User";
 
-  const presentDays = myAttendance.filter((a: any) => ["present", "wfh", "on_duty"].includes(a.status)).length;
-  const absentDays = myAttendance.filter((a: any) => a.status === "absent").length;
-  const lopDays = myAttendance.filter((a: any) => a.status === "lop").length;
+  // Elapsed working days this month (Mon–Fri minus holidays, up to today).
+  const monthStart = new Date(currentYear, currentMonth - 1, 1);
+  const holidayStrSet = new Set((holidays as any[]).map((h) => h.date));
+  let workingDays = 0;
+  for (let d = new Date(monthStart); d <= today; d.setDate(d.getDate() + 1)) {
+    const wd = d.getDay();
+    if (wd === 0 || wd === 6) continue;
+    if (holidayStrSet.has(format(d, "yyyy-MM-dd"))) continue;
+    workingDays++;
+  }
+  // Only count records for ELAPSED working days so the numbers stay consistent with `workingDays`
+  // (future planned leave/WFH must not inflate this-month-so-far totals).
+  const todayStr = format(today, "yyyy-MM-dd");
+  const elapsedAtt = (myAttendance as any[]).filter((a) => {
+    if (!a.date || a.date > todayStr) return false;
+    const d = new Date(`${a.date}T00:00:00`);
+    const wd = d.getDay();
+    return wd !== 0 && wd !== 6 && !holidayStrSet.has(a.date);
+  });
+  const countStatus = (s: string) => elapsedAtt.filter((a) => a.status === s).length;
+  const wfhDays = countStatus("wfh");
+  const onDutyDays = countStatus("on_duty");
+  const absentDays = countStatus("absent");
+  const leaveDays = countStatus("leave");
+  const halfDays = countStatus("half_day");
+  // Present-by-default: every elapsed working day with no exception record counts as office-present.
+  const officePresent = Math.max(0, workingDays - wfhDays - onDutyDays - leaveDays - absentDays - halfDays);
+  const presentDays = officePresent + wfhDays + onDutyDays; // "present" incl. WFH / On-Duty
+
+  // Full month breakdown (all six states, for the legend) + non-zero subset (for the donut).
+  const attLegend = [
+    { key: "present", name: "Present (Office)", value: officePresent },
+    { key: "wfh", name: "WFH", value: wfhDays },
+    { key: "on_duty", name: "On Duty", value: onDutyDays },
+    { key: "half_day", name: "Half Day", value: halfDays },
+    { key: "leave", name: "Leave", value: leaveDays },
+    { key: "absent", name: "Absent", value: absentDays },
+  ].map((s) => ({ ...s, color: ATT_COLORS[s.key] })).sort((a, b) => b.value - a.value);
+  const attSegments = attLegend.filter((s) => s.value > 0);
+  const attendancePct = workingDays ? Math.round(((officePresent + wfhDays + onDutyDays + 0.5 * halfDays) / workingDays) * 100) : 0;
 
   const pendingLeaveRequests = leaveRequests.filter((r: any) => r.status === "pending");
-  const latestPayslip = myPayslips[0];
+  const myPendingCount = pendingLeaveRequests.length + (requestSummary?.purchases?.pending ?? 0) + (requestSummary?.travels?.pending ?? 0);
+  const totalLeaveBalance = myLeaveBalances.reduce((a: number, b: any) => a + parseFloat(b.closingBalance || "0"), 0);
+
+  // Profile snapshot lookups + my upcoming car bookings (for the calendar).
+  const deptName = (departments as any[]).find((d) => d.id === emp?.departmentId)?.name;
+  const designationName = (designations as any[]).find((d) => d.id === emp?.designationId)?.name;
+  const empInitials = emp ? `${emp.firstName?.[0] || ""}${emp.lastName?.[0] || ""}`.toUpperCase() : "";
+  const empJoinDate = (emp as any)?.joinDate as string | undefined;
+  const empEmploymentType = (emp as any)?.employmentType as string | undefined;
+  const tenure = (() => {
+    if (!empJoinDate) return "";
+    const j = new Date(empJoinDate);
+    let m = (today.getFullYear() - j.getFullYear()) * 12 + (today.getMonth() - j.getMonth());
+    if (m < 0) m = 0;
+    const y = Math.floor(m / 12), mm = m % 12;
+    return y ? `${y}y ${mm}m` : `${mm} mo`;
+  })();
+  const managerName = myEmp?.managerName as string | undefined;
+  const empEmail = (myEmp?.email || (emp as any)?.email) as string | undefined;
+  // Today's status chip.
+  const todayRec = (myAttendance as any[]).find((a) => a.date === todayStr);
+  const todayStatusKey = todayRec?.status || ([0, 6].includes(today.getDay()) ? "weekend" : holidayStrSet.has(todayStr) ? "holiday" : "present");
+  const STATUS_META: Record<string, { label: string; color: string }> = {
+    present: { label: "In Office", color: "#206295" }, wfh: { label: "WFH", color: "#0E7C7B" }, on_duty: { label: "On Duty", color: "#4A90C2" },
+    half_day: { label: "Half Day", color: "#6A7366" }, leave: { label: "On Leave", color: "#953229" }, absent: { label: "Absent", color: "#FF6F62" },
+    weekend: { label: "Weekend", color: "#94A3B8" }, holiday: { label: "Holiday", color: "#94A3B8" },
+  };
+  const todayMeta = STATUS_META[todayStatusKey] || STATUS_META.present;
+
+  const todayMidnight = new Date(new Date().toDateString());
+  const myBookings = (allBookings as any[])
+    .filter((b) => (b.requesterId === user?.id || (b.attendees || []).some((a: any) => a?.userId === user?.id)) && b.startTime && new Date(b.startTime) >= todayMidnight && b.status !== "cancelled")
+    .sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime));
+  const bookingDates = myBookings.map((b) => new Date(b.startTime));
+  const upcomingBookings = myBookings.slice(0, 4);
 
   return (
     <div className="min-h-full">
-      <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
+      <div className="p-6 space-y-4 max-w-[92rem] mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -718,6 +951,17 @@ export default function DashboardPage() {
                 Add Employee
               </a>
             </Button>
+          )}
+          {emp && !showAdminLayout && (
+            <>
+              <Button variant="outline" size="sm" asChild data-testid="button-mark-on-duty">
+                <a href="/attendance?action=on-duty"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</a>
+              </Button>
+              <Button variant="outline" size="sm" asChild data-testid="button-apply-wfh">
+                <a href="/attendance?action=wfh"><Home className="h-4 w-4 mr-1.5" /> Apply WFH</a>
+              </Button>
+              <div className="w-px h-6 bg-border self-center mx-0.5" aria-hidden="true" />
+            </>
           )}
           <Button variant="outline" size="sm" asChild data-testid="button-apply-leave">
             <a href="/leave?action=apply">
@@ -774,43 +1018,70 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Personal Stats — only for individual contributors, not company-level viewers
-          (HR/managers/super-admin see the company stats grid above instead). */}
+      {/* Personal row — profile snapshot (merged) + the two non-attendance stats.
+          Attendance now lives in the donut below, so no repetitive present/absence cards. */}
       {emp && !showAdminLayout && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            title="Present This Month"
-            value={presentDays}
-            icon={UserCheck}
-            subtitle="Days present"
-            color="bg-[#4BDCD9]/25 text-[#206295]"
-            href="/attendance"
-          />
+          {/* Profile snapshot — spans the first two card slots */}
+          <Card className="border-0 col-span-2" style={CARD_STYLE}>
+            <CardContent className="p-5 flex items-center gap-5">
+              {/* Left — identity + inline meta (single strip to keep the card short) */}
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className="relative flex-shrink-0">
+                  <Avatar className="h-14 w-14 ring-2 ring-[#206295]/20 ring-offset-2 ring-offset-transparent">
+                    {emp.avatarUrl && <AvatarImage src={emp.avatarUrl} />}
+                    <AvatarFallback className="text-lg font-bold bg-[#206295]/10 text-[#206295]">{empInitials}</AvatarFallback>
+                  </Avatar>
+                  <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ backgroundColor: todayMeta.color }} title={`Today · ${todayMeta.label}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-lg font-bold text-foreground truncate">{emp.firstName} {emp.lastName}</p>
+                    {user?.role && <Badge className={`text-[10px] ${getRoleBadgeColor(user.role as any)}`}>{getRoleLabel(user.role as any)}</Badge>}
+                    {(designationName || deptName) && <span className="text-xs text-muted-foreground truncate">{designationName || ""}{designationName && deptName ? " · " : ""}{deptName || ""}</span>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5"><Hash className="h-3.5 w-3.5 text-[#206295]" /> {emp.employeeCode || "—"}</span>
+                    {empEmploymentType && <span className="inline-flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5 text-[#206295]" /> {empEmploymentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</span>}
+                    {empJoinDate && <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-[#206295]" /> Joined {format(new Date(empJoinDate), "MMM yyyy")}{tenure ? ` · ${tenure}` : ""}</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="hidden sm:block w-px self-stretch bg-border/70" />
+
+              {/* Right — today's status + contact */}
+              <div className="sm:w-64 flex-shrink-0 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: `${todayMeta.color}1F`, color: todayMeta.color }}>
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: todayMeta.color }} /> Today · {todayMeta.label}
+                  </span>
+                  <a href={`/employees/${emp.id}`} className="text-xs text-primary font-medium inline-flex items-center gap-1" data-testid="link-profile-snapshot">View <ArrowRight className="h-3 w-3" /></a>
+                </div>
+                <div className="space-y-1.5 text-xs text-muted-foreground">
+                  {empEmail && <p className="inline-flex items-center gap-2 w-full min-w-0"><Mail className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /><span className="truncate">{empEmail}</span></p>}
+                  <p className="inline-flex items-center gap-2"><UserCheck className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /> {managerName ? <>Reports to <span className="font-medium text-foreground">{managerName}</span></> : "No manager assigned"}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <StatCard
             title="Leave Balance"
-            value={myLeaveBalances.reduce((a: number, b: any) => a + parseFloat(b.closingBalance || "0"), 0)}
+            value={totalLeaveBalance}
             icon={Plane}
             subtitle="Total available days"
-            color="bg-[#206295]/15 text-[#206295]"
+            color="bg-[#4BDCD9]/25 text-[#206295]"
             href="/leave"
           />
           <StatCard
-            title="Absences"
-            value={absentDays}
-            icon={XCircle}
-            subtitle="Days absent"
-            color="bg-[#FF6F62]/20 text-[#FF6F62]"
+            title="My Pending Requests"
+            value={myPendingCount}
+            icon={ClipboardList}
+            subtitle="Awaiting approval"
+            color="bg-[#206295]/15 text-[#206295]"
+            href="/my-requests"
           />
-          {latestPayslip && (
-            <StatCard
-              title="Last Net Pay"
-              value={`₹${Math.round(parseFloat(latestPayslip.netPay || "0")).toLocaleString("en-IN")}`}
-              icon={DollarSign}
-              subtitle={`${latestPayslip.year}-${String(latestPayslip.month).padStart(2, "0")}`}
-              color="bg-[#4BDCD9]/25 text-[#206295]"
-              href="/payroll"
-            />
-          )}
         </div>
       )}
 
@@ -818,9 +1089,9 @@ export default function DashboardPage() {
       {(() => {
         const announcementsPanel = (
           <Card className="border-0 h-full flex flex-col" style={CARD_STYLE}>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between gap-1">
+            <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
               <CardTitle className="text-base font-semibold">Announcements</CardTitle>
-              <Button variant="ghost" size="sm" asChild className="text-xs">
+              <Button variant="ghost" size="sm" asChild className="text-xs h-auto min-h-0 py-1">
                 <a href="/announcements">View all <ArrowRight className="h-3 w-3 ml-1" /></a>
               </Button>
             </CardHeader>
@@ -848,10 +1119,10 @@ export default function DashboardPage() {
 
         if (showAdminLayout) {
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* LEFT — Pending Service Requests (bento card, below 1st overview card) */}
               <Card className="border-0 lg:h-[25rem] flex flex-col" style={CARD_STYLE}>
-                <CardHeader className="pb-2">
+                <CardHeader className="pt-4 pb-2">
                   <CardTitle className="text-base font-semibold">Pending Service Requests</CardTitle>
                 </CardHeader>
                 <CardContent className="px-3 pb-3 flex-1 flex flex-col gap-4">
@@ -874,7 +1145,7 @@ export default function DashboardPage() {
               </Card>
 
               {/* CENTER — Calendar (below 2nd & 3rd overview cards) */}
-              <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={employees} />
+              <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={employees} bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
 
               {/* RIGHT — Announcements (below 4th overview card) */}
               <div className="lg:h-[25rem]">{announcementsPanel}</div>
@@ -883,56 +1154,56 @@ export default function DashboardPage() {
         }
 
         return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">{announcementsPanel}</div>
-
-            {/* Leave Summary */}
-            {emp && (
-          <Card className="border-0" style={CARD_STYLE}>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between gap-1">
-              <CardTitle className="text-base font-semibold">Leave Balances</CardTitle>
-              <Button variant="ghost" size="sm" asChild className="text-xs">
-                <a href="/leave">Apply <ArrowRight className="h-3 w-3 ml-1" /></a>
-              </Button>
-            </CardHeader>
-            <CardContent className="px-5 pb-4">
-              {myLeaveBalances.length === 0 ? (
-                <div className="text-sm text-muted-foreground text-center py-4">No leave balances</div>
-              ) : (
-                <div className="space-y-2.5">
-                  {myLeaveBalances.map((bal: any) => {
-                    const lt = leaveTypes.find((l: any) => l.id === bal.leaveTypeId);
-                    const total = parseFloat(bal.closingBalance || "0");
-                    const taken = parseFloat(bal.taken || "0");
-                    const accrued = parseFloat(bal.accrued || "0");
-                    const pct = accrued > 0 ? Math.min(100, (total / accrued) * 100) : 0;
-                    return (
-                      <div key={bal.id} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: lt?.color || "#3B82F6" }}
-                            />
-                            <span className="text-foreground font-medium">{lt?.name || "Unknown"}</span>
-                          </div>
-                          <span className="font-semibold text-foreground">{total}d</span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-1.5">
-                          <div
-                            className="h-1.5 rounded-full transition-all"
-                            style={{ width: `${pct}%`, backgroundColor: lt?.color || "#3B82F6" }}
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground">{taken}d taken of {accrued}d</p>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            {/* LEFT — My Attendance donut + quick access to the attendance page */}
+            <Card className="border-0 lg:h-[25rem] flex flex-col" style={CARD_STYLE}>
+              <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
+                <CardTitle className="text-base font-semibold">My Attendance</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-4 flex-1 min-h-0 flex flex-col">
+                {workingDays === 0 ? (
+                  <div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">No working days yet this month</p></div>
+                ) : (
+                  <>
+                    <div className="relative h-32 w-32 mx-auto flex-shrink-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={attSegments} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={58} innerRadius={34} paddingAngle={3} cornerRadius={5} stroke="none">
+                            {attSegments.map((s) => <Cell key={s.key} fill={s.color} />)}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-2xl font-bold text-foreground leading-none tabular-nums">{attendancePct}%</span>
+                        <span className="text-[10px] text-muted-foreground mt-0.5">attendance</span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                    </div>
+                    <p className="text-center text-xs text-muted-foreground mt-2">
+                      <span className="font-semibold text-foreground">{presentDays}</span> of {workingDays} working days present
+                    </p>
+                    <Separator className="my-3" />
+                    <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
+                      {attLegend.map((s) => (
+                        <div key={s.key} className={`flex items-center gap-2 text-xs ${s.value === 0 ? "opacity-45" : ""}`}>
+                          <span className="w-2.5 h-2.5 rounded-[3px] flex-shrink-0" style={{ background: s.color }} />
+                          <span className="text-foreground/80 truncate flex-1">{s.name}</span>
+                          <span className="font-semibold text-foreground tabular-nums">{s.value}<span className="text-muted-foreground font-normal"> {s.value === 1 ? "day" : "days"}</span></span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <Button variant="secondary" size="sm" asChild className="w-full mt-3 rounded-[12px] flex-shrink-0">
+                  <a href="/attendance" data-testid="link-view-attendance"><CalendarDays className="h-3.5 w-3.5 mr-1.5" /> View full attendance</a>
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* CENTER — read-only Calendar: holidays + my upcoming bookings; no Add Event / attendee tooling. */}
+            <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={[]} readOnly bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
+
+            {/* RIGHT — Announcements */}
+            <div className="lg:h-[25rem]">{announcementsPanel}</div>
           </div>
         );
       })()}
@@ -940,9 +1211,9 @@ export default function DashboardPage() {
       {/* Pending approvals for managers/HR */}
       {(isHR(user!) || isManager(user!)) && pendingLeaveRequests.length > 0 && (
         <Card className="border-0" style={CARD_STYLE}>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-1">
+          <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
             <CardTitle className="text-base font-semibold">Pending Leave Requests</CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-xs">
+            <Button variant="ghost" size="sm" asChild className="text-xs h-auto min-h-0 py-1">
               <a href="/leave">View all <ArrowRight className="h-3 w-3 ml-1" /></a>
             </Button>
           </CardHeader>
@@ -960,6 +1231,15 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Meet the Team (3/4) + Recent Activity (1/4) — equal height */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <MeetTheTeamCard employees={employees} departments={departments} designations={designations} meId={emp?.id} />
+        <RecentActivityCard />
+      </div>
+
+      {/* Quick Actions — always last */}
+      <QuickActionsRow />
       </div>
     </div>
   );

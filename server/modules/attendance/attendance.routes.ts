@@ -192,7 +192,7 @@ export function registerAttendanceRoutes(app: Express) {
       const pct = c.workingDays ? Math.round(((c.present + c.wfh + c.on_duty + 0.5 * c.half_day) / c.workingDays) * 100) : 0;
       return {
         employeeId: emp.id, code: emp.employeeCode || "—", name: `${emp.firstName} ${emp.lastName}`,
-        department: deptName(emp.departmentId),
+        departmentId: emp.departmentId || null, department: deptName(emp.departmentId), location: emp.workLocation || null,
         present: c.present, wfh: c.wfh, onDuty: c.on_duty, halfDay: c.half_day,
         absent: c.absent, leave: c.leave, workingDays: c.workingDays, attendancePct: pct,
       };
@@ -281,6 +281,81 @@ export function registerAttendanceRoutes(app: Express) {
       cur.setDate(cur.getDate() - 1);
     }
     res.json({ status: todayStatus, days });
+  });
+
+  // Unified approvals feed for the Employee-Attendance screen: Leave + WFH requests as a single
+  // list per request (current status, not an event log). Pending items + decided ones, each with
+  // timestamps and who decided. Super Admin / HR / CEO see everyone; a manager sees only their team.
+  app.get("/api/approvals/feed", requireAuth, async (req, res) => {
+    const viewer = req.currentUser!;
+    const privileged = ["super_admin", "hr_admin", "hr_executive", "ceo_approver"].includes(viewer.role);
+    const asManager = viewer.role === "manager" && !!viewer.employeeId;
+    let teamIds: Set<string> | null = null;
+    if (asManager) teamIds = new Set((await storage.getEmployeesByManager(viewer.employeeId!)).map((e) => e.id));
+
+    const emps = await storage.getEmployees({});
+    const empName = new Map<string, string>(emps.map((e: any) => [e.id, `${e.firstName} ${e.lastName}`.trim()]));
+    const users = await storage.getAllUsers();
+    const userName = new Map<string, string>();
+    for (const u of users) userName.set(u.id, (u.employeeId && empName.get(u.employeeId)) || u.username);
+    const canActFor = (empId: string) => viewer.role === "super_admin" || (asManager && teamIds!.has(empId));
+
+    const items: any[] = [];
+
+    // ----- Leave requests -----
+    let leaveReqs: any[] = [];
+    if (privileged) leaveReqs = await storage.getLeaveRequests(undefined, undefined);
+    else if (asManager) leaveReqs = await storage.getTeamLeaveRequests(viewer.employeeId!);
+    else if (viewer.employeeId) leaveReqs = await storage.getLeaveRequests(viewer.employeeId, undefined);
+    for (const lr of leaveReqs) {
+      if (!["pending", "approved", "rejected"].includes(lr.status)) continue;
+      if (teamIds && !teamIds.has(lr.employeeId)) continue;
+      const decided = lr.status !== "pending";
+      items.push({
+        id: `leave-${lr.id}`, kind: "leave", employeeId: lr.employeeId,
+        employeeName: empName.get(lr.employeeId) || "Employee", status: lr.status,
+        startDate: lr.startDate, endDate: lr.endDate, isHalfDay: !!lr.isHalfDay, reason: lr.reason || null,
+        requestedAt: lr.createdAt || null,
+        decidedAt: decided ? (lr.updatedAt || null) : null,
+        decidedByName: decided && lr.approvedBy ? (userName.get(lr.approvedBy) || null) : null,
+        canAct: lr.status === "pending" && canActFor(lr.employeeId),
+        link: "/leave",
+      });
+    }
+
+    // ----- WFH requests (recent window: last 30d .. next 7d) -----
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const now = new Date();
+    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const fromD = new Date(now); fromD.setDate(fromD.getDate() - 30);
+    const toD = new Date(now); toD.setDate(toD.getDate() + 7);
+    const wfhRecs = await storage.getWfhInRange(fmt(fromD), fmt(toD));
+    for (const r of wfhRecs as any[]) {
+      if (!privileged) {
+        if (asManager) { if (!teamIds!.has(r.employeeId)) continue; }
+        else if (r.employeeId !== viewer.employeeId) continue;
+      }
+      let meta: any; try { meta = JSON.parse(r.notes || "{}"); } catch { continue; }
+      if (meta.kind !== "wfh") continue;
+      if (meta.rangeStart && r.date !== meta.rangeStart) continue; // one item per multi-day request
+      let status = meta.approval || "pending";
+      let decidedByName: string | null = meta.decidedBy && meta.decidedBy !== "auto" ? (userName.get(meta.decidedBy) || null) : (meta.decidedBy === "auto" ? "Auto-approved" : null);
+      const autoDue = meta.autoApproveAt && new Date(meta.autoApproveAt) <= now;
+      if (status === "pending" && autoDue) { status = "approved"; decidedByName = decidedByName || "Auto-approved"; }
+      const decided = status !== "pending";
+      items.push({
+        id: `wfh-${r.employeeId}-${r.date}`, kind: "wfh", employeeId: r.employeeId,
+        employeeName: empName.get(r.employeeId) || "Employee", status,
+        startDate: r.date, endDate: meta.rangeEnd || r.date, isHalfDay: !!(meta.duration && meta.duration !== "full"), reason: meta.reason || null,
+        requestedAt: meta.requestedAt || r.createdAt || null,
+        decidedAt: decided ? (meta.decidedAt || null) : null,
+        decidedByName: decided ? decidedByName : null,
+        canAct: status === "pending" && !autoDue && canActFor(r.employeeId),
+        link: "/attendance",
+      });
+    }
+
+    res.json(items);
   });
 
   app.post("/api/attendance", requireAuth, requireHR, async (req, res) => {

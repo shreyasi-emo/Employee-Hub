@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth, isHR, isManager, hasRole } from "@/lib/auth";
@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Users, UserCheck, Plane, Search, Download,
   CalendarDays, MapPin, Clock, Plus, CircleCheck, ChevronLeft, ChevronRight, Route, Briefcase, CalendarRange, Home, TriangleAlert,
+  ClipboardCheck, ArrowUpRight,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -33,6 +34,7 @@ import {
   isSameDay, isSameMonth, eachDayOfInterval, addMonths, subMonths,
 } from "date-fns";
 import { exportXlsx } from "@/lib/export-xlsx";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -43,14 +45,14 @@ const STATES = [
   { key: "on_duty", label: "On Duty", color: "#4A90C2" },   // lighter brand blue (distinct from Present)
   { key: "half_day", label: "Half Day", color: "#6A7366" }, // grey-green (swapped with leave)
   { key: "absent", label: "Absent", color: "#FF6F62" },     // coral
-  { key: "leave", label: "Leave", color: "#F59E0B" },       // brand amber (swapped with half day)
+  { key: "leave", label: "Leave", color: "#953229" },       // brick red
 ] as const;
 const STATE_KEYS = STATES.map((s) => s.key);
 const STATE_COLOR: Record<string, string> = { attendancePct: "#206295" };
 STATES.forEach((s) => { STATE_COLOR[s.key] = s.color; });
 // Readable label text colors — darker variants for the statuses whose brand color is too light
 // to read on a white/tinted cell; the rest keep their own (dark-enough) brand color.
-const LABEL_COLOR: Record<string, string> = { wfh: "#0E7C7B", half_day: "#4F5A4B", leave: "#B45309", absent: "#C43D30", holiday: "#5B6B7A" };
+const LABEL_COLOR: Record<string, string> = { wfh: "#0E7C7B", half_day: "#4F5A4B", leave: "#953229", absent: "#C43D30", holiday: "#5B6B7A" };
 // Contrasting text color for a solid fill: white on dark colors, dark grey on light ones.
 const textOn = (hex: string) => { const h = hex.replace("#", ""); const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16); const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255; return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.65 ? "#FFFFFF" : "#374151"; };
 // Blend a hex color toward white by (1 - alpha) — the visual result of an alpha fill over a light card.
@@ -215,6 +217,83 @@ function WfhApprovalsCard() {
   );
 }
 
+// Approvals feed for the Employee-Attendance screen: Leave + WFH requests as one list per request
+// (pending on top, then decisions), manager-scoped server-side. Filter Pending/All; expand -> /leave.
+function ApprovalsFeedCard() {
+  const [, navigate] = useLocation();
+  const [filter, setFilter] = useState<"all" | "pending">("all");
+  const { data: feed = [] } = useQuery<any[]>({ queryKey: ["/api/approvals/feed"] });
+
+  const parseYmd = (s: string) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const periodLabel = (it: any) => {
+    const s = parseYmd(it.startDate), e = parseYmd(it.endDate);
+    const base = it.startDate === it.endDate ? format(s, "EEE, d MMM") : `${format(s, "d MMM")} – ${format(e, "d MMM")}`;
+    return it.isHalfDay ? `${base} · Half day` : base;
+  };
+  const stamp = (iso: string | null) => iso ? format(new Date(iso), "d MMM, h:mm a") : "";
+
+  const pending = (feed as any[]).filter((f) => f.status === "pending").sort((a, b) => (a.requestedAt || "") < (b.requestedAt || "") ? -1 : 1);
+  const decided = (feed as any[]).filter((f) => f.status !== "pending").sort((a, b) => (a.decidedAt || "") < (b.decidedAt || "") ? 1 : -1);
+  const rows = filter === "pending" ? pending : [...pending, ...decided];
+
+  const STATUS: Record<string, { label: string; bg: string; color: string }> = {
+    pending: { label: "Pending", bg: "rgba(245,158,11,0.15)", color: "#B5611A" },
+    approved: { label: "Approved", bg: "rgba(14,124,123,0.15)", color: "#0E7C7B" },
+    rejected: { label: "Rejected", bg: "rgba(255,111,98,0.15)", color: "#C24A3E" },
+  };
+
+  return (
+    <Card className="border-0 h-full min-h-[20rem] flex flex-col">
+      <CardHeader className="pt-4 pb-2 px-4">
+        <div className="flex flex-row items-center justify-between gap-2 h-9">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <ClipboardCheck className="h-4 w-4 text-muted-foreground" /> Approvals
+            {pending.length > 0 && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(245,158,11,0.15)", color: "#B5611A" }}>{pending.length} pending</span>}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
+              <SelectTrigger className="h-8 w-[88px] text-[11px] rounded-[10px] opacity-100 border no-default-hover-elevate" style={{ background: "transparent", borderColor: "rgba(29, 31, 32, 0.75)", boxShadow: "none" }} data-testid="select-approvals-filter"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">All</SelectItem>
+                <SelectItem value="pending" className="text-xs">Pending</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="secondary" size="icon" className="h-8 w-8 rounded-[10px] flex-shrink-0" title="Open leave approvals" onClick={() => navigate("/leave")} data-testid="approvals-expand"><ArrowUpRight className="h-4 w-4" /></Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-3 flex-1 min-h-0">
+        {rows.length === 0 ? (
+          <div className="h-full flex items-center justify-center"><p className="text-sm text-muted-foreground">{filter === "pending" ? "No pending requests" : "No requests yet"}</p></div>
+        ) : (
+          <ScrollArea className="h-full">
+            <div className="list-divider pr-2">
+              {rows.map((it) => {
+                const st = STATUS[it.status] || STATUS.pending;
+                return (
+                  <div key={it.id} className="py-2.5" data-testid={`approval-${it.id}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground truncate flex-1">{it.employeeName}</span>
+                      <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0">{it.kind === "wfh" ? "WFH" : "Leave"}</span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: st.bg, color: st.color }}>{st.label}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{periodLabel(it)}{it.reason ? ` · ${it.reason}` : ""}</p>
+                    <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                      {it.status === "pending"
+                        ? `Requested ${stamp(it.requestedAt)}`
+                        : `${st.label}${it.decidedByName ? ` by ${it.decidedByName}` : ""}${it.decidedAt ? ` · ${stamp(it.decidedAt)}` : ""}`}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // Org-wide view (HR / manager / CEO): the full attendance dashboard. Mounted only under its tab.
 function EmployeeAttendanceView() {
   const { data: auth } = useAuth();
@@ -229,7 +308,7 @@ function EmployeeAttendanceView() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [deptFilter, setDeptFilter] = useState("all");
   const [empSearch, setEmpSearch] = useState("");
-  const [chartView, setChartView] = useState<"today" | "monthly" | "weekly">("today");
+  const [chartView, setChartView] = useState<"monthly" | "weekly">("weekly");
   const [stateFilter, setStateFilter] = useState<string>("all");
   const [presentFilter, setPresentFilter] = useState<"all" | "wfo" | "wfh" | "on_duty">("all");
   const [notPresentFilter, setNotPresentFilter] = useState<"all" | "half_day" | "leave" | "absent">("all");
@@ -237,6 +316,10 @@ function EmployeeAttendanceView() {
   const [reportMode, setReportMode] = useState<"month" | "custom">("month");
   const [reportRange, setReportRange] = useState<{ from?: Date; to?: Date }>({});
   const [reportBusy, setReportBusy] = useState(false);
+  const [tblSearch, setTblSearch] = useState("");
+  const [tblDept, setTblDept] = useState("all");
+  const [tblLoc, setTblLoc] = useState("all");
+  const [tblSort, setTblSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
 
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"] });
   const { data: leaveRequests = [] } = useQuery<any[]>({ queryKey: ["/api/leave-requests"] });
@@ -410,6 +493,42 @@ function EmployeeAttendanceView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthAttendance, activeEmployees, holidays, approvedLeaves, rangeStart]);
 
+  // ---- Employee attendance summary table (3rd row) — same present-by-default model as the report ----
+  const tblFrom = format(rangeStart, "yyyy-MM-dd");
+  const tblTo = format(rangeEnd, "yyyy-MM-dd");
+  const { data: tableReport } = useQuery<any>({ queryKey: [`/api/attendance/report?from=${tblFrom}&to=${tblTo}`] });
+  const toggleSort = (key: string) => setTblSort((s) => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "name" || key === "department" ? "asc" : "desc" });
+  const tblLocations = useMemo(() => Array.from(new Set(((tableReport?.rows || []) as any[]).map((r) => r.location).filter(Boolean))).sort(), [tableReport]);
+  const tableRows = useMemo(() => {
+    let rows = ((tableReport?.rows || []) as any[]).slice();
+    const q = tblSearch.trim().toLowerCase();
+    if (q) rows = rows.filter((r) => `${r.name} ${r.code}`.toLowerCase().includes(q));
+    if (tblDept !== "all") rows = rows.filter((r) => r.departmentId === tblDept);
+    if (tblLoc !== "all") rows = rows.filter((r) => r.location === tblLoc);
+    const { key, dir } = tblSort;
+    rows.sort((a, b) => { const av = a[key], bv = b[key]; const cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv)); return dir === "asc" ? cmp : -cmp; });
+    return rows;
+  }, [tableReport, tblSearch, tblDept, tblLoc, tblSort]);
+  const pctColor = (p: number) => p >= 90 ? "#0E7C7B" : p >= 75 ? "#B5611A" : "#C24A3E";
+  const tableColumns: DataTableColumn<any>[] = [
+    { key: "code", header: "Employee ID", sortable: true, cellClassName: "text-muted-foreground tabular-nums" },
+    { key: "name", header: "Employee", sortable: true, cellClassName: "font-medium text-foreground" },
+    { key: "department", header: "Department", sortable: true, cellClassName: "text-muted-foreground" },
+    { key: "present", header: "WFO", align: "right", sortable: true },
+    { key: "wfh", header: "WFH", align: "right", sortable: true },
+    { key: "onDuty", header: "On Duty", align: "right", sortable: true },
+    { key: "halfDay", header: "Half", align: "right", sortable: true },
+    { key: "absent", header: "Absent", align: "right", sortable: true },
+    { key: "leave", header: "Leave", align: "right", sortable: true },
+    { key: "workingDays", header: "Working Days", align: "right", sortable: true, cellClassName: "text-muted-foreground" },
+    { key: "attendancePct", header: "Attendance %", align: "right", sortable: true, render: (r) => <span className="font-semibold" style={{ color: pctColor(r.attendancePct) }}>{r.attendancePct}%</span> },
+    { key: "export", header: "Export", align: "center", render: (r) => (
+      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-[10px] text-muted-foreground" title={`Export ${r.name}'s report`} onClick={() => downloadEmployeeReport(r.employeeId, r.name, tblFrom, tblTo)} data-testid={`export-emp-${r.employeeId}`}>
+        <Download className="h-3.5 w-3.5" />
+      </Button>
+    ) },
+  ];
+
   // Labels for the list status badges
   const PRESENT_LABEL: Record<string, string> = { present: "WFO", wfh: "WFH", on_duty: "On Duty" };
   const NOTPRESENT_LABEL: Record<string, string> = { half_day: "Half Day", leave: "On Leave", absent: "Absent" };
@@ -468,18 +587,33 @@ function EmployeeAttendanceView() {
       toast({ title: "Couldn't generate report", description: e.message, variant: "destructive" });
     } finally { setReportBusy(false); }
   };
-  const downloadEmployeeReport = async (emp: any) => {
+  const downloadEmployeeReport = async (empId: string, name: string, from: string, to: string) => {
     try {
-      const from = format(startOfMonth(rangeStart), "yyyy-MM-dd");
-      const to = format(endOfMonth(rangeStart), "yyyy-MM-dd");
-      const data: any = await apiRequest("GET", `/api/attendance/report?from=${from}&to=${to}&employeeId=${emp.id}`);
+      const data: any = await apiRequest("GET", `/api/attendance/report?from=${from}&to=${to}&employeeId=${empId}`);
+      const days: any[] = data.days || [];
       const headers = ["Date", "Day", "Status"];
-      const rows = (data.days || []).map((d: any) => {
+      const rows: (string | number)[][] = days.map((d: any) => {
         const dt = new Date(`${d.date}T00:00:00`);
         return [format(dt, "dd MMM yyyy"), format(dt, "EEE"), STATUS_DISPLAY[d.status] || "Present (WFO)"];
       });
-      const nm = `${emp.firstName} ${emp.lastName}`;
-      exportXlsx({ filename: `attendance-${nm.replace(/\s+/g, "-")}-${format(rangeStart, "MMM-yyyy")}.xlsx`, sheet: "Attendance", title: `${nm} — ${format(rangeStart, "MMMM yyyy")}`, headers, rows });
+      // Summary totals at the bottom of the sheet.
+      const workingDays = days.length;
+      const presentCount = days.filter((d) => ["present", "wfh", "on_duty"].includes(d.status)).length;
+      const halfCount = days.filter((d) => d.status === "half_day").length;
+      const absentCount = days.filter((d) => d.status === "absent").length;
+      const leaveCount = days.filter((d) => d.status === "leave").length;
+      const pct = workingDays ? Math.round(((presentCount + 0.5 * halfCount) / workingDays) * 100) : 0;
+      rows.push(["", "", ""]);
+      rows.push(["Summary", "", ""]);
+      rows.push(["Attendance %", `${pct}%`]);
+      rows.push(["Present / Working Days", `${presentCount} / ${workingDays}`]);
+      rows.push(["Total Present", presentCount]);
+      rows.push(["Total Not Present (Leave / Absent)", leaveCount + absentCount]);
+      rows.push(["Half Days", halfCount]);
+      const label = from === to
+        ? format(new Date(`${from}T00:00:00`), "dd MMM yyyy")
+        : `${format(new Date(`${from}T00:00:00`), "dd MMM")} – ${format(new Date(`${to}T00:00:00`), "dd MMM yyyy")}`;
+      exportXlsx({ filename: `attendance-${name.replace(/\s+/g, "-")}-${from}_to_${to}.xlsx`, sheet: "Attendance", title: `${name} — ${label}`, headers, rows });
     } catch (e: any) {
       toast({ title: "Couldn't generate report", description: e.message, variant: "destructive" });
     }
@@ -509,9 +643,6 @@ function EmployeeAttendanceView() {
 
           {/* Separator between the date filter and the action buttons */}
           <div className="h-10 w-px bg-border mx-1" />
-          <Button variant="secondary" size="sm" onClick={exportAttendance} data-testid="button-export-attendance">
-            <Download className="h-4 w-4 mr-1" /> Export
-          </Button>
           <Button variant="secondary" size="sm" onClick={() => setReportOpen(true)} data-testid="button-report-attendance">
             <Download className="h-4 w-4 mr-1" /> Report
           </Button>
@@ -559,7 +690,7 @@ function EmployeeAttendanceView() {
                             </div>
                           </div>
                         </button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground" title="Download this employee's report" onClick={() => downloadEmployeeReport(e)} data-testid={`download-emp-${e.id}`}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[10px] shrink-0 text-muted-foreground" title="Download this employee's report" onClick={() => downloadEmployeeReport(e.id, `${e.firstName} ${e.lastName}`, format(startOfMonth(rangeStart), "yyyy-MM-dd"), format(endOfMonth(rangeStart), "yyyy-MM-dd"))} data-testid={`download-emp-${e.id}`}>
                           <Download className="h-4 w-4" />
                         </Button>
                       </div>
@@ -600,12 +731,15 @@ function EmployeeAttendanceView() {
 
       <WfhApprovalsCard />
 
-      {/* Main row: graph (left 2/4) + Present + On Leave (under last two cards), uniform height */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Headcount trend */}
-        <Card className="border-0 lg:col-span-2 lg:h-[26rem] flex flex-col">
-          <CardHeader className="pb-2 space-y-2">
-            <div className="flex items-center justify-between gap-2">
+      {/* Main row — the Today's Attendance card hugs its content and drives the row height; the
+          Headcount and Approvals cards are absolutely positioned so they match that height exactly. */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:items-stretch">
+        {/* Headcount trend (fills the reference height) */}
+        <div className="lg:col-span-2 lg:relative">
+        <div className="lg:absolute lg:inset-0">
+        <Card className="border-0 h-full min-h-[20rem] flex flex-col">
+          <CardHeader className="pt-4 pb-2 space-y-2">
+            <div className="flex items-center justify-between gap-2 h-9">
               <CardTitle className="text-base font-semibold whitespace-nowrap shrink-0">Employee Headcount</CardTitle>
               <div className="flex items-center gap-2 shrink-0">
                 <Select value={chartView} onValueChange={(v) => setChartView(v as any)}>
@@ -613,88 +747,31 @@ function EmployeeAttendanceView() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="today" className="text-xs">Today</SelectItem>
                     <SelectItem value="weekly" className="text-xs">Weekly</SelectItem>
                     <SelectItem value="monthly" className="text-xs">Monthly</SelectItem>
                   </SelectContent>
                 </Select>
-                {chartView !== "today" && (
-                  <Select value={stateFilter} onValueChange={setStateFilter}>
-                    <SelectTrigger className="h-7 w-[108px] text-[11px] rounded-[10px] opacity-100 border no-default-hover-elevate" style={{ background: "transparent", borderColor: "rgba(29, 31, 32, 0.75)", boxShadow: "none" }} data-testid="select-state-filter">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all" className="text-xs">All</SelectItem>
-                      {STATES.map((s) => <SelectItem key={s.key} value={s.key} className="text-xs">{s.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
+                <Select value={stateFilter} onValueChange={setStateFilter}>
+                  <SelectTrigger className="h-7 w-[108px] text-[11px] rounded-[10px] opacity-100 border no-default-hover-elevate" style={{ background: "transparent", borderColor: "rgba(29, 31, 32, 0.75)", boxShadow: "none" }} data-testid="select-state-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">All</SelectItem>
+                    {STATES.map((s) => <SelectItem key={s.key} value={s.key} className="text-xs">{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            {/* Legend — all attendance states (bar views only; the pie has its own side legend) */}
-            {chartView !== "today" && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-                {STATES.map((s) => (
-                  <span key={s.key} className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
-                    <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.color }} /> {s.label}
-                  </span>
-                ))}
-              </div>
-            )}
+            {/* Legend — all attendance states */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+              {STATES.map((s) => (
+                <span key={s.key} className="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.color }} /> {s.label}
+                </span>
+              ))}
+            </div>
           </CardHeader>
           <CardContent className="flex-1 min-h-0 pb-4">
-            {chartView === "today" ? (
-              <div className="h-full flex flex-col sm:flex-row items-center gap-4">
-                {/* Donut */}
-                <div className="relative h-full min-h-[13rem] flex-1 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="58%" outerRadius="88%" paddingAngle={2} stroke="rgba(255,255,255,0.6)" strokeWidth={1}>
-                        {pieData.map((d) => <Cell key={d.key} fill={d.color} />)}
-                      </Pie>
-                      <Tooltip content={({ active, payload }: any) => {
-                        if (!active || !payload?.length) return null;
-                        const p = payload[0]?.payload;
-                        const pct = pieTotal ? Math.round((p.value / pieTotal) * 100) : 0;
-                        return (
-                          <div className="card-surface px-3 py-2 text-xs" style={{ borderRadius: 12, minWidth: 120 }}>
-                            <span className="flex items-center justify-between gap-4">
-                              <span className="flex items-center gap-1.5 text-muted-foreground">
-                                <span className="inline-block w-2 h-2 rounded-full" style={{ background: p.color }} />{p.name}
-                              </span>
-                              <span className="font-semibold text-foreground">{p.value} · {pct}%</span>
-                            </span>
-                          </div>
-                        );
-                      }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-2xl font-bold text-foreground leading-none">{pieTotal}</span>
-                    <span className="text-[11px] text-muted-foreground mt-1">Employees</span>
-                  </div>
-                </div>
-                {/* Legend: color · title · big number, separated */}
-                <div className="w-full sm:w-[44%] shrink-0 list-divider">
-                  {STATES.map((s) => {
-                    const val = (todayCounts as any)[s.key] || 0;
-                    const pct = pieTotal ? Math.round((val / pieTotal) * 100) : 0;
-                    return (
-                      <div key={s.key} className="flex items-center justify-between gap-3 py-2">
-                        <span className="flex items-center gap-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
-                          <span className="text-sm text-foreground truncate">{s.label}</span>
-                        </span>
-                        <span className="flex items-baseline gap-1.5 shrink-0">
-                          <span className="text-lg font-medium text-foreground tabular-nums">{val}</span>
-                          <span className="text-[11px] text-muted-foreground w-9 text-right">{pct}%</span>
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={graphData} barCategoryGap="14%">
                 <defs>
@@ -728,99 +805,99 @@ function EmployeeAttendanceView() {
                 )}
               </BarChart>
             </ResponsiveContainer>
-            )}
           </CardContent>
         </Card>
+        </div>
+        </div>
 
-        {/* Present */}
-        <Card className="border-0 lg:h-[26rem] flex flex-col">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-2"><UserCheck className="h-4 w-4 text-muted-foreground" /> Present</CardTitle>
-            <Select value={presentFilter} onValueChange={(v) => setPresentFilter(v as any)}>
-              <SelectTrigger className="h-7 w-[96px] text-[11px] rounded-[10px] opacity-100 border no-default-hover-elevate" style={{ background: "transparent", borderColor: "rgba(29, 31, 32, 0.75)", boxShadow: "none" }} data-testid="select-present-filter"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs">All</SelectItem>
-                <SelectItem value="wfo" className="text-xs">WFO</SelectItem>
-                <SelectItem value="wfh" className="text-xs">WFH</SelectItem>
-                <SelectItem value="on_duty" className="text-xs">On duty</SelectItem>
-              </SelectContent>
-            </Select>
+        {/* Today's Attendance — donut breakdown (hugs its content; drives the row height) */}
+        <Card className="border-0 flex flex-col">
+          <CardHeader className="pt-4 pb-2">
+            <div className="flex items-center h-9">
+              <CardTitle className="text-base font-semibold flex items-center gap-2"><UserCheck className="h-4 w-4 text-muted-foreground" /> Today's Attendance</CardTitle>
+            </div>
           </CardHeader>
-          <CardContent className="px-3 pb-3 flex-1 min-h-0">
-            {presentFiltered.length === 0 ? (
-              <div className="h-full flex items-center justify-center"><p className="text-sm text-muted-foreground">No one present</p></div>
+          <CardContent className="px-4 pb-4">
+            {pieTotal === 0 ? (
+              <div className="py-10 flex items-center justify-center"><p className="text-sm text-muted-foreground">No one active today</p></div>
             ) : (
-              <ScrollArea className="h-full">
-                <div className="list-divider pr-2">
-                  {presentFiltered.map((e: any) => {
-                    const status = viewStatus.get(e.id)!;
-                    const badgeStyle = {
-                      present: { backgroundColor: "rgba(32,98,149,0.12)", color: "#206295" },
-                      wfh: { backgroundColor: "rgba(75,220,217,0.18)", color: "#1F8F8C" },
-                      on_duty: { backgroundColor: "rgba(74,144,194,0.15)", color: "#4A90C2" },
-                    }[status] || { backgroundColor: "rgba(32,98,149,0.12)", color: "#206295" };
+              <>
+                <div className="relative h-36 w-36 mx-auto" style={{ pointerEvents: "none" }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={64} innerRadius={36} paddingAngle={3} cornerRadius={5} stroke="none">
+                        {pieData.map((d) => <Cell key={d.key} fill={d.color} />)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-xl font-bold text-foreground leading-none tabular-nums">{pieTotal}</span>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">Employees</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5 mt-4">
+                  {STATES.map((s) => {
+                    const val = (todayCounts as any)[s.key] || 0;
+                    const pct = pieTotal ? Math.round((val / pieTotal) * 100) : 0;
                     return (
-                      <div key={e.id} className="flex items-center gap-3 py-3" data-testid={`present-${e.id}`}>
-                        <EmpAvatar emp={e} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p>
-                          <p className="text-xs text-muted-foreground truncate">{deptName(e.departmentId)}</p>
-                        </div>
-                        <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0" style={badgeStyle} data-testid={`status-${e.id}`}>
-                          {PRESENT_LABEL[status]}
-                        </span>
+                      <div key={s.key} className="flex items-center gap-2 text-xs" data-testid={`today-pie-legend-${s.key}`}>
+                        <span className="w-2.5 h-2.5 rounded-[3px] flex-shrink-0" style={{ background: s.color }} />
+                        <span className="text-foreground/80 truncate flex-1">{s.label}</span>
+                        <span className="text-muted-foreground tabular-nums">{pct}%</span>
+                        <span className="font-semibold text-[#206295] flex-shrink-0 w-6 text-right tabular-nums">{val}</span>
                       </div>
                     );
                   })}
                 </div>
-              </ScrollArea>
+              </>
             )}
           </CardContent>
         </Card>
 
-        {/* Not Present */}
-        <Card className="border-0 lg:h-[26rem] flex flex-col">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-2"><Plane className="h-4 w-4 text-muted-foreground" /> Not Present</CardTitle>
-            <Select value={notPresentFilter} onValueChange={(v) => setNotPresentFilter(v as any)}>
-              <SelectTrigger className="h-7 w-[104px] text-[11px] rounded-[10px] opacity-100 border no-default-hover-elevate" style={{ background: "transparent", borderColor: "rgba(29, 31, 32, 0.75)", boxShadow: "none" }} data-testid="select-notpresent-filter"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs">All</SelectItem>
-                <SelectItem value="half_day" className="text-xs">Half Day</SelectItem>
-                <SelectItem value="leave" className="text-xs">On Leave</SelectItem>
-                <SelectItem value="absent" className="text-xs">Absent</SelectItem>
-              </SelectContent>
-            </Select>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 flex-1 min-h-0">
-            {notPresentFiltered.length === 0 ? (
-              <div className="h-full flex items-center justify-center"><p className="text-sm text-muted-foreground">Everyone is present</p></div>
-            ) : (
-              <ScrollArea className="h-full">
-                <div className="list-divider pr-2">
-                  {notPresentFiltered.map((e: any) => {
-                    const status = viewStatus.get(e.id)!;
-                    const badgeStyle = {
-                      half_day: { backgroundColor: "rgba(106,115,102,0.18)", color: "#4F5A4B" },
-                      leave: { backgroundColor: "rgba(255,169,98,0.18)", color: "#B5611A" },
-                      absent: { backgroundColor: "rgba(255,111,98,0.15)", color: "#C24A3E" },
-                    }[status] || { backgroundColor: "rgba(148,163,184,0.18)", color: "#64748B" };
-                    return (
-                      <div key={e.id} className="flex items-center gap-3 py-3" data-testid={`notpresent-${e.id}`}>
-                        <EmpAvatar emp={e} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p>
-                          <p className="text-xs text-muted-foreground truncate">{deptName(e.departmentId)}</p>
-                        </div>
-                        <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0" style={badgeStyle}>
-                          {NOTPRESENT_LABEL[status]}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            )}
+        {/* Approvals feed (fills the reference height) */}
+        <div className="lg:relative">
+          <div className="lg:absolute lg:inset-0">
+            <ApprovalsFeedCard />
+          </div>
+        </div>
+      </div>
+
+      {/* Third row — full employee attendance summary table for the selected period */}
+      <div className="space-y-4">
+        {/* One-line toolbar: title · separator · search · dept · location */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="text-lg font-bold text-foreground shrink-0">Attendance Summary</h2>
+          <div className="h-10 w-px bg-foreground/30 shrink-0 mx-[7px]" />
+          <div className="relative flex-1 min-w-48">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input value={tblSearch} onChange={(e) => setTblSearch(e.target.value)} placeholder="Search by name or code..." className="pl-9" data-testid="input-table-search" />
+          </div>
+          <Select value={tblDept} onValueChange={setTblDept}>
+            <SelectTrigger className="w-44" data-testid="select-table-dept"><SelectValue placeholder="All Departments" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={tblLoc} onValueChange={setTblLoc}>
+            <SelectTrigger className="w-40" data-testid="select-table-loc"><SelectValue placeholder="All Locations" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {tblLocations.map((l: any) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <Card className="border-0">
+          <CardContent className="p-0">
+            <DataTable
+              columns={tableColumns}
+              rows={tableRows}
+              getRowKey={(r: any) => r.employeeId}
+              sort={tblSort}
+              onSortChange={toggleSort}
+              emptyText="No employees match."
+              testIdPrefix="table-row"
+            />
           </CardContent>
         </Card>
       </div>
@@ -1042,6 +1119,13 @@ function MyAttendanceView() {
   const [calFilter, setCalFilter] = useState<string>("all");
   const [dutyOpen, setDutyOpen] = useState(false);
   const [wfhOpen, setWfhOpen] = useState(false);
+  // Deep-link support: /attendance?action=on-duty | wfh (used by the dashboard's header buttons) opens the dialog.
+  useEffect(() => {
+    const action = new URLSearchParams(window.location.search).get("action");
+    if (action === "on-duty") setDutyOpen(true);
+    else if (action === "wfh") setWfhOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [todaySearch, setTodaySearch] = useState("");
   const [todayFilter, setTodayFilter] = useState<string>("all");
   const [streakMap, setStreakMap] = useState<Record<string, { status: string; days: number }>>({});
@@ -1184,10 +1268,7 @@ function MyAttendanceView() {
         <div className="flex items-center gap-3">
           <span className="h-10 w-10 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center"><UserCheck className="h-5 w-5" /></span>
           <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl font-bold text-foreground">My Attendance</h1>
-              {(() => { const s = effectiveStatus(now); const c = (s && STATE_COLOR[s]) || "#64748B"; return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: `${c}1F`, color: c }} data-testid="today-status"><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: c }} />Today · {statusLabelOf(s || undefined)}</span>; })()}
-            </div>
+            <h1 className="text-2xl font-bold text-foreground">My Attendance</h1>
             <p className="text-sm text-muted-foreground">View your attendance history and update your work status.</p>
           </div>
         </div>

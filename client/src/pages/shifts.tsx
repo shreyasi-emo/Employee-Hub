@@ -4,6 +4,7 @@ import { useAuth, isHR } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/datetime-field";
@@ -374,48 +375,18 @@ export default function ShiftsPage() {
             </div>
           ) : (
             <div className="rounded-lg border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Employee</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Shift</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Effective From</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Effective To</th>
-                    {hrUser && <th className="w-10" />}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {assignments.map((a: any) => {
-                    const emp = employees.find((e: any) => e.id === a.employeeId);
-                    const shift = shifts.find((s: any) => s.id === a.shiftId);
-                    return (
-                      <tr key={a.id} className="hover:bg-muted/20 transition-colors" data-testid={`assignment-${a.id}`}>
-                        <td className="px-4 py-3">{emp ? `${emp.firstName} ${emp.lastName}` : a.employeeId}</td>
-                        <td className="px-4 py-3">
-                          {shift ? (
-                            <div>
-                              <span className="font-medium">{shift.name}</span>
-                              <span className="text-muted-foreground ml-2 text-xs">{shift.startTime}–{shift.endTime}</span>
-                            </div>
-                          ) : a.shiftId}
-                        </td>
-                        <td className="px-4 py-3">{a.effectiveFrom}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{a.effectiveTo || "—"}</td>
-                        {hrUser && (
-                          <td className="px-2 py-3">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                              onClick={() => deleteAssignment.mutate(a.id)}
-                              data-testid={`button-remove-assignment-${a.id}`}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DataTable
+                columns={[
+                  { key: "employee", header: "Employee", render: (a: any) => { const emp = employees.find((e: any) => e.id === a.employeeId); return emp ? `${emp.firstName} ${emp.lastName}` : a.employeeId; } },
+                  { key: "shift", header: "Shift", render: (a: any) => { const shift = shifts.find((s: any) => s.id === a.shiftId); return shift ? <div><span className="font-medium">{shift.name}</span><span className="text-muted-foreground ml-2 text-xs">{shift.startTime}–{shift.endTime}</span></div> : a.shiftId; } },
+                  { key: "from", header: "Effective From", render: (a: any) => a.effectiveFrom },
+                  { key: "to", header: "Effective To", cellClassName: "text-muted-foreground", render: (a: any) => a.effectiveTo || "—" },
+                  ...(hrUser ? [{ key: "__action", header: "", align: "right" as const, render: (a: any) => <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => deleteAssignment.mutate(a.id)} data-testid={`button-remove-assignment-${a.id}`}><X className="h-3.5 w-3.5" /></Button> }] as DataTableColumn<any>[] : []),
+                ]}
+                rows={assignments}
+                getRowKey={(a: any) => a.id}
+                testIdPrefix="assignment"
+              />
             </div>
           )}
         </TabsContent>
