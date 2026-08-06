@@ -21,11 +21,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
+import { usePaged, PaginationBar } from "@/components/pagination";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
   Search, Users, Briefcase, Building2, UserPlus, CheckCircle2, X, MapPin, Calendar,
   Download, Upload, BarChart3, LayoutGrid, Table as TableIcon, Pencil,
   Cake, Gift, ClipboardCheck, CheckSquare, MousePointerClick,
+  HeartHandshake, Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 import { exportXlsx } from "@/lib/export-xlsx";
@@ -103,6 +105,25 @@ function daysUntilAnnual(dateStr?: string) {
   const next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
   if (next < today) next.setFullYear(today.getFullYear() + 1);
   return Math.round((+next - +today) / 86400000);
+}
+function daysUntilDate(dateStr?: string) {
+  if (!dateStr) return Infinity;
+  const d = new Date(dateStr); if (isNaN(+d)) return Infinity;
+  d.setHours(0, 0, 0, 0);
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((+d - +t) / 86400000);
+}
+
+// A celebration happening *today* for this employee (birthday > anniversary > farewell).
+type TodayEvent = { kind: "birthday" | "anniversary" | "farewell"; label: string; tint: string; icon: any };
+function todayEvent(e: any): TodayEvent | null {
+  if (e.dateOfBirth && daysUntilAnnual(e.dateOfBirth) === 0) return { kind: "birthday", label: "Birthday", tint: "#FF6F62", icon: Cake };
+  if (e.joinDate && daysUntilAnnual(e.joinDate) === 0) {
+    const yrs = new Date().getFullYear() - new Date(e.joinDate).getFullYear();
+    if (yrs >= 1) return { kind: "anniversary", label: `${yrs}-Year Anniversary`, tint: "#FFA962", icon: Gift };
+  }
+  if (e.lastWorkingDate && daysUntilDate(e.lastWorkingDate) === 0) return { kind: "farewell", label: "Farewell", tint: "#6A7366", icon: HeartHandshake };
+  return null;
 }
 
 const ADD_NEW = "__add_new__";
@@ -496,6 +517,7 @@ function InsightsPanel({ open, onOpenChange, employees, departments }: {
   const hasTenure = tenureData.some((t) => t.value > 0);
   const birthdays = employees.filter((e) => e.dateOfBirth).map((e) => ({ e, d: daysUntilAnnual(e.dateOfBirth) })).filter((x) => x.d <= 45).sort((a, b) => a.d - b.d).slice(0, 8);
   const annivs = employees.filter((e) => e.joinDate).map((e) => ({ e, d: daysUntilAnnual(e.joinDate), yrs: new Date().getFullYear() - new Date(e.joinDate).getFullYear() })).filter((x) => x.d <= 45 && x.yrs >= 1).sort((a, b) => a.d - b.d).slice(0, 8);
+  const farewells = employees.filter((e) => e.lastWorkingDate).map((e) => ({ e, d: daysUntilDate(e.lastWorkingDate) })).filter((x) => x.d >= 0 && x.d <= 60).sort((a, b) => a.d - b.d).slice(0, 8);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -503,6 +525,51 @@ function InsightsPanel({ open, onOpenChange, employees, departments }: {
         <SheetHeader className="px-6 pt-6 pb-3 flex-shrink-0"><SheetTitle>Workforce Insights</SheetTitle></SheetHeader>
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-4 px-6 pt-2 pb-8">
+            <Card className="border-0"><CardContent className="p-4">
+              <p className="text-sm font-semibold mb-1 flex items-center gap-2"><Cake className="h-4 w-4 text-muted-foreground" /> Upcoming Birthdays</p>
+              {birthdays.length === 0 ? <p className="text-xs text-muted-foreground pt-1">None in the next 45 days</p> : (
+                <div className="list-divider">
+                  {birthdays.map(({ e, d }) => (
+                    <div key={e.id} className="flex items-center gap-2.5 py-2">
+                      <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="text-xs" style={{ backgroundColor: `${avatarColor(e.id)}26`, color: avatarColor(e.id) }}>{initials(e.firstName, e.lastName)}</AvatarFallback></Avatar>
+                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p><p className="text-xs text-[#6A7366]">{format(new Date(e.dateOfBirth), "MMM d")}</p></div>
+                      <Badge className="text-[10px] flex-shrink-0 bg-[#FF6F62]/15 text-[#FF6F62]">{d === 0 ? "Today" : `${d}d`}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent></Card>
+
+            <Card className="border-0"><CardContent className="p-4">
+              <p className="text-sm font-semibold mb-1 flex items-center gap-2"><Gift className="h-4 w-4 text-muted-foreground" /> Work Anniversaries</p>
+              {annivs.length === 0 ? <p className="text-xs text-muted-foreground pt-1">None in the next 45 days</p> : (
+                <div className="list-divider">
+                  {annivs.map(({ e, d, yrs }) => (
+                    <div key={e.id} className="flex items-center gap-2.5 py-2">
+                      <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="text-xs" style={{ backgroundColor: `${avatarColor(e.id)}26`, color: avatarColor(e.id) }}>{initials(e.firstName, e.lastName)}</AvatarFallback></Avatar>
+                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p><p className="text-xs text-[#6A7366]">{yrs} year{yrs !== 1 ? "s" : ""} · {format(new Date(e.joinDate), "MMM d")}</p></div>
+                      <Badge className="text-[10px] flex-shrink-0 bg-[#FFA962]/20 text-[#FFA962]">{d === 0 ? "Today" : `${d}d`}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent></Card>
+
+            {farewells.length > 0 && (
+              <Card className="border-0"><CardContent className="p-4">
+                <p className="text-sm font-semibold mb-1 flex items-center gap-2"><HeartHandshake className="h-4 w-4 text-muted-foreground" /> Farewells</p>
+                <div className="list-divider">
+                  {farewells.map(({ e, d }) => (
+                    <div key={e.id} className="flex items-center gap-2.5 py-2">
+                      <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="text-xs" style={{ backgroundColor: `${avatarColor(e.id)}26`, color: avatarColor(e.id) }}>{initials(e.firstName, e.lastName)}</AvatarFallback></Avatar>
+                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p><p className="text-xs text-[#6A7366]">Last day · {format(new Date(e.lastWorkingDate), "MMM d")}</p></div>
+                      <Badge className="text-[10px] flex-shrink-0 bg-[#6A7366]/15 text-[#6A7366]">{d === 0 ? "Today" : `${d}d`}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent></Card>
+            )}
+
             <Card className="border-0"><CardContent className="p-4">
               <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground" /> Department Distribution</p>
               {deptData.length === 0 ? <p className="text-xs text-muted-foreground">No data</p> : (
@@ -562,36 +629,6 @@ function InsightsPanel({ open, onOpenChange, employees, departments }: {
                 </div>
               )}
             </CardContent></Card>
-
-            <Card className="border-0"><CardContent className="p-4">
-              <p className="text-sm font-semibold mb-1 flex items-center gap-2"><Cake className="h-4 w-4 text-muted-foreground" /> Upcoming Birthdays</p>
-              {birthdays.length === 0 ? <p className="text-xs text-muted-foreground pt-1">None in the next 45 days</p> : (
-                <div className="list-divider">
-                  {birthdays.map(({ e, d }) => (
-                    <div key={e.id} className="flex items-center gap-2.5 py-2">
-                      <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="text-xs" style={{ backgroundColor: `${avatarColor(e.id)}26`, color: avatarColor(e.id) }}>{initials(e.firstName, e.lastName)}</AvatarFallback></Avatar>
-                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p><p className="text-xs text-[#6A7366]">{format(new Date(e.dateOfBirth), "MMM d")}</p></div>
-                      <Badge className="text-[10px] flex-shrink-0 bg-[#FF6F62]/15 text-[#FF6F62]">{d === 0 ? "Today" : `${d}d`}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent></Card>
-
-            <Card className="border-0"><CardContent className="p-4">
-              <p className="text-sm font-semibold mb-1 flex items-center gap-2"><Gift className="h-4 w-4 text-muted-foreground" /> Work Anniversaries</p>
-              {annivs.length === 0 ? <p className="text-xs text-muted-foreground pt-1">None in the next 45 days</p> : (
-                <div className="list-divider">
-                  {annivs.map(({ e, d, yrs }) => (
-                    <div key={e.id} className="flex items-center gap-2.5 py-2">
-                      <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="text-xs" style={{ backgroundColor: `${avatarColor(e.id)}26`, color: avatarColor(e.id) }}>{initials(e.firstName, e.lastName)}</AvatarFallback></Avatar>
-                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p><p className="text-xs text-[#6A7366]">{yrs} year{yrs !== 1 ? "s" : ""} · {format(new Date(e.joinDate), "MMM d")}</p></div>
-                      <Badge className="text-[10px] flex-shrink-0 bg-[#FFA962]/20 text-[#FFA962]">{d === 0 ? "Today" : `${d}d`}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent></Card>
           </div>
         </ScrollArea>
       </SheetContent>
@@ -616,8 +653,9 @@ function StatCard({ title, value, subtitle, icon: Icon, color }: { title: string
 }
 
 // ===================== Employee card =====================
-function EmployeeCard({ employee, departments, designations, selectionMode, selected, onToggle }: {
+function EmployeeCard({ employee, departments, designations, selectionMode, selected, onToggle, event }: {
   employee: any; departments: any[]; designations: any[]; selectionMode: boolean; selected: boolean; onToggle: () => void;
+  event?: { label: string; tint: string; icon: any } | null;
 }) {
   const [, navigate] = useLocation();
   const desig = designations.find((d) => d.id === employee.designationId);
@@ -626,10 +664,16 @@ function EmployeeCard({ employee, departments, designations, selectionMode, sele
   const onCardClick = () => (selectionMode ? onToggle() : navigate(`/employees/${employee.id}`));
   return (
     <Card
-      className={`border-0 card-hover cursor-pointer ${selected ? "ring-2 ring-primary" : ""}`}
+      className={`border-0 card-hover cursor-pointer overflow-hidden ${selected ? "ring-2 ring-primary" : ""}`}
+      style={event ? { boxShadow: `0 0 0 1.5px ${event.tint}66` } : undefined}
       onClick={onCardClick}
       data-testid={`employee-card-${employee.id}`}
     >
+      {event && (
+        <div className="flex items-center gap-1.5 px-4 py-1.5 text-white text-[11px] font-bold uppercase tracking-wide" style={{ background: event.tint }}>
+          <event.icon className="h-3.5 w-3.5 celebrate-pop flex-shrink-0" /> {event.label}
+        </div>
+      )}
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           {selectionMode && (
@@ -697,6 +741,8 @@ export default function EmployeesPage() {
     (locFilter === "all" || e.workLocation === locFilter) &&
     (typeFilter === "all" || e.employmentType === typeFilter)
   );
+  const displayed = filtered;
+  const cardPaged = usePaged(displayed);
   const deptCounts = departments.map((d) => ({ ...d, count: employees.filter((e) => e.departmentId === d.id).length }));
 
   // overview cards
@@ -825,8 +871,11 @@ export default function EmployeesPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16"><Users className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" /><h3 className="text-lg font-semibold text-foreground">No employees found</h3><p className="text-sm text-muted-foreground mt-1">Try adjusting your filters</p></div>
       ) : viewMode === "card" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((emp) => <EmployeeCard key={emp.id} employee={emp} departments={departments} designations={designations} selectionMode={selectionMode} selected={selected.has(emp.id)} onToggle={() => toggleSel(emp.id)} />)}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {cardPaged.pageItems.map((emp) => <EmployeeCard key={emp.id} employee={emp} departments={departments} designations={designations} selectionMode={selectionMode} selected={selected.has(emp.id)} onToggle={() => toggleSel(emp.id)} />)}
+          </div>
+          <PaginationBar page={cardPaged.page} totalPages={cardPaged.totalPages} count={cardPaged.count} size={cardPaged.size} onPage={cardPaged.setPage} />
         </div>
       ) : (
         <Card className="border-0"><CardContent className="p-0">
@@ -841,7 +890,7 @@ export default function EmployeesPage() {
               { key: "joinDate", header: "Join Date", cellClassName: "text-muted-foreground", render: (e: any) => e.joinDate ? format(new Date(e.joinDate), "dd MMM yyyy") : "—" },
               { key: "status", header: "Status", render: (e: any) => <Badge className={`text-xs ${statusColors[e.employmentStatus] || statusColors.inactive}`}>{e.employmentStatus.replace("_", " ")}</Badge> },
             ]}
-            rows={filtered}
+            rows={displayed}
             getRowKey={(e: any) => e.id}
             onRowClick={(e: any) => (selectionMode ? toggleSel(e.id) : navigate(`/employees/${e.id}`))}
             testIdPrefix="employee-row"

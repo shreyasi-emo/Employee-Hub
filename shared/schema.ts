@@ -1370,6 +1370,43 @@ export const reimbursements = pgTable("reimbursements", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ----- Office Purchases (small items HR orders for employees: triage -> CEO approval -> order -> deliver) -----
+export const officePurchases = pgTable("office_purchases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reference: text("reference").notNull(),
+  requesterId: varchar("requester_id").notNull(),
+  // [{ description, quantity, suggestedLinks: string[], finalLink, unitPrice }] — HR fills finalLink + unitPrice
+  items: jsonb("items").notNull().default([]),
+  priority: text("priority").notNull().default("medium"),        // low | medium | high (set by HR)
+  isDirect: boolean("is_direct").notNull().default(false),        // HR flagged "send for direct approval"
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("pending_hr"),         // pending_hr -> pending_approval -> approved -> ordered -> delivered (+ rejected/cancelled)
+  justification: text("justification"),
+  // Claimant snapshot (server-stamped)
+  employeeName: text("employee_name"),
+  employeeCode: text("employee_code"),
+  department: text("department"),
+  // HR triage stage
+  reviewedById: varchar("reviewed_by_id"),
+  reviewNote: text("review_note"),
+  reviewedAt: timestamp("reviewed_at"),
+  // CEO approval stage
+  approvedById: varchar("approved_by_id"),
+  decisionNote: text("decision_note"),
+  decidedAt: timestamp("decided_at"),
+  // Fulfillment
+  orderPlacedById: varchar("order_placed_by_id"),
+  expectedDeliveryDate: date("expected_delivery_date"),           // optional ETA HR sets when placing the order
+  orderInfo: text("order_info"),                                  // tracking / courier / order id
+  orderPlacedAt: timestamp("order_placed_at"),
+  deliveredById: varchar("delivered_by_id"),
+  deliveredAt: timestamp("delivered_at"),
+  linkedTicketId: varchar("linked_ticket_id"),                    // set when the employee flags a delivery issue
+  batchId: varchar("batch_id"),                                   // groups requests HR sent to the CEO together (one bulk-approval card)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // ----- Unified Request Intake -----
 export const requests = pgTable("requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1441,6 +1478,7 @@ export const insertMovementEventSchema = createInsertSchema(movementEvents).omit
 export const insertCompanyVehicleSchema = createInsertSchema(companyVehicles).omit({ id: true, createdAt: true });
 export const insertVehicleBookingSchema = createInsertSchema(vehicleBookings).omit({ id: true, createdAt: true });
 export const insertReimbursementSchema = createInsertSchema(reimbursements).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOfficePurchaseSchema = createInsertSchema(officePurchases).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRequestSchema = createInsertSchema(requests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRequestCommentSchema = createInsertSchema(requestComments).omit({ id: true, createdAt: true });
 export const insertCeoApprovalNoteSchema = createInsertSchema(ceoApprovalNotes).omit({ id: true, createdAt: true });
@@ -1452,6 +1490,7 @@ export type MovementEvent = typeof movementEvents.$inferSelect;
 export type CompanyVehicle = typeof companyVehicles.$inferSelect;
 export type VehicleBooking = typeof vehicleBookings.$inferSelect;
 export type Reimbursement = typeof reimbursements.$inferSelect;
+export type OfficePurchase = typeof officePurchases.$inferSelect;
 export type Request_ = typeof requests.$inferSelect;
 export type RequestComment = typeof requestComments.$inferSelect;
 export type CeoApprovalNote = typeof ceoApprovalNotes.$inferSelect;

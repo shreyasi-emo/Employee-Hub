@@ -10,7 +10,7 @@ import {
   notifications, shifts, shiftAssignments, employmentHistory,
   onboardingTemplates, onboardingTasks, onboardingInstances, onboardingTaskItems,
   movementLocations, logisticsMovements, movementEvents,
-  companyVehicles, vehicleBookings, reimbursements,
+  companyVehicles, vehicleBookings, reimbursements, officePurchases,
   zohoConfig, zohoSyncJobs, requests as requestsTable, requestComments,
   ceoApprovalNotes, referenceDocs,
 
@@ -1468,6 +1468,28 @@ export const storage = {
   },
   async updateReimbursement(id: string, data: any) {
     const [r] = await db.update(reimbursements).set({ ...data, updatedAt: new Date() }).where(eq(reimbursements.id, id)).returning();
+    return r;
+  },
+
+  async listOfficePurchases(filters: { requesterId?: string; status?: string } = {}) {
+    let q = db.select().from(officePurchases).$dynamic();
+    const conds: any[] = [];
+    if (filters.requesterId) conds.push(eq(officePurchases.requesterId, filters.requesterId));
+    if (filters.status) conds.push(eq(officePurchases.status, filters.status));
+    if (conds.length) q = q.where(and(...conds));
+    return q.orderBy(desc(officePurchases.createdAt));
+  },
+  async getOfficePurchase(id: string) {
+    const [r] = await db.select().from(officePurchases).where(eq(officePurchases.id, id));
+    return r;
+  },
+  async createOfficePurchase(data: any) {
+    const ref = `OP-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const [r] = await db.insert(officePurchases).values({ ...data, reference: ref }).returning();
+    return r;
+  },
+  async updateOfficePurchase(id: string, data: any) {
+    const [r] = await db.update(officePurchases).set({ ...data, updatedAt: new Date() }).where(eq(officePurchases.id, id)).returning();
     return r;
   },
 
