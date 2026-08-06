@@ -26,6 +26,7 @@ import { registerTeamRequestsRoutes } from "../modules/team-requests/team-reques
 import { registerLogisticsRoutes } from "../modules/logistics/logistics.routes";
 import { registerVehicleRoutes } from "../modules/vehicles/vehicles.routes";
 import { registerReimbursementRoutes } from "../modules/reimbursements/reimbursements.routes";
+import { registerOfficePurchaseRoutes } from "../modules/office-purchases/office-purchases.routes";
 import { registerRequestRoutes } from "../modules/requests/requests.routes";
 import { registerApprovalNotesRoutes } from "../modules/approval-notes/approval-notes.routes";
 import { registerReferenceDocRoutes } from "../modules/reference-docs/reference-docs.routes";
@@ -60,6 +61,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   registerLogisticsRoutes(app);
   registerVehicleRoutes(app);
   registerReimbursementRoutes(app);
+  registerOfficePurchaseRoutes(app);
   registerRequestRoutes(app);
   registerApprovalNotesRoutes(app);
   registerReferenceDocRoutes(app);

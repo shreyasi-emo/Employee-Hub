@@ -24,11 +24,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { exportXlsx } from "@/lib/export-xlsx";
+import { NewRequestDialog, OfficePurchaseDetailDialog, canHrTriage, canCeoApprove } from "@/components/office-purchase";
 import {
   ShoppingCart, Car, TicketIcon, Receipt, Plus, Trash2, ClipboardList,
   ShieldCheck, ArrowRight, ChevronLeft, Check, X, Users, Truck, ChevronRight,
   CalendarClock, ExternalLink, FileText, IndianRupee, MoreVertical, Eye, Download,
   Maximize2, ArrowDownUp, Building2, Hash, Paperclip, Clock, MousePointerClick, CheckSquare, CalendarRange,
+  LayoutGrid, Table as TableIcon, CheckCircle2, Layers,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ReimbursementFormDialog } from "@/components/reimbursement-form";
@@ -85,13 +87,18 @@ export default function CompanyWorkspacePage() {
   const canFinanceReimb = role === "finance" || role === "super_admin";         // Finance-stage review (finance; super_admin as emergency override)
   const canCeoReimb = role === "ceo_approver" || role === "super_admin";         // final approval (+ bulk) — CEO; super_admin as emergency override
   const canReimbApprove = canFinanceReimb || canCeoReimb;
-  const canApprove = isApprover || canReimbApprove;
+  // Office Purchase approvers: HR triages (price / order / deliver), CEO approves; super_admin does both.
+  const canOpTriage = canHrTriage(role);
+  const canOpCeo = canCeoApprove(role);
+  const canOfficePurchase = canOpTriage || canOpCeo;
+  const canApprove = isApprover || canReimbApprove || canOfficePurchase;
 
   // View is URL-driven so navigating to My Approvals updates the browser URL (and is shareable / back-button friendly)
   const view: "main" | "approvals" = location === "/my-approvals" ? "approvals" : "main";
   const setView = (v: "main" | "approvals") => navigate(v === "approvals" ? "/my-approvals" : "/company-workspace");
   const [openForm, setOpenForm] = useState<null | "purchase" | "travel" | "ticket" | "reimbursement">(null);
-  const [apprTab, setApprTab] = useState<"requests" | "logistics" | "vehicles" | "reimbursements">("requests");
+  const [newReqOpen, setNewReqOpen] = useState(false);
+  const [apprTab, setApprTab] = useState<"requests" | "logistics" | "vehicles" | "reimbursements" | "office_purchases">("requests");
 
   // ---- data ----
   const { data: summary, isLoading: sumLoading } = useQuery<any>({ queryKey: ["/api/my-requests/summary"] });
@@ -99,6 +106,7 @@ export default function CompanyWorkspacePage() {
   const { data: travels = [] } = useQuery<any[]>({ queryKey: ["/api/my-requests/travels"] });
   const { data: tickets = [] } = useQuery<any[]>({ queryKey: ["/api/my-requests/tickets"] });
   const { data: reimb = [] } = useQuery<any[]>({ queryKey: ["/api/reimbursements"] });
+  const { data: officePurchases = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases?mine=true"] });
   const { data: teamData } = useQuery<any>({ queryKey: ["/api/team-requests"], enabled: canTeam, retry: false });
 
   // approval domains (super-admin / CEO)
@@ -106,6 +114,8 @@ export default function CompanyWorkspacePage() {
   const { data: movements = [] } = useQuery<any[]>({ queryKey: ["/api/logistics/movements"], enabled: isApprover });
   const { data: bookings = [] } = useQuery<any[]>({ queryKey: ["/api/vehicles/bookings"], enabled: isApprover });
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], enabled: isApprover });
+  // Office purchases needing an approver's attention (HR triage / CEO approval).
+  const { data: opAll = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases"], enabled: canOfficePurchase });
 
   const nameByUser = useMemo(() => {
     const m: Record<string, string> = {};
@@ -121,15 +131,30 @@ export default function CompanyWorkspacePage() {
   // Reimbursement approval queue, stage-aware:
   //  - Finance sees "submitted" (first review) · CEO sees "finance_approved" (final) · super_admin sees both
   const pendingReimb = useMemo(() => (reimb as any[]).filter((r) => {
-    if (r.requesterId === user?.id) return false; // don't approve your own claim
+    // You can't approve your own claim — except super_admin (emergency override; matches the backend).
+    if (r.requesterId === user?.id && role !== "super_admin") return false;
     if (r.status === "submitted") return canFinanceReimb;       // Finance reviews
     if (r.status === "finance_approved") return canCeoReimb;    // CEO finalises
     return false;
-  }), [reimb, canFinanceReimb, canCeoReimb, user?.id]);
-  const apprTotal = (isApprover ? pendingSvc.length + pendingMov.length + pendingVeh.length : 0) + (canReimbApprove ? pendingReimb.length : 0);
-  const pendingReimbAmount = useMemo(() => reimb.filter((r: any) => r.status === "submitted").reduce((s: number, r: any) => s + Number(r.totalAmount || 0), 0), [reimb]);
+  }), [reimb, canFinanceReimb, canCeoReimb, user?.id, role]);
+  // Office purchases awaiting THIS approver's action (HR: triage/order/deliver · CEO: approve).
+  const pendingOp = useMemo(() => (opAll as any[]).filter((o) =>
+    (canOpTriage && ["pending_hr", "priced", "approved", "ordered"].includes(o.status)) ||
+    (canOpCeo && o.status === "pending_approval")
+  ).length, [opAll, canOpTriage, canOpCeo]);
+  const apprTotal = (isApprover ? pendingSvc.length + pendingMov.length + pendingVeh.length : 0) + (canReimbApprove ? pendingReimb.length : 0) + (canOfficePurchase ? pendingOp : 0);
+  // Approver → total awaiting THEIR approval (stage-aware queue). Employee → their own pending claims.
+  const pendingReimbAmount = useMemo(() => {
+    const rows = canReimbApprove
+      ? pendingReimb
+      : reimb.filter((r: any) => r.requesterId === user?.id && ["submitted", "finance_approved", "changes_requested"].includes(r.status));
+    return rows.reduce((s: number, r: any) => s + Number(r.totalAmount || 0), 0);
+  }, [canReimbApprove, pendingReimb, reimb, user?.id]);
 
+  // The user's own in-flight office purchases (Office Purchase is the current purchase flow).
+  const myOpenOp = useMemo(() => (officePurchases as any[]).filter((o) => ["pending_hr", "priced", "pending_approval", "approved", "ordered"].includes(o.status)).length, [officePurchases]);
   const myOpen =
+    myOpenOp +
     purchases.filter((p: any) => ["draft", "submitted", "pending_ceo", "changes_requested"].includes(p.status)).length +
     travels.filter((t: any) => ["draft", "submitted", "pending_ceo", "changes_requested"].includes(t.status)).length +
     tickets.filter((t: any) => ["open", "in_progress", "need_info"].includes(t.status)).length +
@@ -151,6 +176,11 @@ export default function CompanyWorkspacePage() {
     purchases.forEach((p: any) => rows.push({ id: p.id, kind: "purchase", raw: p, requester: "You", type: "Purchase", details: `${cap(p.category) || "Purchase"} Request`, status: p.status, date: p.createdAt, approvedBy: "—" }));
     travels.forEach((t: any) => rows.push({ id: t.id, kind: "travel", raw: t, requester: "You", type: "Travel", details: `${t.fromCity || "?"} → ${t.toCity || "?"}`, status: t.status, date: t.createdAt, approvedBy: t.assignedToName || "—" }));
     tickets.forEach((t: any) => rows.push({ id: t.id, kind: "ticket", raw: t, requester: "You", type: "Ticket", details: t.subject || "Support Ticket", status: t.status, date: t.createdAt, approvedBy: "—" }));
+    officePurchases.forEach((p: any) => {
+      const item0 = Array.isArray(p.items) && p.items[0]?.description ? p.items[0].description : "";
+      const extra = Array.isArray(p.items) && p.items.length > 1 ? ` +${p.items.length - 1} more` : "";
+      rows.push({ id: p.id, kind: "office_purchase", raw: p, requester: "You", type: "Office Purchase", details: item0 ? `${item0}${extra}` : (p.reference || "Office Purchase"), status: p.status, date: p.createdAt, approvedBy: "—" });
+    });
     reimb.forEach((r: any) => {
       const isOwn = r.requesterId === user?.id;
       const requester = isOwn ? "You" : (nameByUser[r.requesterId] || r.employeeName || "—");
@@ -166,7 +196,7 @@ export default function CompanyWorkspacePage() {
       (movements as any[]).forEach((m) => rows.push({ id: m.id, kind: "logistics", raw: m, requester: reqName(m.requesterId), type: "Logistics", details: m.reference || m.notes || "Stock / asset movement", status: m.status, date: m.createdAt, approvedBy: "—" }));
     }
     return rows.filter((r) => r.date && +new Date(r.date) >= weekAgo).sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 20);
-  }, [purchases, travels, tickets, reimb, svcRequests, movements, isApprover, nameByUser, now, user?.id]);
+  }, [purchases, travels, tickets, reimb, officePurchases, svcRequests, movements, isApprover, nameByUser, now, user?.id]);
 
   const [detail, setDetail] = useState<any>(null);
 
@@ -179,6 +209,7 @@ export default function CompanyWorkspacePage() {
         { key: "vehicles", label: "Vehicles", count: pendingVeh.length, icon: Car },
       ] : []),
       ...(canReimbApprove ? [{ key: "reimbursements", label: "Reimbursements", count: pendingReimb.length, icon: Receipt }] : []),
+      ...(canOfficePurchase ? [{ key: "office_purchases", label: "Office Purchases", count: pendingOp, icon: ShoppingCart }] : []),
     ] as { key: string; label: string; count: number; icon: any }[];
     const effectiveTab = tabs.some((t) => t.key === apprTab) ? apprTab : tabs[0]?.key;
     return (
@@ -227,6 +258,7 @@ export default function CompanyWorkspacePage() {
           emptyPending="No upcoming vehicle bookings" emptyCompleted="No past vehicle bookings" />}
 
         {effectiveTab === "reimbursements" && <ReimbApprovals items={pendingReimb} allItems={reimb} nameByUser={nameByUser} allowBulk={canCeoReimb} />}
+        {effectiveTab === "office_purchases" && <OfficePurchaseApprovals allItems={opAll} canTriage={canOpTriage} canCeo={canOpCeo} />}
         {tabs.length === 0 && <Card className="border-0"><CardContent className="p-10 text-center text-sm text-muted-foreground">Nothing awaiting your approval.</CardContent></Card>}
       </div>
     );
@@ -246,10 +278,10 @@ export default function CompanyWorkspacePage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_, i) => <Card key={i} className="border-0"><CardContent className="p-5"><Skeleton className="h-16 w-full" /></CardContent></Card>)}</div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Pending Purchases" value={summary?.purchases?.pending || 0} subtitle="awaiting action" icon={ShoppingCart} color="bg-[#206295]/15 text-[#206295]" />
+          <StatCard title="Pending Purchases" value={myOpenOp} subtitle="in progress" icon={ShoppingCart} color="bg-[#206295]/15 text-[#206295]" />
           <StatCard title="Pending Travels" value={summary?.travels?.pending || 0} subtitle="awaiting action" icon={Car} color="bg-[#4BDCD9]/25 text-[#206295]" />
           <StatCard title="Open Tickets" value={summary?.tickets?.open || 0} subtitle="in progress" icon={TicketIcon} color="bg-[#206295]/15 text-[#206295]" />
-          <StatCard title="Pending Reimbursements" value={money(pendingReimbAmount)} subtitle="awaiting approval" icon={Receipt} color="bg-[#FF6F62]/20 text-[#FF6F62]" />
+          <StatCard title="Pending Reimbursements" value={money(pendingReimbAmount)} subtitle={canReimbApprove ? "awaiting your approval" : "your pending claims"} icon={Receipt} color="bg-[#FF6F62]/20 text-[#FF6F62]" />
         </div>
       )}
 
@@ -258,7 +290,7 @@ export default function CompanyWorkspacePage() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Service Catalog</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {SERVICES.map((s) => (
-            <button key={s.key} onClick={() => setOpenForm(s.key)} data-testid={`service-${s.key}`} className="text-left focus:outline-none">
+            <button key={s.key} onClick={() => s.key === "purchase" ? setNewReqOpen(true) : setOpenForm(s.key)} data-testid={`service-${s.key}`} className="text-left focus:outline-none">
               <Card className="border-0 card-hover h-full"><CardContent className="p-5">
                 <div className={`p-2.5 rounded-xl w-fit mb-3 ${s.color}`}><s.icon className="h-5 w-5" /></div>
                 <h3 className="font-semibold text-sm text-foreground mb-1">{s.title}</h3>
@@ -313,6 +345,7 @@ export default function CompanyWorkspacePage() {
       <TravelForm open={openForm === "travel"} onClose={() => setOpenForm(null)} />
       <TicketForm open={openForm === "ticket"} onClose={() => setOpenForm(null)} />
       <ReimbursementFormDialog open={openForm === "reimbursement"} onClose={() => setOpenForm(null)} />
+      <NewRequestDialog open={newReqOpen} onClose={() => setNewReqOpen(false)} />
 
       {detail && <ActivityDetailModal row={detail} onClose={() => setDetail(null)} />}
     </div>
@@ -355,6 +388,11 @@ function ActivityDetailModal({ row, onClose }: { row: any; onClose: () => void }
     case "reimbursement":
       add("Reference", r.reference); add("Category", r.category); add("Amount", money(r.totalAmount)); add("Description", r.description);
       add("Invoice No.", r.invoiceNumber); add("Invoice Date", r.invoiceDate ? fmtDate(r.invoiceDate) : null); add("Decision Note", r.decisionNote);
+      break;
+    case "office_purchase":
+      add("Reference", r.reference);
+      add("Items", Array.isArray(r.items) ? r.items.map((i: any) => `${i.description || "Item"}${i.quantity ? ` ×${i.quantity}` : ""}`).filter(Boolean).join(", ") : null);
+      add("Priority", cap(r.priority)); add("Total", Number(r.totalAmount) > 0 ? money(r.totalAmount) : null); add("Justification", r.justification);
       break;
     case "request":
       add("Reference", r.reference); add("Type", cap(r.type)); add("Title", r.title); add("Description", r.description); add("Routed To", r.routeToTeam);
@@ -483,7 +521,21 @@ const dayInRange = (d: any, range: { from?: Date; to?: Date }) => {
 const rangeSuffix = (range: { from?: Date; to?: Date }) =>
   range.from || range.to ? ` (${range.from ? format(range.from, "MMM d") : "…"} to ${range.to ? format(range.to, "MMM d, yyyy") : "…"})` : "";
 
-const LIST_PAGE_SIZE = 8;
+// Card / Table view switch, shared across the approval lists.
+function ViewToggle({ view, onChange }: { view: "card" | "table"; onChange: (v: "card" | "table") => void }) {
+  return (
+    <div className="segmented-toggle inline-flex p-0.5 h-9 flex-shrink-0">
+      {([["card", LayoutGrid], ["table", TableIcon]] as const).map(([v, Icon]) => (
+        <button key={v} onClick={() => onChange(v)} title={`${v === "card" ? "Card" : "Table"} view`} data-testid={`view-${v}`}
+          className={`px-2.5 h-full rounded-[10px] flex items-center transition-colors ${view === v ? "btn-primary-gradient text-white" : "text-muted-foreground hover-elevate"}`}>
+          <Icon className="h-4 w-4" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const LIST_PAGE_SIZE = 15;
 
 // Generic Pending/Completed approvals panel for the non-reimbursement tabs (service requests, logistics, vehicles).
 // Mirrors the reimbursement tab layout: phase toggle + date range (+ export on Completed), pending list + completed table.
@@ -504,6 +556,7 @@ function ListApprovals({ allItems, isPending, dateOf, render, navigate, reviewHr
   const [range, setRange] = useState<{ from?: Date; to?: Date }>({});
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date_desc");
+  const [view, setView] = useState<"card" | "table">("card");
   const [page, setPage] = useState(1);
 
   const baseList = useMemo(() => allItems.filter((x) => (phase === "pending" ? isPending(x) : !isPending(x))), [allItems, phase, isPending]);
@@ -546,6 +599,7 @@ function ListApprovals({ allItems, isPending, dateOf, render, navigate, reviewHr
         <div className="flex flex-wrap items-center gap-2">
           {phaseToggle}
           <div className="h-7 w-px bg-foreground/30 mx-0.5" />
+          <ViewToggle view={view} onChange={setView} />
           <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
             <SelectTrigger className="h-9 w-[150px] text-xs" data-testid="filter-status"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
@@ -574,46 +628,41 @@ function ListApprovals({ allItems, isPending, dateOf, render, navigate, reviewHr
         </div>
       </div>
 
-      {/* ===== Completed: table view ===== */}
-      {phase === "completed" && (
-        sorted.length === 0 ? (
-          <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{emptyCompleted}{hasRange ? " in this date range" : ""}.</p></div>
-        ) : (
-          <div className="card-surface rounded-2xl">
-            <DataTable
-              columns={[
-                ...columns.map((c: any) => ({ key: c.label, header: c.label, align: c.align, render: (x: any) => c.cell(x) })),
-                { key: "__view", header: "View", align: "center" as const, render: (x: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); navigate(reviewHref(x)); }} data-testid={`view-row-${x.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Button> },
-              ]}
-              rows={pageItems}
-              getRowKey={(x: any) => x.id}
-              onRowClick={(x: any) => navigate(reviewHref(x))}
-              testIdPrefix="completed-row"
-            />
-          </div>
-        )
-      )}
-
-      {/* ===== Pending: list ===== */}
-      {phase === "pending" && (
-        sorted.length === 0 ? (
-          <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{emptyPending}{hasRange ? " in this date range" : ""}.</p></div>
-        ) : (
-          <Card className="border-0"><CardContent className="p-0">
-            <div className="list-divider px-4">
-              {pageItems.map((x: any) => { const d = render(x); return (
-                <div key={x.id} className="flex items-center gap-3 py-3 flex-wrap cursor-pointer hover-elevate -mx-2 px-2 rounded-lg" onClick={() => navigate(reviewHref(x))} data-testid={`appr-item-${x.id}`}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{d.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{d.sub}</p>
-                  </div>
-                  <Badge className={`text-xs ${statusClass(d.status)}`}>{cap(d.status)}</Badge>
-                  {actions ? actions(x) : <Button size="sm" variant="outline" className="h-8 text-xs" onClick={(e) => { e.stopPropagation(); navigate(reviewHref(x)); }}>Review</Button>}
+      {/* ===== Body: card or table for the current phase ===== */}
+      {sorted.length === 0 ? (
+        <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{phase === "pending" ? emptyPending : emptyCompleted}{hasRange ? " in this date range" : ""}.</p></div>
+      ) : view === "table" ? (
+        <div className="card-surface rounded-2xl">
+          <DataTable
+            columns={[
+              ...columns.map((c: any) => ({ key: c.label, header: c.label, align: c.align, render: (x: any) => c.cell(x) })),
+              { key: "__view", header: "", align: "center" as const, render: (x: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); navigate(reviewHref(x)); }} data-testid={`view-row-${x.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> {phase === "pending" ? "Review" : "View"}</Button> },
+            ]}
+            rows={pageItems}
+            getRowKey={(x: any) => x.id}
+            onRowClick={(x: any) => navigate(reviewHref(x))}
+            testIdPrefix="appr-row"
+          />
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {pageItems.map((x: any) => { const d = render(x); return (
+            <div key={x.id} className="card-surface card-hover p-4 cursor-pointer flex items-center gap-5" onClick={() => navigate(reviewHref(x))} data-testid={`appr-item-${x.id}`}>
+              <div className="flex-1 min-w-0 pr-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">{d.title}</span>
+                  <Badge className={`text-[10px] ${statusClass(d.status)}`}>{statusLabel(d.status)}</Badge>
                 </div>
-              ); })}
+                {d.sub && <p className="text-sm text-muted-foreground mt-1 truncate">{d.sub}</p>}
+                {d.date && <p className="text-xs text-muted-foreground mt-1.5 inline-flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 flex-shrink-0" /> {fmtDate(d.date)}</p>}
+              </div>
+              <Separator orientation="vertical" className="h-12 flex-shrink-0" />
+              <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                {actions ? actions(x) : <Button size="sm" variant="ghost" className="h-10 btn-glass text-[#206295] hover:text-[#206295]" onClick={() => navigate(reviewHref(x))} data-testid={`review-${x.id}`}><Eye className="h-4 w-4 mr-1.5" /> Review</Button>}
+              </div>
             </div>
-          </CardContent></Card>
-        )
+          ); })}
+        </div>
       )}
     </div>
   );
@@ -668,7 +717,7 @@ const reimbPriority = (amt: number) =>
 const CAT_PALETTE = ["#206295", "#0E7C7B", "#425B8D", "#64748B"];
 const catStyle = (cat: string) => { const c = CAT_PALETTE[Math.abs([...(cat || "?")].reduce((a, ch) => a + ch.charCodeAt(0), 0)) % CAT_PALETTE.length]; return { color: c, backgroundColor: `${c}1f` }; };
 
-const REIMB_PAGE_SIZE = 6;
+const REIMB_PAGE_SIZE = 15;
 
 // Premium card-based reimbursement approvals list. Finance = individual; CEO = + bulk.
 function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { items: any[]; allItems?: any[]; nameByUser?: Record<string, string>; allowBulk: boolean }) {
@@ -683,6 +732,7 @@ function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { 
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [catFilter, setCatFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date_desc");
+  const [view, setView] = useState<"card" | "table">("card");
   const [page, setPage] = useState(1);
   const inRange = (d: any) => dayInRange(d, range);
   const approvedByName = (r: any) => nameByUser[r.approvedById] || nameByUser[r.financeApprovedById] || "—";
@@ -759,6 +809,7 @@ function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { 
         <div className="flex flex-wrap items-center gap-2">
           {phaseToggle}
           <div className="h-7 w-px bg-foreground/30 mx-0.5" />
+          <ViewToggle view={view} onChange={setView} />
           <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
             <SelectTrigger className="h-9 w-[130px] text-xs" data-testid="filter-priority"><SelectValue placeholder="Priority" /></SelectTrigger>
             <SelectContent>
@@ -790,7 +841,7 @@ function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { 
           {phase === "completed" && (
             <Button variant="secondary" size="sm" className="h-9" onClick={() => doExport(sorted)} data-testid="button-export-reimb"><Download className="h-4 w-4 mr-1" /> Export</Button>
           )}
-          {allowBulk && phase === "pending" && !selectionMode && (
+          {allowBulk && phase === "pending" && view === "card" && !selectionMode && (
             <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelectionMode(true)} data-testid="button-select">
               <MousePointerClick className="h-4 w-4 mr-1" /> Select
             </Button>
@@ -823,10 +874,10 @@ function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { 
         </CardContent></Card>
       )}
 
-      {/* ===== Completed: table view ===== */}
-      {phase === "completed" && (
+      {/* ===== Table view (either phase) ===== */}
+      {view === "table" && (
         sorted.length === 0 ? (
-          <div className="card-surface rounded-2xl p-10 text-center text-sm text-muted-foreground">No completed reimbursements{range.from || range.to ? " in this date range" : ""}.</div>
+          <div className="card-surface rounded-2xl p-10 text-center text-sm text-muted-foreground">{phase === "pending" ? "No reimbursements awaiting your approval" : "No completed reimbursements"}{range.from || range.to ? " in this date range" : ""}.</div>
         ) : (
           <div className="card-surface rounded-2xl">
             <DataTable
@@ -850,10 +901,10 @@ function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { 
         )
       )}
 
-      {/* ===== Pending: cards ===== */}
-      {phase === "pending" && (
+      {/* ===== Card view (either phase) ===== */}
+      {view === "card" && (
         sorted.length === 0 ? (
-          <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">No reimbursements awaiting your approval{range.from || range.to ? " in this date range" : ""}.</p></div>
+          <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{phase === "pending" ? "No reimbursements awaiting your approval" : "No completed reimbursements"}{range.from || range.to ? " in this date range" : ""}.</p></div>
         ) : (
       <div className="space-y-3">
         {pageItems.map((r: any) => {
@@ -978,6 +1029,323 @@ function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { 
           onExpand={() => { const id = detail.id; setDetail(null); navigate(`/my-approvals/reimbursement/${id}`); }}
         />
       )}
+    </div>
+  );
+}
+
+// ===================== Office Purchase approvals (HR triage + CEO approval) =====================
+const OP_PRIORITY: Record<string, { label: string; cls: string }> = {
+  high: { label: "High", cls: "bg-[#FF6F62]/15 text-[#FF6F62]" },
+  medium: { label: "Medium", cls: "bg-[#206295]/15 text-[#206295]" },
+  low: { label: "Low", cls: "bg-[#64748B]/15 text-[#64748B]" },
+};
+// One CEO card for a whole HR-sent batch — opens a table with approve/reject-all.
+function OfficePurchaseBatchModal({ items, open, onClose }: { items: any[]; open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [note, setNote] = useState("");
+  const ids = items.map((i) => i.id);
+  const total = items.reduce((s, i) => s + Number(i.totalAmount || 0), 0);
+  const requesters = Array.from(new Set(items.map((i) => i.employeeName).filter(Boolean)));
+  const invalidateOp = () => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/office-purchases") });
+  const approve = useMutation({ mutationFn: () => apiRequest("POST", "/api/office-purchases/bulk-approve", { ids, note }), onSuccess: () => { invalidateOp(); toast({ title: "Group approved" }); onClose(); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
+  const reject = useMutation({ mutationFn: () => apiRequest("POST", "/api/office-purchases/bulk-reject", { ids, note }), onSuccess: () => { invalidateOp(); toast({ title: "Group rejected" }); onClose(); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
+  const busy = approve.isPending || reject.isPending;
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2.5">
+            <span className="h-9 w-9 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Layers className="h-5 w-5" /></span>
+            Purchase group · {items.length} request{items.length !== 1 ? "s" : ""}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex items-end gap-1"><IndianRupee className="h-7 w-7 text-[#206295] mb-1" /><span className="text-[2rem] leading-none font-bold text-[#206295] tabular-nums">{total.toLocaleString("en-IN")}</span></div>
+        <p className="text-xs text-muted-foreground">{requesters.length} requester{requesters.length !== 1 ? "s" : ""}: {requesters.join(", ") || "—"}</p>
+        <div className="card-surface rounded-2xl">
+          <DataTable
+            columns={[
+              { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground" },
+              { key: "requester", header: "Requester", render: (o: any) => <span className="text-foreground">{o.employeeName || "—"}<span className="text-muted-foreground"> ({o.employeeCode || "—"})</span></span> },
+              { key: "items", header: "Items", cellClassName: "text-muted-foreground max-w-[16rem] truncate", render: (o: any) => (o.items || []).map((i: any) => `${i.description}${i.quantity ? ` ×${i.quantity}` : ""}`).filter(Boolean).join(", ") || "—" },
+              { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => money(o.totalAmount) },
+            ]}
+            rows={items}
+            getRowKey={(o: any) => o.id}
+            testIdPrefix="batch-row"
+          />
+        </div>
+        <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Decision note (optional)" className="h-9" />
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1 text-[#FF6F62] border-[#FF6F62]/40" disabled={busy} onClick={() => reject.mutate()}><X className="h-4 w-4 mr-1.5" /> Reject all</Button>
+          <Button className="btn-primary-gradient flex-1" disabled={busy} onClick={() => approve.mutate()}><Check className="h-4 w-4 mr-1.5" /> Approve all</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allItems: any[]; canTriage: boolean; canCeo: boolean }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [batchItems, setBatchItems] = useState<any[] | null>(null);
+  const [phase, setPhase] = useState<"pending" | "ordered" | "completed">("pending");
+  const [range, setRange] = useState<{ from?: Date; to?: Date }>({});
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("date_desc");
+  const [view, setView] = useState<"card" | "table">("card");
+  const [selMode, setSelMode] = useState(false);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+
+  const baseList = useMemo(() => {
+    if (phase === "ordered") return (allItems as any[]).filter((o) => o.status === "ordered");
+    if (phase === "completed") return (allItems as any[]).filter((o) => ["delivered", "rejected", "cancelled"].includes(o.status));
+    return (allItems as any[]).filter((o) => (canTriage && ["pending_hr", "priced", "approved"].includes(o.status)) || (canCeo && o.status === "pending_approval"));
+  }, [allItems, phase, canTriage, canCeo]);
+  const statuses = useMemo(() => Array.from(new Set(baseList.map((o) => o.status))), [baseList]);
+  const filtered = useMemo(() => baseList.filter((o) => {
+    if (statusFilter !== "all" && o.status !== statusFilter) return false;
+    if (priorityFilter !== "all" && (o.priority || "medium") !== priorityFilter) return false;
+    if (!dayInRange(o.createdAt, range)) return false;
+    return true;
+  }), [baseList, statusFilter, priorityFilter, range]);
+  const sorted = useMemo(() => {
+    const s = [...filtered];
+    s.sort((a, b) => {
+      if (sortBy === "amount_desc") return Number(b.totalAmount) - Number(a.totalAmount);
+      if (sortBy === "amount_asc") return Number(a.totalAmount) - Number(b.totalAmount);
+      const da = +new Date(a.createdAt || 0), db = +new Date(b.createdAt || 0);
+      return sortBy === "date_asc" ? da - db : db - da;
+    });
+    return s;
+  }, [filtered, sortBy]);
+
+  // Batched pending-approval requests collapse into one "group" entry (single CEO card).
+  const entries = useMemo(() => {
+    const seen = new Map<string, any>(); const out: any[] = [];
+    for (const o of sorted) {
+      if (o.batchId && o.status === "pending_approval") {
+        let e = seen.get(o.batchId);
+        if (!e) { e = { kind: "group", key: `g-${o.batchId}`, items: [] as any[] }; seen.set(o.batchId, e); out.push(e); }
+        e.items.push(o);
+      } else out.push({ kind: "single", key: o.id, o });
+    }
+    return out;
+  }, [sorted]);
+
+  const totalPages = Math.max(1, Math.ceil((view === "table" ? sorted.length : entries.length) / LIST_PAGE_SIZE));
+  const curPage = Math.min(page, totalPages);
+  const pageItems = sorted.slice((curPage - 1) * LIST_PAGE_SIZE, curPage * LIST_PAGE_SIZE);
+  const pageEntries = entries.slice((curPage - 1) * LIST_PAGE_SIZE, curPage * LIST_PAGE_SIZE);
+  const hasRange = !!(range.from || range.to);
+
+  const invalidateOp = () => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/office-purchases") });
+  const send = useMutation({
+    mutationFn: (ids: string[]) => ids.length === 1
+      ? apiRequest("POST", `/api/office-purchases/${ids[0]}/send`, {})
+      : apiRequest("POST", "/api/office-purchases/batch-send", { ids }),
+    onSuccess: (_d, ids) => { invalidateOp(); setSel(new Set()); setSelMode(false); toast({ title: ids.length > 1 ? "Group sent for approval" : "Sent for approval" }); },
+    onError: (e: any) => toast({ title: "Couldn't send", description: e.message, variant: "destructive" }),
+  });
+  const pricedCount = useMemo(() => sorted.filter((o) => o.status === "priced").length, [sorted]);
+  const canGroup = canTriage && phase === "pending" && pricedCount > 0;
+  const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const exitSel = () => { setSelMode(false); setSel(new Set()); };
+
+  const doExport = () => exportXlsx({
+    filename: `office-purchases-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    sheet: "Office Purchases", title: `Office Purchases${rangeSuffix(range)}`,
+    headers: ["Reference", "Requester", "Items", "Amount (INR)", "Status", "Priority", "Created"],
+    rows: sorted.map((o) => [o.reference, o.employeeName || "", (o.items || []).map((i: any) => i.description).filter(Boolean).join("; "), Number(o.totalAmount || 0), statusLabel(o.status), o.priority || "medium", o.createdAt ? fmtDate(o.createdAt) : ""]),
+  });
+
+  const phaseToggle = (
+    <div className="segmented-toggle inline-flex p-0.5 h-9 flex-shrink-0">
+      {(["pending", "ordered", "completed"] as const).map((p) => (
+        <button key={p} onClick={() => { setPhase(p); setPage(1); exitSel(); }} className={`px-3 h-full rounded-[10px] text-xs font-medium capitalize ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`phase-${p}`}>{p}</button>
+      ))}
+    </div>
+  );
+
+  // ---- card renderers ----
+  const singleCard = (o: any) => {
+    const amt = Number(o.totalAmount || 0);
+    const pr = OP_PRIORITY[o.priority || "medium"] || OP_PRIORITY.medium;
+    const lines = Array.isArray(o.items) ? o.items : [];
+    const summary = lines.length ? `${lines[0]?.description || "Item"}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}` : "—";
+    const selectable = selMode && o.status === "priced";
+    const checked = sel.has(o.id);
+    return (
+      <div key={o.id} data-testid={`appr-op-${o.id}`} className={`group card-surface card-hover relative p-4 cursor-pointer ${selectable && checked ? "ring-2 ring-[#206295]" : ""} ${selMode && !selectable ? "opacity-60" : ""}`} onClick={() => (selectable ? toggleSel(o.id) : selMode ? undefined : setDetailId(o.id))}>
+        <div className="flex items-center gap-5">
+          {selMode && <Checkbox checked={checked} disabled={!selectable} onClick={(e: any) => e.stopPropagation()} onCheckedChange={() => selectable && toggleSel(o.id)} className="flex-shrink-0" />}
+          <div className="flex-1 min-w-0 pr-4">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">{o.reference}</span>
+            </div>
+            {amt > 0
+              ? <div className="flex items-end gap-1 mt-1.5"><IndianRupee className="h-6 w-6 text-[#206295] mb-0.5" /><span className="text-[1.9rem] leading-none font-bold text-[#206295] tracking-tight tabular-nums">{amt.toLocaleString("en-IN")}</span></div>
+              : <p className="text-sm text-muted-foreground mt-2">Amount pending HR pricing</p>}
+            <div className="flex items-center gap-2.5 mt-2 text-sm min-w-0">
+              <span className="flex-shrink-0"><span className="font-bold text-foreground">{o.employeeName || "Employee"}</span><span className="text-muted-foreground font-normal"> ({o.employeeCode || "—"})</span></span>
+              <Separator orientation="vertical" className="h-3.5 flex-shrink-0" />
+              <span className="min-w-0 truncate"><span className="text-muted-foreground">{lines.length} item{lines.length !== 1 ? "s" : ""}: </span><span className="text-muted-foreground">{summary}</span></span>
+            </div>
+          </div>
+          <div className="self-center w-px h-20 rounded-full bg-border flex-shrink-0" />
+          <div className="flex items-stretch gap-4 flex-shrink-0">
+            <div className="w-[104px]">
+              <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Submitted</p>
+              <p className="text-sm font-semibold text-foreground mt-1">{o.createdAt ? fmtDate(o.createdAt) : "—"}</p>
+            </div>
+            <div className="w-px self-stretch bg-border rounded-full flex-shrink-0" />
+            <div className="w-[104px]">
+              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Dept</p>
+              <p className="text-sm font-semibold text-foreground mt-1 truncate">{o.department || "—"}</p>
+            </div>
+            <div className="w-px self-stretch bg-border rounded-full flex-shrink-0" />
+            <div className="w-[104px]">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Priority</p>
+              <div className="mt-1"><Badge className={`text-[10px] px-2 py-0.5 font-semibold ${pr.cls}`}>{pr.label}</Badge></div>
+            </div>
+            <div className="w-px self-stretch bg-border rounded-full flex-shrink-0" />
+            <div className="w-[104px]">
+              <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Status</p>
+              <div className="mt-1"><Badge className={`text-[10px] ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge></div>
+            </div>
+            {!selMode && <>
+              <div className="w-px self-stretch bg-border rounded-full flex-shrink-0" />
+              <div className="flex items-center flex-shrink-0 pl-1" onClick={(e) => e.stopPropagation()}>
+                <Button size="sm" variant="ghost" className="h-10 w-[100px] btn-glass text-[#206295] hover:text-[#206295]" onClick={() => setDetailId(o.id)} data-testid={`review-op-${o.id}`}><Eye className="h-4 w-4 mr-1.5" /> {phase === "pending" ? "Review" : "View"}</Button>
+              </div>
+            </>}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const groupCard = (entry: any) => {
+    const its = entry.items as any[];
+    const total = its.reduce((s, i) => s + Number(i.totalAmount || 0), 0);
+    const itemCount = its.reduce((s, i) => s + (Array.isArray(i.items) ? i.items.length : 0), 0);
+    const requesters = new Set(its.map((i) => i.employeeName).filter(Boolean)).size;
+    return (
+      <div key={entry.key} data-testid={`appr-op-group-${entry.key}`} className="group card-surface card-hover relative p-4 cursor-pointer ring-1 ring-[#206295]/25" onClick={() => setBatchItems(its)}>
+        <div className="flex items-center gap-5">
+          <div className="flex-1 min-w-0 pr-4">
+            <div className="flex items-center gap-2">
+              <Layers className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" />
+              <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">Purchase group · {its.length} requests</span>
+              <Badge className={`text-[10px] ${statusClass("pending_approval")}`}>{statusLabel("pending_approval")}</Badge>
+            </div>
+            <div className="flex items-end gap-1 mt-1.5"><IndianRupee className="h-6 w-6 text-[#206295] mb-0.5" /><span className="text-[1.9rem] leading-none font-bold text-[#206295] tracking-tight tabular-nums">{total.toLocaleString("en-IN")}</span></div>
+            <p className="text-sm text-muted-foreground mt-2">{itemCount} item{itemCount !== 1 ? "s" : ""} · {requesters} requester{requesters !== 1 ? "s" : ""}</p>
+          </div>
+          <div className="self-center w-px h-20 rounded-full bg-border flex-shrink-0" />
+          <div className="flex-shrink-0 pr-1" onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" variant="ghost" className="h-10 w-[104px] btn-glass text-[#206295] hover:text-[#206295]" onClick={() => setBatchItems(its)} data-testid={`review-op-group-${entry.key}`}><Eye className="h-4 w-4 mr-1.5" /> Review</Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2 justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {phaseToggle}
+          <div className="h-7 w-px bg-foreground/30 mx-0.5" />
+          <ViewToggle view={view} onChange={setView} />
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+            <SelectTrigger className="h-9 w-[150px] text-xs" data-testid="filter-status"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {statuses.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
+            <SelectTrigger className="h-9 w-[130px] text-xs" data-testid="filter-priority"><SelectValue placeholder="Priority" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priority</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="h-9 w-[160px] text-xs" data-testid="sort-op"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date_desc">Newest first</SelectItem>
+              <SelectItem value="date_asc">Oldest first</SelectItem>
+              <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
+              <SelectItem value="amount_asc">Amount: Low → High</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          {canGroup && !selMode && <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelMode(true)} data-testid="op-group"><Layers className="h-4 w-4 mr-1.5" /> Group &amp; send</Button>}
+          <ApprovalDateRange value={range} onChange={(v) => { setRange(v); setPage(1); }} />
+          {phase === "completed" && <Button variant="secondary" size="sm" className="h-9" disabled={sorted.length === 0} onClick={doExport} data-testid="op-export"><Download className="h-4 w-4 mr-1.5" /> Export ({sorted.length})</Button>}
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} data-testid="page-prev"><ChevronLeft className="h-4 w-4" /></Button>
+            <span className="px-1 tabular-nums">{curPage} / {totalPages}</span>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage >= totalPages} onClick={() => setPage(curPage + 1)} data-testid="page-next"><ChevronRight className="h-4 w-4" /></Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Selection bar — pick priced requests to send singly or as a group */}
+      {selMode && (
+        <div className="card-surface rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap">
+          <span className="text-sm font-medium">{sel.size} selected <span className="text-muted-foreground font-normal">· select priced requests to send</span></span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={exitSel} data-testid="op-group-cancel">Cancel</Button>
+            <Button size="sm" className="btn-primary-gradient" disabled={sel.size === 0 || send.isPending} onClick={() => send.mutate([...sel])} data-testid="op-group-send"><ArrowRight className="h-4 w-4 mr-1.5" /> Send {sel.size > 1 ? "group " : ""}for approval</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Body — card or table view for the current phase */}
+      {sorted.length === 0 ? (
+        <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{phase === "pending" ? "No office purchases awaiting your action" : phase === "ordered" ? "No orders in transit" : "No completed office purchases"}{hasRange ? " in this date range" : ""}.</p></div>
+      ) : view === "table" ? (
+        <div className="card-surface rounded-2xl">
+          <DataTable
+            columns={[
+              { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground" },
+              { key: "requester", header: "Requester", render: (o: any) => <span className="text-foreground">{o.employeeName || "—"}<span className="text-muted-foreground"> ({o.employeeCode || "—"})</span></span> },
+              { key: "items", header: "Items", cellClassName: "text-muted-foreground", render: (o: any) => `${(o.items || []).length} item${(o.items || []).length !== 1 ? "s" : ""}` },
+              { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
+              { key: "priority", header: "Priority", render: (o: any) => { const pr = OP_PRIORITY[o.priority || "medium"] || OP_PRIORITY.medium; return <Badge className={`text-[10px] font-semibold ${pr.cls}`}>{pr.label}</Badge>; } },
+              { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
+              { key: "created", header: "Submitted", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? fmtDate(o.createdAt) : "—" },
+              { key: "__view", header: "", align: "center", render: (o: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); setDetailId(o.id); }} data-testid={`view-op-${o.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> {phase === "pending" ? "Review" : "View"}</Button> },
+            ]}
+            rows={pageItems}
+            getRowKey={(o: any) => o.id}
+            onRowClick={(o: any) => setDetailId(o.id)}
+            testIdPrefix="op-row"
+          />
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {pageEntries.map((entry: any) => entry.kind === "group" ? groupCard(entry) : singleCard(entry.o))}
+        </div>
+      )}
+
+      <OfficePurchaseDetailDialog id={detailId} open={!!detailId} onClose={() => setDetailId(null)} />
+      {batchItems && <OfficePurchaseBatchModal items={batchItems} open={!!batchItems} onClose={() => setBatchItems(null)} />}
     </div>
   );
 }

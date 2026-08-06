@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
+import { usePaged, PaginationBar } from "@/components/pagination";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -14,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NewRequestDialog, OfficePurchaseDetailDialog } from "@/components/office-purchase";
 import { useToast } from "@/hooks/use-toast";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { DateInput } from "@/components/datetime-field";
@@ -481,6 +483,73 @@ function RequestCard({ item, type, onOpen }: { item: any; type: "purchase" | "tr
   );
 }
 
+// Office Purchase card — same columnar layout as RequestCard, wired to the office-purchase lifecycle.
+function OfficePurchaseCard({ item, onOpen }: { item: any; onOpen: (id: string) => void }) {
+  const { toast } = useToast();
+  const reference = item.reference || `OP-${String(item.id || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()}`;
+  const lines = Array.isArray(item.items) ? item.items : [];
+  const title = lines.length ? `${lines[0]?.description || "Item"}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}` : "Office Purchase";
+  const amt = Number(item.totalAmount) || 0;
+  const canCancel = ["pending_hr", "pending_approval"].includes(item.status);
+  const cancel = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/office-purchases/${item.id}/cancel`, {}),
+    onSuccess: () => { queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/office-purchases") }); toast({ title: "Request cancelled" }); },
+    onError: (e: any) => toast({ title: "Could not cancel", description: e.message, variant: "destructive" }),
+  });
+  return (
+    <Card data-testid={`card-op-${item.id}`} className="border-0 hover-elevate active-elevate-2 cursor-pointer" onClick={() => onOpen(item.id)}>
+      <CardContent className="p-[17px]">
+        <div className="flex items-stretch gap-0">
+          <div className="flex-1 min-w-0 flex items-start gap-3 pr-5">
+            <div className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0 mt-1"><ShoppingCart className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-muted-foreground tracking-wide">{reference}</span>
+                <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(reference); toast({ title: "Reference copied" }); }} aria-label="Copy reference" className="h-5 w-5 rounded inline-flex items-center justify-center text-muted-foreground hover:text-[#206295] hover:bg-muted"><Copy className="h-3 w-3" /></button>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">{item.priority || "medium"}</Badge>
+              </div>
+              <h3 className="text-[18px] leading-tight font-semibold text-foreground tracking-tight truncate mt-0.5">{title}</h3>
+              <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 flex-shrink-0" /> Created · {formatDate(item.createdAt)}</p>
+            </div>
+          </div>
+
+          {colDivider}
+          <div className="w-[150px] flex-shrink-0 px-5 flex flex-col justify-end">
+            <History className="h-4 w-4 text-muted-foreground" />
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Last Updated</p>
+            <p className="text-sm font-semibold text-foreground mt-1.5 whitespace-nowrap">{item.updatedAt ? formatDate(item.updatedAt) : "—"}</p>
+          </div>
+
+          {colDivider}
+          <div className="w-[188px] flex-shrink-0 px-5 flex flex-col justify-end">
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Approval Status</p>
+            <div className="mt-1.5"><Badge className={`text-xs ${statusClass(item.status)}`}>{statusLabel(item.status)}</Badge></div>
+          </div>
+
+          {colDivider}
+          <div className="w-[188px] flex-shrink-0 px-5 flex flex-col justify-end items-end text-right">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">Amount</p>
+            {amt > 0
+              ? <p className="text-2xl font-bold text-[#206295] tracking-tight tabular-nums mt-1.5"><span className="font-semibold mr-0.5">₹</span>{amt.toLocaleString("en-IN")}</p>
+              : <p className="text-sm text-muted-foreground mt-1.5">Not priced yet</p>}
+          </div>
+
+          <div className="flex-shrink-0 flex items-center pl-2" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" data-testid={`more-op-${item.id}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={() => onOpen(item.id)}><Eye className="h-4 w-4 mr-2" /> View details</DropdownMenuItem>
+                {canCancel && <DropdownMenuItem className="text-[#FF6F62] focus:text-[#FF6F62]" disabled={cancel.isPending} onClick={() => { if (window.confirm("Cancel this request? This cannot be undone.")) cancel.mutate(); }}><Ban className="h-4 w-4 mr-2" /> Cancel</DropdownMenuItem>}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ---- Local drafts store (per-browser; not submitted to the server until "Submit") ----
 const DRAFTS_KEY = "emo:my-requests:drafts";
 type Draft = { id: string; type: string; data: any; savedAt: number };
@@ -565,7 +634,7 @@ function DraftCard({ draft, onEdit, onDelete, onSubmit, submitting }: { draft: D
   );
 }
 
-const CR_PAGE_SIZE = 4;
+const CR_PAGE_SIZE = 15;
 // Reimbursement card view: "Changes Requested" claims are lifted into their own urgency section at the
 // top (grey caps heading, count + pagination when > 2), separated from the rest of the list.
 function ReimbCardView({ items, onOpen }: { items: any[]; onOpen: (it: any) => void }) {
@@ -611,7 +680,9 @@ export default function MyRequestsPage() {
   // Tab comes from the clean path (/my-requests/<tab>); query is only used for the auto-open flag.
   const params = new URLSearchParams(location.split("?")[1] || "");
   const pathTab = location.replace(/\?.*$/, "").replace(/^\/my-requests\/?/, "");
-  const initTab = pathTab || params.get("tab") || "purchases";
+  // "Purchases" (legacy) is retired in favour of "Office Purchases"; redirect old links/default.
+  const rawTab = pathTab || params.get("tab") || "office-purchases";
+  const initTab = rawTab === "purchases" ? "office-purchases" : rawTab;
   const autoNew = params.get("new") === "true";
 
   const [tab, setTab] = useState(initTab);
@@ -649,6 +720,9 @@ export default function MyRequestsPage() {
   const { data: travels = [], isLoading: loadTR } = useQuery<any[]>({ queryKey: ["/api/my-requests/travels"] });
   const { data: tickets = [], isLoading: loadTickets } = useQuery<any[]>({ queryKey: ["/api/my-requests/tickets"] });
   const { data: reimbursements = [], isLoading: loadReimb } = useQuery<any[]>({ queryKey: ["/api/reimbursements?mine=true"] });
+  const { data: officePurchases = [], isLoading: loadOP } = useQuery<any[]>({ queryKey: ["/api/office-purchases?mine=true"] });
+  const [opDetailId, setOpDetailId] = useState<string | null>(null);
+  const [opNewOpen, setOpNewOpen] = useState(false);
 
   // PR form with items
   const prForm = useForm({
@@ -905,6 +979,16 @@ export default function MyRequestsPage() {
   const fTravels = refine(travels as any[], "travel");
   const fTickets = refine(tickets as any[], "ticket");
   const fReimb = refine(reimbursements as any[], "reimbursement");
+  const opQuery = search.trim().toLowerCase();
+  const fOP = (officePurchases as any[]).filter((o) =>
+    matchesFilter(o.status, statusFilter) &&
+    (opQuery === "" || `${o.reference || ""} ${(o.items || []).map((i: any) => i.description).join(" ")}`.toLowerCase().includes(opQuery))
+  );
+  // 15-per-page pagination for the card views (table views paginate via DataTable).
+  const tvPaged = usePaged(fTravels);
+  const tkPaged = usePaged(fTickets);
+  const rbPaged = usePaged(fReimb);
+  const opPaged = usePaged(fOP);
 
   return (
     <div className="p-6 space-y-5 max-w-[92rem] mx-auto">
@@ -920,9 +1004,9 @@ export default function MyRequestsPage() {
 
       <Tabs value={tab} onValueChange={(v) => { setTab(v); navigate(`/my-requests/${v}`); }} data-testid="tabs-my-requests">
         <TabsList>
-          <TabsTrigger value="purchases">
+          <TabsTrigger value="office-purchases">
             <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
-            Purchases {(purchases as any[]).length > 0 && `(${(purchases as any[]).length})`}
+            Purchases {(officePurchases as any[]).length > 0 && `(${(officePurchases as any[]).length})`}
           </TabsTrigger>
           <TabsTrigger value="travels">
             <Car className="h-3.5 w-3.5 mr-1.5" />
@@ -942,23 +1026,6 @@ export default function MyRequestsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="purchases" className="mt-4 space-y-5">
-          {controls(
-            <Button size="sm" onClick={() => { setEditingDraftId(null); prForm.reset(); setShowPRForm(true); }} data-testid="button-new-purchase">
-              <Plus className="h-4 w-4 mr-1.5" /> New Purchase Request
-            </Button>
-          )}
-          {loadPR ? <Skeleton className="h-24 w-full" /> :
-            fPurchases.length === 0 ? renderEmpty((purchases as any[]).length === 0 ? "No purchase requests yet." : "No purchase requests match this filter.") :
-            view === "table" ? <RequestTable type="purchase" items={fPurchases} onOpen={(it) => setDetail({ type: "purchase", item: it })} /> :
-            <div className="space-y-3">
-              {fPurchases.map(p => (
-                <RequestCard key={p.id} item={p} type="purchase" onOpen={(it) => setDetail({ type: "purchase", item: it })} />
-              ))}
-            </div>
-          }
-        </TabsContent>
-
         <TabsContent value="travels" className="mt-4 space-y-5">
           {controls(
             <Button size="sm" onClick={() => { setEditingDraftId(null); trForm.reset(); setShowTRForm(true); }} data-testid="button-new-travel">
@@ -969,9 +1036,10 @@ export default function MyRequestsPage() {
             fTravels.length === 0 ? renderEmpty((travels as any[]).length === 0 ? "No travel requests yet." : "No travel requests match this filter.") :
             view === "table" ? <RequestTable type="travel" items={fTravels} onOpen={(it) => setDetail({ type: "travel", item: it })} /> :
             <div className="space-y-3">
-              {fTravels.map(t => (
+              {tvPaged.pageItems.map(t => (
                 <RequestCard key={t.id} item={t} type="travel" onOpen={(it) => setDetail({ type: "travel", item: it })} />
               ))}
+              <PaginationBar page={tvPaged.page} totalPages={tvPaged.totalPages} count={tvPaged.count} size={tvPaged.size} onPage={tvPaged.setPage} />
             </div>
           }
         </TabsContent>
@@ -986,9 +1054,10 @@ export default function MyRequestsPage() {
             fTickets.length === 0 ? renderEmpty((tickets as any[]).length === 0 ? "No tickets yet." : "No tickets match this filter.") :
             view === "table" ? <RequestTable type="ticket" items={fTickets} onOpen={(it) => setDetail({ type: "ticket", item: it })} /> :
             <div className="space-y-3">
-              {fTickets.map(t => (
+              {tkPaged.pageItems.map(t => (
                 <RequestCard key={t.id} item={t} type="ticket" onOpen={(it) => setDetail({ type: "ticket", item: it })} />
               ))}
+              <PaginationBar page={tkPaged.page} totalPages={tkPaged.totalPages} count={tkPaged.count} size={tkPaged.size} onPage={tkPaged.setPage} />
             </div>
           }
         </TabsContent>
@@ -1002,7 +1071,44 @@ export default function MyRequestsPage() {
           {loadReimb ? <Skeleton className="h-24 w-full" /> :
             fReimb.length === 0 ? renderEmpty((reimbursements as any[]).length === 0 ? "No reimbursements yet." : "No reimbursements match this filter.") :
             view === "table" ? <RequestTable type="reimbursement" items={fReimb} onOpen={openReimb} /> :
-            <ReimbCardView items={fReimb} onOpen={openReimb} />
+            <div className="space-y-5">
+              <ReimbCardView items={rbPaged.pageItems} onOpen={openReimb} />
+              <PaginationBar page={rbPaged.page} totalPages={rbPaged.totalPages} count={rbPaged.count} size={rbPaged.size} onPage={rbPaged.setPage} />
+            </div>
+          }
+        </TabsContent>
+
+        <TabsContent value="office-purchases" className="mt-4 space-y-5">
+          {controls(
+            <Button size="sm" onClick={() => setOpNewOpen(true)} data-testid="button-new-office-purchase">
+              <Plus className="h-4 w-4 mr-1.5" /> New Office Purchase
+            </Button>
+          )}
+          {loadOP ? <Skeleton className="h-24 w-full" /> :
+            fOP.length === 0 ? renderEmpty((officePurchases as any[]).length === 0 ? "No office purchases yet." : "No office purchases match this filter.") :
+            view === "table" ? (
+              <Card className="border-0"><CardContent className="p-0">
+                <DataTable
+                  columns={[
+                    { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
+                    { key: "items", header: "Items", cellClassName: "text-muted-foreground", render: (o: any) => `${(o.items || []).length} item${(o.items || []).length !== 1 ? "s" : ""}` },
+                    { key: "priority", header: "Priority", cellClassName: "capitalize text-muted-foreground", render: (o: any) => o.priority || "medium" },
+                    { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
+                    { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
+                    { key: "created", header: "Created", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? formatDate(o.createdAt) : "—" },
+                  ]}
+                  rows={fOP}
+                  getRowKey={(o: any) => o.id}
+                  onRowClick={(o: any) => setOpDetailId(o.id)}
+                  testIdPrefix="op-row"
+                />
+              </CardContent></Card>
+            ) : (
+              <div className="space-y-3">
+                {opPaged.pageItems.map((o) => <OfficePurchaseCard key={o.id} item={o} onOpen={setOpDetailId} />)}
+                <PaginationBar page={opPaged.page} totalPages={opPaged.totalPages} count={opPaged.count} size={opPaged.size} onPage={opPaged.setPage} />
+              </div>
+            )
           }
         </TabsContent>
 
@@ -1020,6 +1126,10 @@ export default function MyRequestsPage() {
             )}
         </TabsContent>
       </Tabs>
+
+      {/* Office Purchase — new-request chooser + detail (cancel / flag) */}
+      <NewRequestDialog open={opNewOpen} onClose={() => setOpNewOpen(false)} />
+      <OfficePurchaseDetailDialog id={opDetailId} open={!!opDetailId} onClose={() => setOpDetailId(null)} />
 
       {/* Purchase Request Form */}
       <Dialog open={showPRForm} onOpenChange={(v) => { if (!v) closePR(); }}>

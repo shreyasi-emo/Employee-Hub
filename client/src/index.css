@@ -281,7 +281,7 @@
    Outlined deep-blue glass button — used for in-form actions (Add / Edit / etc.).
    ("Secondary Button A" is the .btn-glass style above.) */
 .btn-secondary-b {
-  border-radius: 20px;
+  border-radius: 16px;
   border: 1.5px solid #1A4B94;
   background: rgba(26, 75, 148, 0.06);
   box-shadow: none;
@@ -439,4 +439,19 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+}
+
+/* Office Purchase chooser — themed icon hover motion */
+@keyframes op-cart-roll {
+  0%   { transform: translateX(0) rotate(0deg); }
+  25%  { transform: translateX(5px) rotate(4deg); }
+  50%  { transform: translateX(-3px) rotate(-3deg); }
+  75%  { transform: translateX(3px) rotate(2deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+@keyframes op-box-lift {
+  0%   { transform: translateY(0) rotate(0deg); }
+  40%  { transform: translateY(-6px) rotate(-9deg); }
+  70%  { transform: translateY(-3px) rotate(5deg); }
+  100% { transform: translateY(0) rotate(0deg); }
 }
