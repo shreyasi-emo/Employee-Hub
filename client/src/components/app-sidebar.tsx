@@ -10,10 +10,9 @@ import {
   FileText, Target, ClipboardList, Briefcase, ShoppingCart,
   Car, CreditCard, TicketIcon, CheckSquare, Inbox, Store, Truck, BookOpen, ScrollText,
 } from "lucide-react";
-import { useAuth, useLogout, isHR, isAdmin, hasWorkspaceAccess, isCEOApprover } from "@/lib/auth";
+import { useAuth, useLogout, isHR, isAdmin, hasWorkspaceAccess } from "@/lib/auth";
 import BRAND from "@/lib/brand";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { getRoleLabel } from "@/lib/auth";
@@ -55,7 +54,7 @@ const workspaceItems: NavItem[] = [
   { title: "ATS / Recruitment", href: "/workspace/ats", icon: Briefcase, roles: ["super_admin", "hr_admin", "hr_executive", "recruiter", "hr_ops"] },
   { title: "HR Ops", href: "/workspace/hr-ops", icon: CheckSquare, roles: ["super_admin", "hr_admin", "hr_executive", "hr_ops"] },
   { title: "Office Admin", href: "/workspace/office", icon: ShoppingCart, roles: ["super_admin", "hr_admin", "office_admin"] },
-  { title: "CEO Inbox", href: "/workspace/approvals", icon: Inbox, roles: ["super_admin", "ceo_approver"] },
+  { title: "CEO Inbox", href: "/workspace/approvals", icon: Inbox, roles: ["super_admin"] },
 ];
 
 const adminItems: NavItem[] = [
@@ -74,11 +73,17 @@ export function AppSidebar() {
   const user = auth?.user;
   const emp = auth?.employee;
 
-  const { data: pendingApprovals = [] } = useQuery<any[]>({
-    queryKey: ["/api/workspace/approvals/pending"],
-    enabled: isCEOApprover(user ?? null),
-    refetchInterval: 60000,
-  });
+  // CEO Inbox badge = CEO-stage items awaiting action (mirrors the page's count): finance-approved
+  // reimbursements + office/procurement pending_approval or under_review. Super-admin only (they own the tab).
+  const isSuper = user?.role === "super_admin";
+  const { data: ceoReimb = [] } = useQuery<any[]>({ queryKey: ["/api/reimbursements"], enabled: isSuper, refetchInterval: 60000 });
+  const { data: ceoOps = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases"], enabled: isSuper, refetchInterval: 60000 });
+  const { data: ceoProcs = [] } = useQuery<any[]>({ queryKey: ["/api/procurement"], enabled: isSuper, refetchInterval: 60000 });
+  const ceoInboxCount = isSuper
+    ? (ceoReimb as any[]).filter((r) => r.status === "finance_approved").length
+      + (ceoOps as any[]).filter((o) => ["pending_approval", "under_review"].includes(o.status)).length
+      + (ceoProcs as any[]).filter((o) => ["pending_approval", "under_review"].includes(o.status)).length
+    : 0;
 
   const displayName = emp ? `${emp.firstName} ${emp.lastName}` : user?.username || "";
   const initials = emp ? `${emp.firstName[0]}${emp.lastName[0]}` : user?.username?.slice(0, 2).toUpperCase() || "U";
@@ -176,10 +181,10 @@ export function AppSidebar() {
                       <a href={item.href} className="flex items-center gap-2.5 py-1.5">
                         <item.icon className="h-4 w-4 flex-shrink-0" />
                         <span className="text-sm flex-1">{item.title}</span>
-                        {item.href === "/workspace/approvals" && (pendingApprovals as any[]).length > 0 && (
-                          <Badge className="h-4 min-w-4 px-1 text-[10px] bg-destructive text-destructive-foreground border-0 flex-shrink-0">
-                            {(pendingApprovals as any[]).length}
-                          </Badge>
+                        {item.href === "/workspace/approvals" && ceoInboxCount > 0 && (
+                          <span className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full text-[10px] font-bold leading-none tabular-nums bg-[#FF6F62] text-white flex-shrink-0">
+                            {ceoInboxCount}
+                          </span>
                         )}
                       </a>
                     </SidebarMenuButton>

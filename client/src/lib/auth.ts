@@ -99,20 +99,27 @@ export function isCEOApprover(user: CurrentUser | null): boolean {
 }
 
 export function getRoleBadgeColor(role: UserRole): string {
+  // Brand palette only (mirrors lib/status.ts): blue = leadership, teal = HR/ops,
+  // coral = finance, grey = everyone else. Labels carry the finer distinction.
+  const BLUE = "bg-[#206295]/15 text-[#206295]";
+  const TEAL = "bg-[#4BDCD9]/25 text-[#0E7C7B]";
+  const CORAL = "bg-[#FF6F62]/20 text-[#FF6F62]";
+  const GREY = "bg-[#64748B]/15 text-[#64748B]";
   const colors: Record<string, string> = {
-    super_admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-    hr_admin: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-    hr_executive: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-    hr_ops: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300",
-    finance: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-    manager: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
-    recruiter: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300",
-    office_admin: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
-    ceo_approver: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
-    interviewer: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300",
-    employee: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
+    super_admin: TEAL,
+    ceo_approver: TEAL,
+    hr_admin: BLUE,
+    hr_executive: BLUE,
+    hr_ops: BLUE,
+    office_admin: BLUE,
+    finance: CORAL,
+    manager: GREY,
+    recruiter: GREY,
+    interviewer: GREY,
+    logistics: GREY,
+    employee: GREY,
   };
-  return colors[role] || colors.employee;
+  return colors[role] || GREY;
 }
 
 export function getRoleLabel(role: UserRole): string {

@@ -14,6 +14,7 @@ export function registerOfficePurchaseRoutes(app: Express) {
   const CEO_ROLES = ["ceo_approver"];
   const isHrTriage = (r: Request) => hasRole(r, "super_admin", ...HR_ROLES);
   const isCeo = (r: Request) => hasRole(r, "super_admin", ...CEO_ROLES);
+  const isFinance = (r: Request) => hasRole(r, "super_admin", "finance");
   const isApprover = (r: Request) => hasRole(r, "super_admin", ...HR_ROLES, ...CEO_ROLES, "finance");
 
   // Total is always derived server-side from HR-entered unit prices × quantities.
@@ -90,8 +91,11 @@ export function registerOfficePurchaseRoutes(app: Express) {
     if (!["pending_hr", "priced"].includes(r.status)) return res.status(400).json({ error: `Cannot price a request in '${r.status}' state` });
     const items = Array.isArray(req.body?.items) ? req.body.items : r.items;
     const priority = ["low", "medium", "high"].includes(req.body?.priority) ? req.body.priority : (r.priority || "medium");
+    const purchaseType = ["online", "vendor"].includes(req.body?.purchaseType) ? req.body.purchaseType : (r.purchaseType || "online");
     const updated = await storage.updateOfficePurchase(req.params.id, {
       items, priority, isDirect: !!req.body?.isDirect, totalAmount: sumItems(items),
+      purchaseType, vendorName: purchaseType === "vendor" ? (req.body?.vendorName || null) : null,
+      proformaInvoice: purchaseType === "vendor" ? (req.body?.proformaInvoice ?? r.proformaInvoice ?? null) : null,
       reviewedById: req.currentUser!.id, reviewNote: req.body?.reviewNote || null, reviewedAt: new Date(),
       status: "priced",
     });
@@ -135,11 +139,13 @@ export function registerOfficePurchaseRoutes(app: Express) {
   const approveOne = async (req: Request, id: string, note: string | null) => {
     const r = await storage.getOfficePurchase(id);
     if (!r) return { error: 404 as const };
-    if (r.status !== "pending_approval") return { error: 400 as const, msg: `Cannot approve a request in '${r.status}' state` };
-    const updated = await storage.updateOfficePurchase(id, { status: "approved", approvedById: req.currentUser!.id, decisionNote: note, decidedAt: new Date() });
-    await notifyRequester(r.requesterId, { type: "office_purchase_approved", title: "Office Purchase Approved", body: `${r.reference} was approved — HR will place the order.`, link: "/my-requests" });
+    if (!["pending_approval", "under_review"].includes(r.status)) return { error: 400 as const, msg: `Cannot approve a request in '${r.status}' state` };
+    const isVendor = r.purchaseType === "vendor";
+    const updated = await storage.updateOfficePurchase(id, { status: "approved", approvedById: req.currentUser!.id, decisionNote: note, decidedAt: new Date(), ...(isVendor ? { paymentStatus: "pending" } : {}) });
+    // #5: on approval HR is notified to place the order (NOT the requester). Vendor purchases also flag Finance to pay.
     try {
-      await storage.notifyByRole([...HR_ROLES, "finance"], { type: "office_purchase_approved", title: "Office Purchase Approved", body: `${r.reference} (${r.employeeName || "Employee"}) is approved — ready to order.`, link: "/company-workspace" });
+      await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_approved", title: "Approved — place the order", body: `${r.reference} (${r.employeeName || "Employee"}) was approved.${isVendor ? " Vendor purchase — Finance will pay via the proforma." : ""}`, link: "/company-workspace" });
+      if (isVendor) await storage.notifyByRole(["finance", "super_admin"], { type: "office_purchase_payment", title: "Vendor payment needed", body: `${r.reference} — pay ${r.vendorName || "the vendor"} ₹${Number(r.totalAmount || 0).toLocaleString("en-IN")} (proforma attached).`, link: "/reimbursements" });
     } catch { /* best-effort */ }
     return { updated };
   };
@@ -173,7 +179,7 @@ export function registerOfficePurchaseRoutes(app: Express) {
     const results: any[] = [];
     for (const id of ids) {
       const r = await storage.getOfficePurchase(id);
-      if (!r || r.status !== "pending_approval") continue;
+      if (!r || !["pending_approval", "under_review"].includes(r.status)) continue;
       const updated = await storage.updateOfficePurchase(id, { status: "rejected", approvedById: req.currentUser!.id, decisionNote: note, decidedAt: new Date() });
       await log(req, "OFFICE_PURCHASE_REJECT", "office_purchase", id, r, updated);
       await notifyRequester(r.requesterId, { type: "office_purchase_rejected", title: "Office Purchase Declined", body: `${r.reference} was not approved.${note ? ` Note: ${note}` : ""}`, link: "/my-requests" });
@@ -187,7 +193,7 @@ export function registerOfficePurchaseRoutes(app: Express) {
     if (!isCeo(req)) return res.status(403).json({ error: "CEO approval required" });
     const r = await storage.getOfficePurchase(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    if (r.status !== "pending_approval") return res.status(400).json({ error: `Cannot reject a request in '${r.status}' state` });
+    if (!["pending_approval", "under_review"].includes(r.status)) return res.status(400).json({ error: `Cannot reject a request in '${r.status}' state` });
     const updated = await storage.updateOfficePurchase(req.params.id, { status: "rejected", approvedById: req.currentUser!.id, decisionNote: req.body?.note || null, decidedAt: new Date() });
     await log(req, "OFFICE_PURCHASE_REJECT", "office_purchase", r.id, r, updated);
     await notifyRequester(r.requesterId, { type: "office_purchase_rejected", title: "Office Purchase Declined", body: `${r.reference} was not approved.${req.body?.note ? ` Note: ${req.body.note}` : ""}`, link: "/my-requests" });
@@ -200,9 +206,22 @@ export function registerOfficePurchaseRoutes(app: Express) {
     const r = await storage.getOfficePurchase(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
     if (r.status !== "approved") return res.status(400).json({ error: `Cannot place an order in '${r.status}' state` });
-    const updated = await storage.updateOfficePurchase(req.params.id, { status: "ordered", orderPlacedById: req.currentUser!.id, orderInfo: req.body?.orderInfo || null, expectedDeliveryDate: req.body?.expectedDeliveryDate || null, orderPlacedAt: new Date() });
+    const updated = await storage.updateOfficePurchase(req.params.id, { status: "ordered", orderPlacedById: req.currentUser!.id, orderInfo: req.body?.orderInfo || null, expectedDeliveryDate: req.body?.expectedDeliveryDate || null, invoice: req.body?.invoice ?? r.invoice ?? null, orderPlacedAt: new Date() });
     await log(req, "OFFICE_PURCHASE_ORDER", "office_purchase", r.id, r, updated);
     await notifyRequester(r.requesterId, { type: "office_purchase_ordered", title: "Order Placed", body: `${r.reference} has been ordered${req.body?.orderInfo ? ` — ${req.body.orderInfo}` : ""}.`, link: "/my-requests" });
+    try { await storage.notifyByRole(["finance", "super_admin"], { type: "office_purchase_invoice", title: "Invoice available", body: `${r.reference} (${r.employeeName || "Employee"}) — invoice uploaded for records.`, link: "/reimbursements" }); } catch { /* best-effort */ }
+    res.json(updated);
+  });
+
+  // ----- Finance: record a vendor payment (uses the proforma) -----
+  app.post("/api/office-purchases/:id/pay", requireAuth, async (req, res) => {
+    if (!isFinance(req)) return res.status(403).json({ error: "Finance only" });
+    const r = await storage.getOfficePurchase(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.paymentStatus !== "pending") return res.status(400).json({ error: "No payment is pending for this purchase." });
+    const updated = await storage.updateOfficePurchase(req.params.id, { paymentStatus: "paid", paidById: req.currentUser!.id, paidAt: new Date(), paymentRef: req.body?.paymentRef || null });
+    await log(req, "OFFICE_PURCHASE_PAY", "office_purchase", r.id, r, updated);
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_paid", title: "Vendor paid", body: `${r.reference} — Finance recorded the payment${req.body?.paymentRef ? ` (ref ${req.body.paymentRef})` : ""}.`, link: "/company-workspace" }); } catch { /* best-effort */ }
     res.json(updated);
   });
 
@@ -247,5 +266,59 @@ export function registerOfficePurchaseRoutes(app: Express) {
       await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_issue", title: "Order Issue Flagged", body: `${r.employeeName || "An employee"} flagged an issue with ${r.reference}.`, link: "/workspace/hr-ops" });
     } catch { /* best-effort */ }
     res.json({ order: updated, ticket });
+  });
+
+  // ----- CEO ⇄ HR discussion thread -----
+  const actorName = async (req: Request) => (await requesterContext(req.currentUser!.id, req.currentUser!.username)).employeeName || req.currentUser!.username;
+  const mkComment = (req: Request, name: string, body: string, kind?: string) => ({ id: randomUUID(), authorId: req.currentUser!.id, authorName: name, authorRole: req.currentUser!.role, body, at: new Date().toISOString(), ...(kind ? { kind } : {}) });
+  // Fan a thread update to everyone involved except the author: requester → /my-requests, approver-side → /my-approvals.
+  const notifyThread = async (r: any, actorId: string, payload: any) => {
+    if (r.requesterId && r.requesterId !== actorId) await storage.notifyUser(r.requesterId, { ...payload, link: "/my-requests" });
+    const seen = new Set<string>([r.requesterId, actorId]);
+    for (const id of [r.approvedById, r.reviewedById, ...((r.comments || []) as any[]).map((c) => c.authorId)]) {
+      if (id && !seen.has(id)) { seen.add(id); await storage.notifyUser(id, { ...payload, link: "/my-approvals" }); }
+    }
+  };
+
+  // Anyone with access (owner or approver) can post to the thread.
+  app.post("/api/office-purchases/:id/comment", requireAuth, async (req, res) => {
+    const r = await storage.getOfficePurchase(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (!isApprover(req) && r.requesterId !== req.currentUser!.id) return res.status(403).json({ error: "Forbidden" });
+    const body = String(req.body?.body || "").trim();
+    if (!body) return res.status(400).json({ error: "Write a message." });
+    const comment = mkComment(req, await actorName(req), body);
+    const updated = await storage.updateOfficePurchase(req.params.id, { comments: [...((r.comments as any[]) || []), comment] });
+    await notifyThread(r, req.currentUser!.id, { type: "office_purchase_comment", title: `New comment · ${r.reference}`, body: `${comment.authorName}: ${body.slice(0, 90)}` });
+    res.json(updated);
+  });
+
+  // CEO raises a query → item goes Under Review and HR is notified. Single or bulk.
+  const queryOne = async (req: Request, id: string, body: string, name: string) => {
+    const r = await storage.getOfficePurchase(id);
+    if (!r || !["pending_approval", "under_review"].includes(r.status)) return null;
+    const updated = await storage.updateOfficePurchase(id, { status: "under_review", comments: [...((r.comments as any[]) || []), mkComment(req, name, body, "query")] });
+    await log(req, "OFFICE_PURCHASE_QUERY", "office_purchase", id, r, updated);
+    return updated;
+  };
+  app.post("/api/office-purchases/:id/query", requireAuth, async (req, res) => {
+    if (!isCeo(req)) return res.status(403).json({ error: "CEO only" });
+    const body = String(req.body?.body || "").trim();
+    if (!body) return res.status(400).json({ error: "Add a message for HR." });
+    const updated = await queryOne(req, req.params.id, body, await actorName(req));
+    if (!updated) return res.status(400).json({ error: "This request can no longer be queried." });
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_query", title: `Query · ${updated.reference}`, body: `CEO asked: ${body.slice(0, 90)}`, link: "/company-workspace" }); } catch { /* best-effort */ }
+    res.json(updated);
+  });
+  app.post("/api/office-purchases/bulk-query", requireAuth, async (req, res) => {
+    if (!isCeo(req)) return res.status(403).json({ error: "CEO only" });
+    const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const body = String(req.body?.body || "").trim();
+    if (!body) return res.status(400).json({ error: "Add a message for HR." });
+    const name = await actorName(req);
+    const results: any[] = [];
+    for (const id of ids) { const u = await queryOne(req, id, body, name); if (u) results.push(u); }
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_query", title: "CEO raised a query", body: `${results.length} request${results.length !== 1 ? "s" : ""}: ${body.slice(0, 90)}`, link: "/company-workspace" }); } catch { /* best-effort */ }
+    res.json({ queried: results.length, items: results });
   });
 }

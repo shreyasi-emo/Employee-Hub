@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
@@ -16,8 +16,10 @@ import { format } from "date-fns";
 import {
   ShoppingCart, Plus, X, Link2, ChevronRight, ChevronLeft, Check, Truck,
   CircleCheck, AlertTriangle, ExternalLink, Hash, IndianRupee, Copy, MoreVertical,
-  User, CalendarClock, Clock, Building2, FileText,
+  User, CalendarClock, Clock, Building2, FileText, MessageSquare,
 } from "lucide-react";
+import { CommentThread } from "@/components/comment-thread";
+import { FileUpload, type UploadedFile } from "@/components/file-upload";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -68,30 +70,56 @@ function FormSection({ n, title, hint, children }: { n: number; title: string; h
 // ============================ Progressive "New Request" dialog ============================
 // Page 1: pick the nature (Office Purchase — functional; Equipment & Assets — not yet wired).
 // Page 2: the Office Purchase form. A 2-step progress bar runs across the top.
-export function NewRequestDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function NewRequestDialog({ open, onClose, initialKind, onSaveDraft, initialData, onSubmitted }: { open: boolean; onClose: () => void; initialKind?: "office" | "procurement"; onSaveDraft?: (data: any) => void; initialData?: any; onSubmitted?: () => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [step, setStep] = useState(0);
+  const [kind, setKind] = useState<"office" | "procurement">("office");
   const [items, setItems] = useState<Item[]>([emptyItem()]);
   const [justification, setJustification] = useState("");
 
-  const reset = () => { setStep(0); setItems([emptyItem()]); setJustification(""); };
+  const reset = () => { setStep(0); setKind("office"); setItems([emptyItem()]); setJustification(""); };
   const close = () => { reset(); onClose(); };
   const setItem = (i: number, patch: Partial<Item>) => setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+  const pickKind = (k: "office" | "procurement") => { setKind(k); setItems([emptyItem()]); setJustification(""); setStep(1); };
 
+  // Open from a "New …" button (initialKind) or a saved draft (initialData) → skip the chooser + prefill.
+  useEffect(() => {
+    if (!open) return;
+    if (initialData) {
+      setKind(initialData.kind || initialKind || "office");
+      setItems(Array.isArray(initialData.items) && initialData.items.length ? initialData.items : [emptyItem()]);
+      setJustification(initialData.justification || "");
+      setStep(1);
+    } else if (initialKind) {
+      setKind(initialKind); setItems([emptyItem()]); setJustification(""); setStep(1);
+    }
+  }, [open]);
+
+  const invalidateProc = () => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/procurement") });
   const submit = useMutation({
-    mutationFn: (payload: any) => apiRequest("POST", "/api/office-purchases", payload),
-    onSuccess: () => { invalidate(qc); toast({ title: "Awaiting approval" }); close(); },
+    mutationFn: (payload: any) => apiRequest("POST", kind === "procurement" ? "/api/procurement" : "/api/office-purchases", payload),
+    onSuccess: () => { invalidate(qc); invalidateProc(); toast({ title: "Awaiting approval" }); onSubmitted?.(); close(); },
     onError: (e: any) => toast({ title: "Couldn't submit", description: e.message, variant: "destructive" }),
   });
 
-  const valid = items.length > 0 && items.every((it) => it.description.trim() && Number(it.quantity) > 0);
+  const procTotal = items.reduce((s, it) => s + (Number(it.unitPrice) || 0) * (Number(it.quantity) || 0), 0);
+  const valid = items.length > 0 && (kind === "procurement"
+    ? items.every((it) => it.description.trim() && Number(it.quantity) > 0 && Number(it.unitPrice) > 0 && (it.finalLink || "").trim())
+    : items.every((it) => it.description.trim() && Number(it.quantity) > 0));
   const doSubmit = () => {
-    if (!valid) return toast({ title: "Add at least one item with a description and quantity", variant: "destructive" });
-    submit.mutate({
-      justification: justification.trim() || null,
-      items: items.map((it) => ({ description: it.description.trim(), quantity: Number(it.quantity) || 1, suggestedLinks: (it.suggestedLinks || []).filter(Boolean) })),
-    });
+    if (!valid) return toast({ title: kind === "procurement" ? "Each item needs a description, quantity, link and cost" : "Add at least one item with a description and quantity", variant: "destructive" });
+    if (kind === "procurement") {
+      submit.mutate({
+        category: "amazon", justification: justification.trim() || null,
+        items: items.map((it) => ({ description: it.description.trim(), quantity: Number(it.quantity) || 1, link: (it.finalLink || "").trim(), unitPrice: Number(it.unitPrice) || 0 })),
+      });
+    } else {
+      submit.mutate({
+        justification: justification.trim() || null,
+        items: items.map((it) => ({ description: it.description.trim(), quantity: Number(it.quantity) || 1, suggestedLinks: (it.suggestedLinks || []).filter(Boolean) })),
+      });
+    }
   };
 
   return (
@@ -121,7 +149,7 @@ export function NewRequestDialog({ open, onClose }: { open: boolean; onClose: ()
             {step === 0 ? (
               <div className="flex flex-col justify-center h-full min-h-[320px] space-y-5">
                 <p className="text-[15px] font-bold text-foreground text-center">Select the type of request you'd like to raise.</p>
-                <button type="button" onClick={() => setStep(1)} className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4" data-testid="choose-office-purchase">
+                <button type="button" onClick={() => pickKind("office")} className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4" data-testid="choose-office-purchase">
                   <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#206295]/15 to-[#4BDCD9]/25 text-[#206295] flex items-center justify-center flex-shrink-0 shadow-sm">
                     <CartIllustration className="h-8 w-8 origin-center group-hover:animate-[op-cart-roll_0.7s_ease-in-out]" />
                   </div>
@@ -131,7 +159,7 @@ export function NewRequestDialog({ open, onClose }: { open: boolean; onClose: ()
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
                 </button>
-                <button type="button" className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4" data-testid="choose-procurement">
+                <button type="button" onClick={() => pickKind("procurement")} className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4" data-testid="choose-procurement">
                   <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#0E7C7B]/15 to-[#4BDCD9]/30 text-[#0E7C7B] flex items-center justify-center flex-shrink-0 shadow-sm">
                     <BoxIllustration className="h-8 w-8 origin-center group-hover:animate-[op-box-lift_0.7s_ease-in-out]" />
                   </div>
@@ -141,6 +169,45 @@ export function NewRequestDialog({ open, onClose }: { open: boolean; onClose: ()
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
                 </button>
+              </div>
+            ) : kind === "procurement" ? (
+              <div className="space-y-5">
+                <div className="flex items-center gap-2.5 rounded-xl bg-[#0E7C7B]/[0.06] px-3 py-2.5">
+                  <span className="h-8 w-8 rounded-lg bg-[#0E7C7B]/10 text-[#0E7C7B] flex items-center justify-center flex-shrink-0"><BoxIllustration className="h-4 w-4" /></span>
+                  <p className="text-sm font-semibold text-foreground">Equipment &amp; Assets</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Purpose</Label>
+                  <Input value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="e.g. Replacement bearing for the assembly line" data-testid="proc-purpose" />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Items</Label>
+                    <span className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</span>
+                  </div>
+                  {items.map((it, i) => (
+                    <div key={i} className="rounded-[16px] border border-border p-3 space-y-3 bg-muted/30">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-muted-foreground">Item {i + 1}</span>
+                        {items.length > 1 && <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setItems((a) => a.filter((_, idx) => idx !== i))} aria-label="Remove item"><X className="h-3.5 w-3.5 text-[#FF6F62]" /></Button>}
+                      </div>
+                      <div className="space-y-1"><p className="text-xs text-muted-foreground">Item</p><Input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="e.g. SKF 6205 bearing" className="h-9" data-testid={`proc-item-desc-${i}`} /></div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Quantity</p><Input type="number" min={1} value={it.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} className="h-9" /></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Unit cost (₹)</p><Input type="number" min={0} value={it.unitPrice ?? ""} onChange={(e) => setItem(i, { unitPrice: Number(e.target.value) })} placeholder="0.00" className="h-9" /></div>
+                      </div>
+                      <div className="space-y-1"><p className="text-xs text-muted-foreground">Amazon link</p><div className="relative"><Link2 className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" /><Input value={it.finalLink || ""} onChange={(e) => setItem(i, { finalLink: e.target.value })} placeholder="https://amazon.in/…" className="h-9 pl-8" /></div></div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="secondaryB" size="sm" className="w-full" style={{ borderRadius: "16px" }} onClick={() => setItems((a) => [...a, emptyItem()])}><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item</Button>
+                </div>
+
+                <div className="rounded-[16px] border border-border p-4 bg-muted/30 flex items-center justify-between ml-auto sm:w-64">
+                  <span className="text-sm text-muted-foreground">Total</span>
+                  <span className={`text-base font-bold tabular-nums ${procTotal > 0 ? "text-[#206295]" : "text-muted-foreground/50"}`}>{money(procTotal)}</span>
+                </div>
               </div>
             ) : (
               <div className="space-y-6">
@@ -192,6 +259,7 @@ export function NewRequestDialog({ open, onClose }: { open: boolean; onClose: ()
           {step === 1 ? <Button variant="ghost" onClick={() => setStep(0)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button> : <span />}
           <div className="flex gap-2">
             <Button variant="outline" onClick={close}>Cancel</Button>
+            {step === 1 && onSaveDraft && <Button variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft({ kind, items, justification }); close(); }} data-testid="op-save-draft">Save as Draft</Button>}
             {step === 1 && <Button className="btn-primary-gradient" disabled={!valid || submit.isPending} onClick={doSubmit} data-testid="op-submit">{submit.isPending ? "Submitting…" : "Submit request"}</Button>}
           </div>
         </div>
@@ -267,7 +335,7 @@ function LinkChip({ url, label }: { url: string; label?: string }) {
 }
 
 // ============================ Detail + role actions dialog ============================
-export function OfficePurchaseDetailDialog({ id, open, onClose }: { id: string | null; open: boolean; onClose: () => void }) {
+export function OfficePurchaseDetailDialog({ id, open, onClose, onPriced, context = "owner" }: { id: string | null; open: boolean; onClose: () => void; onPriced?: (id: string) => void; context?: "owner" | "approver" }) {
   const { data: auth } = useAuth();
   const role = auth?.user?.role;
   const meId = auth?.user?.id;
@@ -281,6 +349,10 @@ export function OfficePurchaseDetailDialog({ id, open, onClose }: { id: string |
   const [orderInfo, setOrderInfo] = useState("");
   const [expDate, setExpDate] = useState("");
   const [issue, setIssue] = useState("");
+  const [purchaseType, setPurchaseType] = useState("online");
+  const [vendorName, setVendorName] = useState("");
+  const [proforma, setProforma] = useState<UploadedFile | null>(null);
+  const [invoice, setInvoice] = useState<UploadedFile | null>(null);
 
   const act = useMutation({
     mutationFn: ({ path, body }: { path: string; body?: any }) => apiRequest("POST", `/api/office-purchases/${id}/${path}`, body || {}),
@@ -289,12 +361,21 @@ export function OfficePurchaseDetailDialog({ id, open, onClose }: { id: string |
       const MSG: Record<string, string> = { price: "Saved to group", send: "Sent for approval", approve: "Approved", reject: "Rejected", "place-order": "Order marked placed", deliver: "Marked delivered", cancel: "Request cancelled", flag: "Issue reported — support ticket opened" };
       toast({ title: MSG[vars.path] || "Done" });
       setNote(""); setOrderInfo(""); setExpDate(""); setIssue(""); setPriced(null);
+      // Saving a price stages it — hand off to the list's grouping flow with this one pre-selected.
+      if (vars.path === "price" && onPriced && id) { onPriced(id); onClose(); }
     },
     onError: (e: any) => toast({ title: "Action failed", description: e.message, variant: "destructive" }),
   });
 
-  // Seed the priority selector from the request when it loads.
-  useEffect(() => { if (order?.priority) setPriority(order.priority); }, [order?.id]);
+  // Seed editable fields from the request when it loads.
+  useEffect(() => {
+    if (!order) return;
+    setPriority(order.priority || "medium");
+    setPurchaseType(order.purchaseType || "online");
+    setVendorName(order.vendorName || "");
+    setProforma(order.proformaInvoice || null);
+    setInvoice(order.invoice || null);
+  }, [order?.id]);
 
   if (!order) return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -307,21 +388,27 @@ export function OfficePurchaseDetailDialog({ id, open, onClose }: { id: string |
 
   const items: Item[] = Array.isArray(order.items) ? order.items : [];
   const isOwner = order.requesterId === meId;
+  const canAct = context === "approver"; // triage/approve actions only on the approvals page, never from My Requests
   const approver = canHrTriage(role) || canCeoApprove(role);
-  const isHrPriceEdit = canHrTriage(role) && ["pending_hr", "priced"].includes(order.status);
+  const isHrPriceEdit = canAct && canHrTriage(role) && ["pending_hr", "priced"].includes(order.status);
   const editItems = priced ?? items.map((it) => ({ ...it }));
   const setEdit = (i: number, patch: Partial<Item>) => setPriced((prev) => (prev ?? items.map((it) => ({ ...it }))).map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   const rows = isHrPriceEdit ? editItems : items;
   const grandTotal = rows.reduce((s, it) => s + (Number(it.unitPrice) || 0) * (Number(it.quantity) || 0), 0);
-  const canSend = editItems.length > 0 && editItems.every((it) => Number(it.unitPrice) > 0);
+  const hasLink = editItems.some((it) => (it.finalLink || "").trim());
+  const canSend = editItems.length > 0 && editItems.every((it) => Number(it.unitPrice) > 0) && (hasLink || !!proforma);
   const ownerCanCancel = isOwner && ["pending_hr", "pending_approval"].includes(order.status);
   // Suggested links are the employee's proposals — HR (triage) and the requester see them; the CEO only sees the final link.
   const showSuggested = canHrTriage(role) || isOwner;
 
+  const showCeoAct = canAct && canCeoApprove(role) && ["pending_approval", "under_review"].includes(order.status);
+  const showOrderAct = canAct && canHrTriage(role) && order.status === "approved";
+  const showDeliverAct = canAct && canHrTriage(role) && order.status === "ordered";
+  const hasFooter = grandTotal > 0 || isHrPriceEdit || showCeoAct || showOrderAct || showDeliverAct;
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader>
+      <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
           <div className="flex items-start justify-between gap-2 pr-6">
             <DialogTitle className="flex items-center gap-2 min-w-0">
               <span className="h-9 w-9 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><ShoppingCart className="h-5 w-5" /></span>
@@ -338,138 +425,161 @@ export function OfficePurchaseDetailDialog({ id, open, onClose }: { id: string |
           </div>
         </DialogHeader>
 
-        {!["rejected", "cancelled"].includes(order.status) && <div className="py-1"><Stepper status={order.status} approver={approver} /></div>}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-4 space-y-4">
+          {!["rejected", "cancelled"].includes(order.status) && <div className="py-1"><Stepper status={order.status} approver={approver} /></div>}
 
-        {/* Meta — full-width strip, icon + vertical separators */}
-        {(() => {
-          const segs: { icon: any; label: string; value: React.ReactNode }[] = [
-            { icon: User, label: "Requester", value: `${order.employeeName || "Employee"}${order.employeeCode ? ` · ${order.employeeCode}` : ""}` },
-            ...(order.department ? [{ icon: Building2, label: "Department", value: order.department as React.ReactNode }] : []),
-            { icon: CalendarClock, label: "Submitted", value: order.createdAt ? format(new Date(order.createdAt), "MMM d, yyyy") : "—" },
-            { icon: Clock, label: "Priority", value: <Badge className={`text-[10px] capitalize ${PRIORITY_CLS[order.priority || "medium"] || PRIORITY_CLS.medium}`}>{order.priority || "medium"}</Badge> },
-            { icon: CircleCheck, label: "Status", value: <Badge className={`text-[10px] ${statusClass(order.status)}`}>{statusLabel(order.status)}</Badge> },
-            ...(grandTotal > 0 ? [{ icon: IndianRupee, label: "Amount", value: <span className="text-[#206295] font-bold">{money(grandTotal)}</span> as React.ReactNode }] : []),
-          ];
-          return (
-            <div className="flex items-stretch rounded-xl border border-border/60 overflow-hidden">
-              {segs.map((s) => (
-                <div key={s.label} className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2.5 border-l border-border/60 first:border-l-0">
-                  <s.icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground leading-tight">{s.label}</p>
-                    <div className="text-sm font-semibold text-foreground truncate leading-tight mt-0.5">{s.value}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-        })()}
-
-        {/* Employee's note — visible to HR & the requester, not the CEO */}
-        {(canHrTriage(role) || isOwner) && order.justification && (
-          <div className="flex items-start gap-2 rounded-xl bg-muted/40 px-3 py-2.5">
-            <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Employee's note</p>
-              <p className="text-sm text-foreground/90 mt-0.5 break-words">{order.justification}</p>
-            </div>
-          </div>
-        )}
-
-        <Separator />
-
-        {/* Items — pricing is inlined per item during HR triage */}
-        <div className="space-y-2">
-          {rows.map((it, i) => {
-            const lineTotal = (Number(it.unitPrice) || 0) * (Number(it.quantity) || 0);
-            const suggested = (it.suggestedLinks || []).filter(Boolean);
+          {/* Meta — wrapping grid (no amount; the total lives once in the footer) */}
+          {(() => {
+            const segs: { icon: any; label: string; value: React.ReactNode }[] = [
+              { icon: User, label: "Requester", value: `${order.employeeName || "Employee"}${order.employeeCode ? ` | ${order.employeeCode}` : ""}` },
+              ...(order.department ? [{ icon: Building2, label: "Department", value: order.department as React.ReactNode }] : []),
+              { icon: CalendarClock, label: "Submitted", value: order.createdAt ? format(new Date(order.createdAt), "MMM d, yyyy") : "—" },
+              { icon: Clock, label: "Priority", value: <Badge className={`text-[10px] capitalize ${PRIORITY_CLS[order.priority || "medium"] || PRIORITY_CLS.medium}`}>{order.priority || "medium"}</Badge> },
+              { icon: CircleCheck, label: "Status", value: <Badge className={`text-[10px] ${statusClass(order.status)}`}>{statusLabel(order.status)}</Badge> },
+            ];
             return (
-              <div key={i} className="rounded-xl border border-border/60 p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-foreground min-w-0 truncate">{it.description || `Item ${i + 1}`} <span className="text-muted-foreground font-normal">× {it.quantity}</span></p>
-                  {lineTotal > 0 && <span className="text-sm font-semibold text-foreground flex-shrink-0">{money(lineTotal)}</span>}
-                </div>
-                {showSuggested && suggested.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] font-medium text-muted-foreground flex-shrink-0">Suggested:</span>
-                    {suggested.map((l, li) => <LinkChip key={li} url={l} />)}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {segs.map((s) => (
+                  <div key={s.label} className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5"><s.icon className="h-3 w-3 flex-shrink-0" /> {s.label}</p>
+                    <div className="text-sm font-semibold text-foreground mt-1 break-words leading-snug">{s.value}</div>
                   </div>
-                )}
-                {it.finalLink && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] font-medium text-muted-foreground flex-shrink-0">Final link:</span>
-                    <LinkChip url={it.finalLink} />
-                  </div>
-                )}
-                {isHrPriceEdit && (
-                  <div className="grid grid-cols-[1fr_7rem] gap-2 items-end min-w-0 pt-0.5">
-                    <div className="space-y-1 min-w-0"><Label className="text-[11px]">Final link</Label><Input value={it.finalLink || ""} onChange={(e) => setEdit(i, { finalLink: e.target.value })} placeholder="Product link" className="h-9" /></div>
-                    <div className="space-y-1 min-w-0"><Label className="text-[11px]">Unit price (₹)</Label><Input type="number" min={0} value={it.unitPrice ?? ""} onChange={(e) => setEdit(i, { unitPrice: Number(e.target.value) })} className="h-9" placeholder="0" /></div>
-                  </div>
-                )}
+                ))}
               </div>
             );
-          })}
+          })()}
+
+          {/* Employee's note */}
+          {(canHrTriage(role) || isOwner) && order.justification && (
+            <div className="flex items-start gap-2 rounded-xl bg-muted/40 px-3 py-2.5">
+              <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Employee's note</p>
+                <p className="text-sm text-foreground/90 mt-0.5 break-words">{order.justification}</p>
+              </div>
+            </div>
+          )}
+
+          {/* HR pricing setup — chosen FIRST; drives whether items show a link field */}
+          {isHrPriceEdit && (
+            <div className="rounded-xl border border-[#206295]/30 bg-[#206295]/[0.05] p-3 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1"><Label className="text-[11px]">Purchase type</Label>
+                  <Select value={purchaseType} onValueChange={setPurchaseType}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="online">Online (Amazon)</SelectItem><SelectItem value="vendor">Offline (Vendor)</SelectItem></SelectContent></Select>
+                </div>
+                <div className="space-y-1"><Label className="text-[11px]">Priority</Label>
+                  <Select value={priority} onValueChange={setPriority}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent></Select>
+                </div>
+              </div>
+              {purchaseType === "vendor" && (
+                <div className="space-y-2">
+                  <div className="space-y-1"><Label className="text-[11px]">Vendor</Label><Input value={vendorName} onChange={(e) => setVendorName(e.target.value)} placeholder="Vendor name" className="h-9" /></div>
+                  <div className="space-y-1"><Label className="text-[11px]">Proforma invoice</Label><FileUpload value={proforma} onChange={setProforma} label="Upload proforma" /></div>
+                </div>
+              )}
+              <div className="space-y-1"><Label className="text-[11px]">Note (optional)</Label><Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" placeholder="Internal note for the CEO" /></div>
+              <p className="text-[11px] text-muted-foreground">{purchaseType === "vendor" ? "Upload the vendor's proforma (or add a product link on an item)." : "Add a product link on at least one item."} Enter a unit price for every item.</p>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Items — link field only for Online */}
+          <div className="space-y-2">
+            {rows.map((it, i) => {
+              const lineTotal = (Number(it.unitPrice) || 0) * (Number(it.quantity) || 0);
+              const suggested = (it.suggestedLinks || []).filter(Boolean);
+              return (
+                <div key={i} className="rounded-xl border border-border/60 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-foreground min-w-0 truncate">{it.description || `Item ${i + 1}`} <span className="text-muted-foreground font-normal">× {it.quantity}</span></p>
+                    {lineTotal > 0 && <span className="text-sm font-semibold text-foreground flex-shrink-0">{money(lineTotal)}</span>}
+                  </div>
+                  {showSuggested && suggested.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-muted-foreground flex-shrink-0">Suggested:</span>
+                      {suggested.map((l, li) => <LinkChip key={li} url={l} />)}
+                    </div>
+                  )}
+                  {it.finalLink && !isHrPriceEdit && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-muted-foreground flex-shrink-0">Link:</span>
+                      <LinkChip url={it.finalLink} />
+                    </div>
+                  )}
+                  {isHrPriceEdit && (
+                    <div className={`grid gap-2 items-end min-w-0 pt-0.5 ${purchaseType === "online" ? "grid-cols-[1fr_7rem]" : "grid-cols-[7rem]"}`}>
+                      {purchaseType === "online" && <div className="space-y-1 min-w-0"><Label className="text-[11px]">Product link</Label><Input value={it.finalLink || ""} onChange={(e) => setEdit(i, { finalLink: e.target.value })} placeholder="Amazon link" className="h-9" /></div>}
+                      <div className="space-y-1 min-w-0"><Label className="text-[11px]">Unit price (₹)</Label><Input type="number" min={0} value={it.unitPrice ?? ""} onChange={(e) => setEdit(i, { unitPrice: Number(e.target.value) })} className="h-9" placeholder="0" /></div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {order.orderInfo && <p className="text-xs text-muted-foreground inline-flex items-center gap-1"><Truck className="h-3.5 w-3.5 flex-shrink-0" /> {order.orderInfo}</p>}
+          {order.expectedDeliveryDate && <p className="text-xs text-muted-foreground inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5 flex-shrink-0" /> Expected delivery {format(new Date(order.expectedDeliveryDate), "MMM d, yyyy")}</p>}
+          {order.linkedTicketId && <p className="text-xs text-[#FF6F62] inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" /> An issue was flagged (support ticket opened).</p>}
+
+          {/* Type + documents + payment (once priced) */}
+          {order.status !== "pending_hr" && (
+            <div className="rounded-xl border border-border/60 p-3 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className="text-[10px] bg-[#206295]/10 text-[#206295]">{order.purchaseType === "vendor" ? "Offline (Vendor)" : "Online (Amazon)"}</Badge>
+                {order.vendorName && <span className="text-xs text-muted-foreground">{order.vendorName}</span>}
+                {order.paymentStatus && <Badge className={`text-[10px] ${order.paymentStatus === "paid" ? "bg-[#4BDCD9]/25 text-[#0E7C7B]" : "bg-[#FFA962]/25 text-[#D98324]"}`}>{order.paymentStatus === "paid" ? "Paid" : "Payment pending"}</Badge>}
+              </div>
+              {order.proformaInvoice?.fileData && <a href={order.proformaInvoice.fileData} download={order.proformaInvoice.fileName} className="text-xs text-[#206295] hover:underline inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Proforma | {order.proformaInvoice.fileName}</a>}
+              {order.invoice?.fileData && <a href={order.invoice.fileData} download={order.invoice.fileName} className="text-xs text-[#206295] hover:underline inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Invoice | {order.invoice.fileName}</a>}
+            </div>
+          )}
+
+          {/* Discussion — only when the CEO has actually started a thread */}
+          {(order.comments || []).length > 0 && (
+            <div className="rounded-xl border border-border p-3">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5"><MessageSquare className="h-3.5 w-3.5" /> Discussion</p>
+              <CommentThread basePath="/api/office-purchases" id={order.id} comments={order.comments || []} invalidateKey="/api/office-purchases" meId={meId} />
+            </div>
+          )}
+
+          {/* CEO decision note (Approve/Reject buttons in the footer) */}
+          {showCeoAct && (
+            <div className="space-y-1"><Label className="text-[11px]">Decision note (optional)</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note for the requester / HR" className="h-9" /></div>
+          )}
+
+          {/* HR place-order inputs (button in the footer) */}
+          {showOrderAct && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1 min-w-0"><Label className="text-[11px]">Order / tracking info (optional)</Label><Input value={orderInfo} onChange={(e) => setOrderInfo(e.target.value)} className="h-9" /></div>
+                <div className="space-y-1 min-w-0"><Label className="text-[11px]">Expected delivery (optional)</Label><Input type="date" value={expDate} onChange={(e) => setExpDate(e.target.value)} className="h-9" /></div>
+              </div>
+              <div className="space-y-1"><Label className="text-[11px]">Invoice (goes to Finance)</Label><FileUpload value={invoice} onChange={setInvoice} label="Upload invoice" /></div>
+            </div>
+          )}
+
+          {/* Owner: flag a delivery issue */}
+          {isOwner && order.status === "delivered" && !order.linkedTicketId && (
+            <div className="rounded-xl border border-border p-3 space-y-2">
+              <Label className="text-xs">Something wrong? Report an issue (opens a support ticket)</Label>
+              <Textarea rows={2} value={issue} onChange={(e) => setIssue(e.target.value)} placeholder="Describe what's wrong…" />
+              <Button variant="outline" className="w-full" disabled={act.isPending || !issue.trim()} onClick={() => act.mutate({ path: "flag", body: { issue } })}><AlertTriangle className="h-4 w-4 mr-1.5" /> Report an issue</Button>
+            </div>
+          )}
         </div>
 
-        {order.orderInfo && <p className="text-xs text-muted-foreground inline-flex items-center gap-1"><Truck className="h-3.5 w-3.5 flex-shrink-0" /> {order.orderInfo}</p>}
-        {order.expectedDeliveryDate && <p className="text-xs text-muted-foreground inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5 flex-shrink-0" /> Expected delivery {format(new Date(order.expectedDeliveryDate), "MMM d, yyyy")}</p>}
-        {order.linkedTicketId && <p className="text-xs text-[#FF6F62] inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" /> An issue was flagged (support ticket opened).</p>}
-
-        {/* ---------- Role-based actions ---------- */}
-        {/* HR: price (stage) then send — single, or group several from the list */}
-        {isHrPriceEdit && (
-          <div className="rounded-xl border border-[#206295]/30 bg-[#206295]/[0.05] p-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-foreground">Total</span>
-              <span className={`text-lg font-bold tabular-nums ${grandTotal > 0 ? "text-[#206295]" : "text-muted-foreground/50"}`}>{money(grandTotal)}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1"><Label className="text-[11px]">Priority</Label>
-                <Select value={priority} onValueChange={setPriority}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent></Select>
-              </div>
-              <div className="space-y-1"><Label className="text-[11px]">Note (optional)</Label><Input value={note} onChange={(e) => setNote(e.target.value)} className="h-9" /></div>
-            </div>
-            <Button className="btn-primary-gradient w-full" disabled={!canSend || act.isPending} data-testid="op-save-group" onClick={() => act.mutate({ path: "price", body: { items: editItems.map((it) => ({ ...it, unitPrice: Number(it.unitPrice) || 0 })), priority, reviewNote: note } })}>Save &amp; add to group</Button>
-            {!canSend
-              ? <p className="text-[11px] text-muted-foreground text-center">Enter a unit price for every item to continue.</p>
-              : <p className="text-[11px] text-muted-foreground text-center">Then send it — on its own or as a group — from the list.</p>}
-          </div>
-        )}
-
-        {/* CEO: approve / reject */}
-        {canCeoApprove(role) && order.status === "pending_approval" && (
-          <div className="rounded-xl border border-border p-3 space-y-2">
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Decision note (optional)" className="h-9" />
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1 text-[#FF6F62] border-[#FF6F62]/40" disabled={act.isPending} onClick={() => act.mutate({ path: "reject", body: { note } })}>Reject</Button>
-              <Button className="btn-primary-gradient flex-1" disabled={act.isPending} onClick={() => act.mutate({ path: "approve", body: { note } })}><CircleCheck className="h-4 w-4 mr-1.5" /> Approve</Button>
-            </div>
-          </div>
-        )}
-
-        {/* HR: place order (+ optional expected delivery) */}
-        {canHrTriage(role) && order.status === "approved" && (
-          <div className="rounded-xl border border-border p-3 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1 min-w-0"><Label className="text-[11px]">Order / tracking info (optional)</Label><Input value={orderInfo} onChange={(e) => setOrderInfo(e.target.value)} className="h-9" /></div>
-              <div className="space-y-1 min-w-0"><Label className="text-[11px]">Expected delivery (optional)</Label><Input type="date" value={expDate} onChange={(e) => setExpDate(e.target.value)} className="h-9" /></div>
-            </div>
-            <Button className="btn-primary-gradient w-full" disabled={act.isPending} onClick={() => act.mutate({ path: "place-order", body: { orderInfo, expectedDeliveryDate: expDate || null } })}><Truck className="h-4 w-4 mr-1.5" /> Mark order placed</Button>
-          </div>
-        )}
-
-        {/* HR: mark delivered */}
-        {canHrTriage(role) && order.status === "ordered" && (
-          <Button className="btn-primary-gradient w-full" disabled={act.isPending} onClick={() => act.mutate({ path: "deliver" })}><CircleCheck className="h-4 w-4 mr-1.5" /> Mark delivered</Button>
-        )}
-
-        {/* Owner: flag a delivery issue */}
-        {isOwner && order.status === "delivered" && !order.linkedTicketId && (
-          <div className="rounded-xl border border-border p-3 space-y-2">
-            <Label className="text-xs">Something wrong? Report an issue (opens a support ticket)</Label>
-            <Textarea rows={2} value={issue} onChange={(e) => setIssue(e.target.value)} placeholder="Describe what's wrong…" />
-            <Button variant="outline" className="w-full" disabled={act.isPending || !issue.trim()} onClick={() => act.mutate({ path: "flag", body: { issue } })}><AlertTriangle className="h-4 w-4 mr-1.5" /> Report an issue</Button>
+        {/* Fixed footer — the total shown ONCE + the primary action(s) */}
+        {hasFooter && (
+          <div className="flex-shrink-0 border-t border-border px-6 py-3 flex items-center gap-2 justify-end bg-background">
+            {grandTotal > 0 && <div className="mr-auto flex items-baseline gap-2"><span className="text-xl font-bold text-[#206295] tabular-nums">{money(grandTotal)}</span><span className="text-xs text-muted-foreground">total</span></div>}
+            {isHrPriceEdit && <Button className="btn-primary-gradient" disabled={!canSend || act.isPending} data-testid="op-save-group" onClick={() => act.mutate({ path: "price", body: { items: editItems.map((it) => ({ ...it, unitPrice: Number(it.unitPrice) || 0 })), priority, reviewNote: note, purchaseType, vendorName: purchaseType === "vendor" ? vendorName : null, proformaInvoice: purchaseType === "vendor" ? proforma : null } })}>Save &amp; add to group</Button>}
+            {showCeoAct && <>
+              <Button variant="outline" className="text-[#FF6F62] border-[#FF6F62]/40" disabled={act.isPending} onClick={() => act.mutate({ path: "reject", body: { note } })}>Reject</Button>
+              <Button className="btn-primary-gradient" disabled={act.isPending} onClick={() => act.mutate({ path: "approve", body: { note } })}><CircleCheck className="h-4 w-4 mr-1.5" /> Approve</Button>
+            </>}
+            {showOrderAct && <Button className="btn-primary-gradient" disabled={act.isPending} onClick={() => act.mutate({ path: "place-order", body: { orderInfo, expectedDeliveryDate: expDate || null, invoice } })}><Truck className="h-4 w-4 mr-1.5" /> Mark order placed</Button>}
+            {showDeliverAct && <Button className="btn-primary-gradient" disabled={act.isPending} onClick={() => act.mutate({ path: "deliver" })}><CircleCheck className="h-4 w-4 mr-1.5" /> Mark delivered</Button>}
           </div>
         )}
       </DialogContent>
@@ -506,8 +616,8 @@ export function OfficePurchaseQueue() {
                 <button key={o.id} onClick={() => setOpenId(o.id)} className="w-full flex items-center gap-3 py-2.5 text-left hover-elevate rounded-lg px-1" data-testid={`op-queue-${o.id}`}>
                   <span className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Hash className="h-4 w-4" /></span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">{o.reference} · {o.employeeName || "Employee"}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">{(o.items || []).length} item{(o.items || []).length !== 1 ? "s" : ""}{Number(o.totalAmount) > 0 ? ` · ${money(o.totalAmount)}` : ""} · {o.priority} priority</p>
+                    <p className="text-sm font-medium text-foreground truncate">{o.reference} | {o.employeeName || "Employee"}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{(o.items || []).length} item{(o.items || []).length !== 1 ? "s" : ""}{Number(o.totalAmount) > 0 ? ` | ${money(o.totalAmount)}` : ""} | {o.priority} priority</p>
                   </div>
                   {needsYou && <span className="h-2 w-2 rounded-full bg-[#FF6F62] flex-shrink-0" title="Needs your action" />}
                   <Badge className={`text-[10px] ${statusClass(o.status)} flex-shrink-0`}>{statusLabel(o.status)}</Badge>

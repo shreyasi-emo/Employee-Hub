@@ -16,11 +16,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NewRequestDialog, OfficePurchaseDetailDialog } from "@/components/office-purchase";
+import { NewTravelDialog, TravelDetailDialog, TRAVEL_CATS } from "@/components/travel";
+import { ProcurementDetailDialog } from "@/components/procurement";
 import { useToast } from "@/hooks/use-toast";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { DateInput } from "@/components/datetime-field";
 import {
-  Plus, ShoppingCart, Car, TicketIcon, Send, Receipt, ChevronLeft, ChevronRight,
+  Plus, ShoppingCart, Car, TicketIcon, Send, Receipt, ChevronLeft, ChevronRight, Package,
   MessageSquare, ChevronDown, ChevronUp, Trash2, FileText,
   CheckCircle2, CircleDot, CircleDashed, XCircle, Ban, History, AlertTriangle,
   Search, LayoutGrid, Table2, ArrowDownUp, MoreVertical, Eye, CalendarClock, Copy,
@@ -557,6 +559,9 @@ function readDrafts(): Draft[] { try { return JSON.parse(localStorage.getItem(DR
 function writeDrafts(d: Draft[]): boolean { try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(d)); return true; } catch { return false; } }
 const newDraftId = () => `dft_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
 const DRAFT_META: Record<string, { label: string; icon: any }> = {
+  office: { label: "Office Purchase", icon: ShoppingCart },
+  procurement: { label: "Procurement", icon: Package },
+  trip: { label: "Travel", icon: Car },
   purchase: { label: "Purchase", icon: ShoppingCart },
   travel: { label: "Travel", icon: Car },
   ticket: { label: "Ticket", icon: TicketIcon },
@@ -564,6 +569,8 @@ const DRAFT_META: Record<string, { label: string; icon: any }> = {
 };
 const draftTitle = (d: Draft): string => {
   const x = d.data || {};
+  if (d.type === "trip") return x.purpose || `${(x.category || "Travel")[0].toUpperCase()}${(x.category || "ravel").slice(1)} request`;
+  if (d.type === "office" || d.type === "procurement") { const it = (x.items || [])[0]; return it?.description ? `${it.description}${x.items.length > 1 ? ` +${x.items.length - 1}` : ""}` : (d.type === "procurement" ? "Procurement" : "Office Purchase"); }
   if (d.type === "purchase") return `${formatStatus(x.category) || "Purchase"} Request`;
   if (d.type === "travel") return x.purpose || `${x.fromCity || "?"} → ${x.toCity || "?"}`;
   if (d.type === "ticket") return x.subject || "Support Ticket";
@@ -571,6 +578,7 @@ const draftTitle = (d: Draft): string => {
 };
 const draftAmount = (d: Draft): number => {
   const x = d.data || {};
+  if (d.type === "office" || d.type === "procurement") return (x.items || []).reduce((s: number, i: any) => s + (Number(i.unitPrice) || 0) * (Number(i.quantity) || 0), 0);
   if (d.type === "purchase") return (x.items || []).reduce((s: number, i: any) => s + (Number(i.estimatedCost) || 0), 0);
   if (d.type === "travel") return Number(x.estimatedBudget) || 0;
   if (d.type === "reimbursement") return (x.items || []).reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
@@ -671,6 +679,25 @@ function ReimbCardView({ items, onOpen }: { items: any[]; onOpen: (it: any) => v
   );
 }
 
+// Section header to break a request list into "In progress" / "Completed" (renders only if it has items).
+function ReqSection({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
+  if (count === 0) return null;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span className="text-[10px] font-bold rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">{count}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+const DONE_STATUS: Record<string, string[]> = {
+  office: ["delivered", "rejected", "cancelled"],
+  procurement: ["approved", "rejected", "cancelled"],
+  trip: ["booked", "rejected", "cancelled"],
+};
+
 export default function MyRequestsPage() {
   const { data: auth } = useAuth();
   const { toast } = useToast();
@@ -711,18 +738,26 @@ export default function MyRequestsPage() {
   useEffect(() => {
     if (autoNew) {
       if (initTab === "purchases") setShowPRForm(true);
-      else if (initTab === "travels") setShowTRForm(true);
+      else if (initTab === "travels") { setEditingDraftId(null); setTripInitial(null); setShowNewTravel(true); }
       else if (initTab === "tickets") setShowTicketForm(true);
     }
   }, [autoNew, initTab]);
 
   const { data: purchases = [], isLoading: loadPR } = useQuery<any[]>({ queryKey: ["/api/my-requests/purchases"] });
   const { data: travels = [], isLoading: loadTR } = useQuery<any[]>({ queryKey: ["/api/my-requests/travels"] });
+  const { data: myTrips = [], isLoading: loadTrips } = useQuery<any[]>({ queryKey: ["/api/travel?mine=true"] });
+  const [showNewTravel, setShowNewTravel] = useState(false);
+  const [travelDetailId, setTravelDetailId] = useState<string | null>(null);
+  const [tripInitial, setTripInitial] = useState<any>(null);
   const { data: tickets = [], isLoading: loadTickets } = useQuery<any[]>({ queryKey: ["/api/my-requests/tickets"] });
   const { data: reimbursements = [], isLoading: loadReimb } = useQuery<any[]>({ queryKey: ["/api/reimbursements?mine=true"] });
   const { data: officePurchases = [], isLoading: loadOP } = useQuery<any[]>({ queryKey: ["/api/office-purchases?mine=true"] });
   const [opDetailId, setOpDetailId] = useState<string | null>(null);
   const [opNewOpen, setOpNewOpen] = useState(false);
+  const [newKind, setNewKind] = useState<"office" | "procurement" | undefined>(undefined);
+  const [newInitialData, setNewInitialData] = useState<any>(null);
+  const { data: procurement = [], isLoading: loadProc } = useQuery<any[]>({ queryKey: ["/api/procurement?mine=true"] });
+  const [procDetailId, setProcDetailId] = useState<string | null>(null);
 
   // PR form with items
   const prForm = useForm({
@@ -780,14 +815,24 @@ export default function MyRequestsPage() {
   const editDraft = (d: Draft) => {
     setEditingDraftId(d.id);
     setReimbForceValidate(false);
-    if (d.type === "purchase") { prForm.reset({ category: "office_supplies", items: [{ description: "", qty: 1, estimatedCost: "", link: "" }], notes: "", neededByDate: "", ...d.data }); setShowPRForm(true); }
-    else if (d.type === "travel") { trForm.reset({ purpose: "", fromCity: "", toCity: "", travelDate: "", returnDate: "", preferences: "", estimatedBudget: "", ...d.data }); setShowTRForm(true); }
+    if (d.type === "trip") { setTripInitial(d.data); setShowNewTravel(true); }
+    else if (d.type === "office" || d.type === "procurement") { setNewKind(d.type); setNewInitialData(d.data); setOpNewOpen(true); }
+    else if (d.type === "purchase") { prForm.reset({ category: "office_supplies", items: [{ description: "", qty: 1, estimatedCost: "", link: "" }], notes: "", neededByDate: "", ...d.data }); setShowPRForm(true); }
+    else if (d.type === "travel") { setTripInitial(null); setShowNewTravel(true); } // legacy travel drafts → new travel dialog
     else if (d.type === "ticket") { ticketForm.reset({ category: "hr_query", subject: "", description: "", priority: "medium", ...d.data }); setShowTicketForm(true); }
     else { setReimbInitial(d.data); setShowReimbForm(true); }
   };
   // Mandatory-field check per draft type — mirrors each form's own required fields.
   const draftComplete = (d: Draft): boolean => {
     const x = d.data || {};
+    if (d.type === "trip") return false; // always open the travel dialog to finish + submit
+    if (d.type === "office" || d.type === "procurement") {
+      const items = Array.isArray(x.items) ? x.items : [];
+      if (!items.length) return false;
+      return d.type === "procurement"
+        ? items.every((i: any) => (i.description || "").trim() && Number(i.quantity) > 0 && Number(i.unitPrice) > 0 && (i.finalLink || "").trim())
+        : items.every((i: any) => (i.description || "").trim() && Number(i.quantity) > 0);
+    }
     if (d.type === "purchase") { const items = Array.isArray(x.items) ? x.items : []; return items.length > 0 && items.every((i: any) => (i.description || "").trim()); }
     if (d.type === "travel") return !!((x.purpose || "").trim() && (x.fromCity || "").trim() && (x.toCity || "").trim() && x.travelDate);
     if (d.type === "ticket") return !!((x.subject || "").trim());
@@ -801,7 +846,7 @@ export default function MyRequestsPage() {
       if (d.type === "purchase") setTimeout(() => prForm.trigger(), 0);
       else if (d.type === "travel") setTimeout(() => trForm.trigger(), 0);
       else if (d.type === "ticket") setTimeout(() => ticketForm.trigger(), 0);
-      else setReimbForceValidate(true);
+      else if (!["office", "procurement", "trip"].includes(d.type)) setReimbForceValidate(true); // office/procurement/trip: the dialog's own Submit stays disabled until valid
       toast({ title: "Please complete the required fields", variant: "destructive" });
       return;
     }
@@ -817,6 +862,12 @@ export default function MyRequestsPage() {
         await apiRequest("POST", `/api/my-requests/travels/${tr.id}/submit`, {});
       } else if (d.type === "ticket") {
         await apiRequest("POST", "/api/my-requests/tickets", x);
+      } else if (d.type === "office") {
+        const items = (x.items || []).filter((it: any) => (it.description || "").trim());
+        await apiRequest("POST", "/api/office-purchases", { justification: x.justification || null, items: items.map((it: any) => ({ description: (it.description || "").trim(), quantity: Number(it.quantity) || 1, suggestedLinks: (it.suggestedLinks || []).filter(Boolean) })) });
+      } else if (d.type === "procurement") {
+        const items = (x.items || []).filter((it: any) => (it.description || "").trim());
+        await apiRequest("POST", "/api/procurement", { category: "amazon", justification: x.justification || null, items: items.map((it: any) => ({ description: (it.description || "").trim(), quantity: Number(it.quantity) || 1, link: (it.finalLink || "").trim(), unitPrice: Number(it.unitPrice) || 0 })) });
       } else {
         const items = x.items || [];
         const subTotal = items.reduce((s: number, it: any) => s + (Number(it.amount) || 0), 0);
@@ -984,11 +1035,16 @@ export default function MyRequestsPage() {
     matchesFilter(o.status, statusFilter) &&
     (opQuery === "" || `${o.reference || ""} ${(o.items || []).map((i: any) => i.description).join(" ")}`.toLowerCase().includes(opQuery))
   );
+  const fProc = (procurement as any[]).filter((o) =>
+    matchesFilter(o.status, statusFilter) &&
+    (opQuery === "" || `${o.reference || ""} ${(o.items || []).map((i: any) => i.description).join(" ")}`.toLowerCase().includes(opQuery))
+  );
   // 15-per-page pagination for the card views (table views paginate via DataTable).
   const tvPaged = usePaged(fTravels);
   const tkPaged = usePaged(fTickets);
   const rbPaged = usePaged(fReimb);
   const opPaged = usePaged(fOP);
+  const prPaged = usePaged(fProc);
 
   return (
     <div className="p-6 space-y-5 max-w-[92rem] mx-auto">
@@ -1008,9 +1064,13 @@ export default function MyRequestsPage() {
             <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
             Purchases {(officePurchases as any[]).length > 0 && `(${(officePurchases as any[]).length})`}
           </TabsTrigger>
+          <TabsTrigger value="procurement">
+            <Package className="h-3.5 w-3.5 mr-1.5" />
+            Procurement {(procurement as any[]).length > 0 && `(${(procurement as any[]).length})`}
+          </TabsTrigger>
           <TabsTrigger value="travels">
             <Car className="h-3.5 w-3.5 mr-1.5" />
-            Travel {(travels as any[]).length > 0 && `(${(travels as any[]).length})`}
+            Travel {(myTrips as any[]).length > 0 && `(${(myTrips as any[]).length})`}
           </TabsTrigger>
           <TabsTrigger value="tickets">
             <TicketIcon className="h-3.5 w-3.5 mr-1.5" />
@@ -1028,19 +1088,36 @@ export default function MyRequestsPage() {
 
         <TabsContent value="travels" className="mt-4 space-y-5">
           {controls(
-            <Button size="sm" onClick={() => { setEditingDraftId(null); trForm.reset(); setShowTRForm(true); }} data-testid="button-new-travel">
+            <Button size="sm" onClick={() => { setEditingDraftId(null); setTripInitial(null); setShowNewTravel(true); }} data-testid="button-new-travel">
               <Plus className="h-4 w-4 mr-1.5" /> New Travel Request
             </Button>
           )}
-          {loadTR ? <Skeleton className="h-24 w-full" /> :
-            fTravels.length === 0 ? renderEmpty((travels as any[]).length === 0 ? "No travel requests yet." : "No travel requests match this filter.") :
-            view === "table" ? <RequestTable type="travel" items={fTravels} onOpen={(it) => setDetail({ type: "travel", item: it })} /> :
-            <div className="space-y-3">
-              {tvPaged.pageItems.map(t => (
-                <RequestCard key={t.id} item={t} type="travel" onOpen={(it) => setDetail({ type: "travel", item: it })} />
-              ))}
-              <PaginationBar page={tvPaged.page} totalPages={tvPaged.totalPages} count={tvPaged.count} size={tvPaged.size} onPage={tvPaged.setPage} />
-            </div>
+          {loadTrips ? <Skeleton className="h-24 w-full" /> :
+            (myTrips as any[]).length === 0 ? renderEmpty("No travel requests yet.") :
+            (() => {
+              const tripCard = (t: any) => {
+                const c = TRAVEL_CATS[t.category] || TRAVEL_CATS.flight;
+                const route = t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "") : `${t.details?.from || "?"} → ${t.details?.to || "?"}`;
+                return (
+                  <div key={t.id} className="card-surface card-hover p-4 flex items-center gap-4 cursor-pointer" onClick={() => setTravelDetailId(t.id)} data-testid={`trip-${t.id}`}>
+                    <span className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${c.tint}1a`, color: c.tint }}><c.icon className="h-4 w-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-semibold text-foreground truncate">{t.reference}</span><Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge></div>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">{c.label} | {route}{t.startDate ? ` | ${format(new Date(t.startDate), "MMM d, yyyy")}` : ""}</p>
+                    </div>
+                    {Number(t.amount) > 0 && <span className="text-sm font-bold text-[#206295] tabular-nums flex-shrink-0">₹{Number(t.amount).toLocaleString("en-IN")}</span>}
+                  </div>
+                );
+              };
+              const done = (myTrips as any[]).filter((t) => DONE_STATUS.trip.includes(t.status));
+              const active = (myTrips as any[]).filter((t) => !DONE_STATUS.trip.includes(t.status));
+              return (
+                <div className="space-y-6">
+                  <ReqSection label="In progress" count={active.length}><div className="space-y-3">{active.map(tripCard)}</div></ReqSection>
+                  <ReqSection label="Completed" count={done.length}><div className="space-y-3">{done.map(tripCard)}</div></ReqSection>
+                </div>
+              );
+            })()
           }
         </TabsContent>
 
@@ -1080,7 +1157,7 @@ export default function MyRequestsPage() {
 
         <TabsContent value="office-purchases" className="mt-4 space-y-5">
           {controls(
-            <Button size="sm" onClick={() => setOpNewOpen(true)} data-testid="button-new-office-purchase">
+            <Button size="sm" onClick={() => { setEditingDraftId(null); setNewInitialData(null); setNewKind("office"); setOpNewOpen(true); }} data-testid="button-new-office-purchase">
               <Plus className="h-4 w-4 mr-1.5" /> New Office Purchase
             </Button>
           )}
@@ -1103,12 +1180,64 @@ export default function MyRequestsPage() {
                   testIdPrefix="op-row"
                 />
               </CardContent></Card>
-            ) : (
-              <div className="space-y-3">
-                {opPaged.pageItems.map((o) => <OfficePurchaseCard key={o.id} item={o} onOpen={setOpDetailId} />)}
-                <PaginationBar page={opPaged.page} totalPages={opPaged.totalPages} count={opPaged.count} size={opPaged.size} onPage={opPaged.setPage} />
-              </div>
-            )
+            ) : (() => {
+              const done = fOP.filter((o: any) => DONE_STATUS.office.includes(o.status));
+              const active = fOP.filter((o: any) => !DONE_STATUS.office.includes(o.status));
+              return (
+                <div className="space-y-6">
+                  <ReqSection label="In progress" count={active.length}><div className="space-y-3">{active.map((o: any) => <OfficePurchaseCard key={o.id} item={o} onOpen={setOpDetailId} />)}</div></ReqSection>
+                  <ReqSection label="Completed" count={done.length}><div className="space-y-3">{done.map((o: any) => <OfficePurchaseCard key={o.id} item={o} onOpen={setOpDetailId} />)}</div></ReqSection>
+                </div>
+              );
+            })()
+          }
+        </TabsContent>
+
+        <TabsContent value="procurement" className="mt-4 space-y-5">
+          {controls(
+            <Button size="sm" onClick={() => { setEditingDraftId(null); setNewInitialData(null); setNewKind("procurement"); setOpNewOpen(true); }} data-testid="button-new-procurement">
+              <Plus className="h-4 w-4 mr-1.5" /> New Procurement
+            </Button>
+          )}
+          {loadProc ? <Skeleton className="h-24 w-full" /> :
+            fProc.length === 0 ? renderEmpty((procurement as any[]).length === 0 ? "No procurement requests yet." : "No procurement requests match this filter.") :
+            view === "table" ? (
+              <Card className="border-0"><CardContent className="p-0">
+                <DataTable
+                  columns={[
+                    { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
+                    { key: "items", header: "Items", cellClassName: "text-muted-foreground", render: (o: any) => `${(o.items || []).length} item${(o.items || []).length !== 1 ? "s" : ""}` },
+                    { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
+                    { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
+                    { key: "created", header: "Created", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? formatDate(o.createdAt) : "—" },
+                  ]}
+                  rows={fProc}
+                  getRowKey={(o: any) => o.id}
+                  onRowClick={(o: any) => setProcDetailId(o.id)}
+                  testIdPrefix="proc-row"
+                />
+              </CardContent></Card>
+            ) : (() => {
+              const procCard = (o: any) => (
+                <button key={o.id} onClick={() => setProcDetailId(o.id)} className="w-full text-left card-surface rounded-[16px] p-4 hover-elevate flex items-center gap-3" data-testid={`proc-card-${o.id}`}>
+                  <span className="h-10 w-10 rounded-xl bg-[#0E7C7B]/10 text-[#0E7C7B] flex items-center justify-center flex-shrink-0"><Package className="h-5 w-5" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground truncate">{o.reference} | {(o.items || []).length} item{(o.items || []).length !== 1 ? "s" : ""}</p>
+                    <p className="text-xs text-muted-foreground truncate">{(o.items || []).map((it: any) => it.description).filter(Boolean).join(", ") || "—"}</p>
+                  </div>
+                  {Number(o.totalAmount) > 0 && <span className="text-sm font-bold text-[#206295] flex-shrink-0 tabular-nums">{money(o.totalAmount)}</span>}
+                  <Badge className={`text-xs ${statusClass(o.status)} flex-shrink-0`}>{statusLabel(o.status)}</Badge>
+                </button>
+              );
+              const done = fProc.filter((o: any) => DONE_STATUS.procurement.includes(o.status));
+              const active = fProc.filter((o: any) => !DONE_STATUS.procurement.includes(o.status));
+              return (
+                <div className="space-y-6">
+                  <ReqSection label="In progress" count={active.length}><div className="space-y-3">{active.map(procCard)}</div></ReqSection>
+                  <ReqSection label="Completed" count={done.length}><div className="space-y-3">{done.map(procCard)}</div></ReqSection>
+                </div>
+              );
+            })()
           }
         </TabsContent>
 
@@ -1128,8 +1257,15 @@ export default function MyRequestsPage() {
       </Tabs>
 
       {/* Office Purchase — new-request chooser + detail (cancel / flag) */}
-      <NewRequestDialog open={opNewOpen} onClose={() => setOpNewOpen(false)} />
-      <OfficePurchaseDetailDialog id={opDetailId} open={!!opDetailId} onClose={() => setOpDetailId(null)} />
+      <NewRequestDialog open={opNewOpen} onClose={() => { setOpNewOpen(false); setNewKind(undefined); setNewInitialData(null); }} initialKind={newKind} initialData={newInitialData}
+        onSaveDraft={(data) => saveDraft(data.kind === "procurement" ? "procurement" : "office", data)}
+        onSubmitted={() => { if (editingDraftId) { removeDraft(editingDraftId); setEditingDraftId(null); } }} />
+      <OfficePurchaseDetailDialog id={opDetailId} open={!!opDetailId} onClose={() => setOpDetailId(null)} context="owner" />
+      <ProcurementDetailDialog id={procDetailId} open={!!procDetailId} onClose={() => setProcDetailId(null)} context="owner" />
+      <NewTravelDialog open={showNewTravel} onClose={() => { setShowNewTravel(false); setTripInitial(null); }} initialData={tripInitial}
+        onSaveDraft={(data) => saveDraft("trip", data)}
+        onSubmitted={() => { if (editingDraftId) { removeDraft(editingDraftId); setEditingDraftId(null); } }} />
+      <TravelDetailDialog id={travelDetailId} open={!!travelDetailId} onClose={() => setTravelDetailId(null)} context="owner" />
 
       {/* Purchase Request Form */}
       <Dialog open={showPRForm} onOpenChange={(v) => { if (!v) closePR(); }}>
@@ -1206,44 +1342,7 @@ export default function MyRequestsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Travel Request Form */}
-      <Dialog open={showTRForm} onOpenChange={(v) => { if (!v) closeTR(); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>New Travel Request</DialogTitle></DialogHeader>
-          <form onSubmit={trForm.handleSubmit(data => createTRMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Purpose *</Label>
-              <Textarea rows={2} {...trForm.register("purpose", { required: true })} placeholder="Business purpose for travel..." className={trErrors.purpose ? ERR_BORDER : ""} data-testid="textarea-tr-purpose" />
-              <FieldError show={trErrors.purpose} msg="Purpose is required" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>From City *</Label><Input {...trForm.register("fromCity", { required: true })} placeholder="e.g. Bengaluru" className={trErrors.fromCity ? ERR_BORDER : ""} data-testid="input-tr-from" /><FieldError show={trErrors.fromCity} msg="From city is required" /></div>
-              <div className="space-y-1.5"><Label>To City *</Label><Input {...trForm.register("toCity", { required: true })} placeholder="e.g. Mumbai" className={trErrors.toCity ? ERR_BORDER : ""} data-testid="input-tr-to" /><FieldError show={trErrors.toCity} msg="To city is required" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Travel Date *</Label><Controller control={trForm.control} name="travelDate" rules={{ required: true }} render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} className={trErrors.travelDate ? ERR_BORDER : ""} testId="input-tr-date" />} /><FieldError show={trErrors.travelDate} msg="Travel date is required" /></div>
-              <div className="space-y-1.5"><Label>Return Date</Label><Controller control={trForm.control} name="returnDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-tr-return" />} /></div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Preferences / Constraints</Label>
-              <Textarea rows={2} {...trForm.register("preferences")} placeholder="Mode of travel, hotel preferences, dietary needs..." data-testid="textarea-tr-prefs" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Estimated Budget (₹)</Label>
-              <Input type="number" min="0" {...trForm.register("estimatedBudget")} placeholder="0" data-testid="input-tr-budget" />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeTR}>Cancel</Button>
-              <Button type="button" variant="secondary" className="btn-glass text-[#206295]" onClick={() => saveDraft("travel", trForm.getValues())} data-testid="button-draft-tr">
-                <Save className="h-4 w-4 mr-1.5" /> Save as Draft
-              </Button>
-              <Button type="submit" disabled={createTRMutation.isPending} data-testid="button-save-tr">
-                {createTRMutation.isPending ? "Submitting..." : "Submit"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Legacy travel form removed — travel now uses NewTravelDialog (chooser: Flights / Stays / Transport). */}
 
       {/* Ticket Form */}
       <Dialog open={showTicketForm} onOpenChange={(v) => { if (!v) closeTicket(); }}>

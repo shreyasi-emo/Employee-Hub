@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { usePaged, PaginationBar } from "@/components/pagination";
 import { DataTable } from "@/components/data-table";
 import { useToast } from "@/hooks/use-toast";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
@@ -25,16 +27,18 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { exportXlsx } from "@/lib/export-xlsx";
 import { NewRequestDialog, OfficePurchaseDetailDialog, canHrTriage, canCeoApprove } from "@/components/office-purchase";
+import { canProcureApprove } from "@/components/procurement";
+import { CommentThread } from "@/components/comment-thread";
+import { TravelApprovals, NewTravelDialog, canTravelHr, canTravelCeo } from "@/components/travel";
 import {
-  ShoppingCart, Car, TicketIcon, Receipt, Plus, Trash2, ClipboardList,
-  ShieldCheck, ArrowRight, ChevronLeft, Check, X, Users, Truck, ChevronRight,
+  ShoppingCart, Car, Plane, TicketIcon, Receipt, Plus, Trash2, ClipboardList,
+  ShieldCheck, ArrowRight, ChevronLeft, Check, X, Users, ChevronRight, ChevronDown, MessageSquare,
   CalendarClock, ExternalLink, FileText, IndianRupee, MoreVertical, Eye, Download,
   Maximize2, ArrowDownUp, Building2, Hash, Paperclip, Clock, MousePointerClick, CheckSquare, CalendarRange,
-  LayoutGrid, Table as TableIcon, CheckCircle2, Layers,
+  LayoutGrid, Table as TableIcon, CheckCircle2, Layers, Package,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ReimbursementFormDialog } from "@/components/reimbursement-form";
-import { ReimbursementApprovalModal, exportReimbursement } from "@/components/reimbursement-approval-detail";
 import { statusClass, statusLabel } from "@/lib/status";
 
 // ---- helpers ----
@@ -47,9 +51,6 @@ const reimbSubmittedInfo = (r: any): { label: string; date: any; resubmitted: bo
   return { label: "Submitted on", date: r?.createdAt, resubmitted: false };
 };
 
-
-const REQ_PENDING = ["submitted", "in_review", "pending_ceo", "changes_requested"];
-const MOV_PENDING = ["submitted", "needs_approval"];
 
 function StatCard({ title, value, subtitle, icon: Icon, color, onClick }: { title: string; value: any; subtitle?: React.ReactNode; icon: any; color: string; onClick?: () => void; }) {
   const inner = (
@@ -91,14 +92,23 @@ export default function CompanyWorkspacePage() {
   const canOpTriage = canHrTriage(role);
   const canOpCeo = canCeoApprove(role);
   const canOfficePurchase = canOpTriage || canOpCeo;
-  const canApprove = isApprover || canReimbApprove || canOfficePurchase;
+  const canProc = canProcureApprove(role);   // Procurement approvals: CEO / super_admin
+  // "CEO Inbox" (/workspace/approvals) is a super-admin-only super-access tab: super_admin acts AS the CEO
+  // there (same view as the CEO's My Approvals) for when the CEO is unavailable. Super_admin's OWN
+  // /my-approvals does NOT show the CEO cards — only the CEO (ceo_approver) sees them on /my-approvals.
+  const actingCeo = role === "super_admin" && location === "/workspace/approvals";
+  const isCeo = role === "ceo_approver" || actingCeo;
+  const canApprove = isCeo || canOfficePurchase; // CEO cards; super_admin/HR → office triage; finance approves on its own /reimbursements page
 
-  // View is URL-driven so navigating to My Approvals updates the browser URL (and is shareable / back-button friendly)
-  const view: "main" | "approvals" = location === "/my-approvals" ? "approvals" : "main";
+  // View is URL-driven so navigating updates the browser URL (shareable / back-button friendly).
+  const view: "main" | "approvals" = (location === "/my-approvals" || location === "/workspace/approvals") ? "approvals" : "main";
   const setView = (v: "main" | "approvals") => navigate(v === "approvals" ? "/my-approvals" : "/company-workspace");
   const [openForm, setOpenForm] = useState<null | "purchase" | "travel" | "ticket" | "reimbursement">(null);
   const [newReqOpen, setNewReqOpen] = useState(false);
-  const [apprTab, setApprTab] = useState<"requests" | "logistics" | "vehicles" | "reimbursements" | "office_purchases">("requests");
+  const [apprView, setApprView] = useState<"pending" | "completed">("pending");
+  const [apprTab, setApprTab] = useState<string>("");
+  const [travelModal, setTravelModal] = useState(false);
+  const [batchCat, setBatchCat] = useState<any>(null);
 
   // ---- data ----
   const { data: summary, isLoading: sumLoading } = useQuery<any>({ queryKey: ["/api/my-requests/summary"] });
@@ -107,6 +117,7 @@ export default function CompanyWorkspacePage() {
   const { data: tickets = [] } = useQuery<any[]>({ queryKey: ["/api/my-requests/tickets"] });
   const { data: reimb = [] } = useQuery<any[]>({ queryKey: ["/api/reimbursements"] });
   const { data: officePurchases = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases?mine=true"] });
+  const { data: myProcurement = [] } = useQuery<any[]>({ queryKey: ["/api/procurement?mine=true"] });
   const { data: teamData } = useQuery<any>({ queryKey: ["/api/team-requests"], enabled: canTeam, retry: false });
 
   // approval domains (super-admin / CEO)
@@ -116,6 +127,9 @@ export default function CompanyWorkspacePage() {
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], enabled: isApprover });
   // Office purchases needing an approver's attention (HR triage / CEO approval).
   const { data: opAll = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases"], enabled: canOfficePurchase });
+  const { data: procAll = [] } = useQuery<any[]>({ queryKey: ["/api/procurement"], enabled: canProc });
+  const canTravelApprove = canTravelHr(role) || canTravelCeo(role);
+  const { data: travelAll = [] } = useQuery<any[]>({ queryKey: ["/api/travel"], enabled: canTravelApprove });
 
   const nameByUser = useMemo(() => {
     const m: Record<string, string> = {};
@@ -125,11 +139,9 @@ export default function CompanyWorkspacePage() {
   const reqName = (uid: string) => (uid === user?.id ? "You" : nameByUser[uid] || "—");
 
   const now = Date.now();
-  const pendingSvc = useMemo(() => (svcRequests as any[]).filter((r) => REQ_PENDING.includes(r.status)), [svcRequests]);
-  const pendingMov = useMemo(() => (movements as any[]).filter((m) => MOV_PENDING.includes(m.status)), [movements]);
   const pendingVeh = useMemo(() => (bookings as any[]).filter((b) => b.status !== "cancelled" && +new Date(b.endTime || b.startTime || 0) >= now), [bookings, now]);
   // Reimbursement approval queue, stage-aware:
-  //  - Finance sees "submitted" (first review) · CEO sees "finance_approved" (final) · super_admin sees both
+  //  - Finance sees "submitted" (first review) | CEO sees "finance_approved" (final) | super_admin sees both
   const pendingReimb = useMemo(() => (reimb as any[]).filter((r) => {
     // You can't approve your own claim — except super_admin (emergency override; matches the backend).
     if (r.requesterId === user?.id && role !== "super_admin") return false;
@@ -137,12 +149,18 @@ export default function CompanyWorkspacePage() {
     if (r.status === "finance_approved") return canCeoReimb;    // CEO finalises
     return false;
   }), [reimb, canFinanceReimb, canCeoReimb, user?.id, role]);
-  // Office purchases awaiting THIS approver's action (HR: triage/order/deliver · CEO: approve).
-  const pendingOp = useMemo(() => (opAll as any[]).filter((o) =>
-    (canOpTriage && ["pending_hr", "priced", "approved", "ordered"].includes(o.status)) ||
-    (canOpCeo && o.status === "pending_approval")
-  ).length, [opAll, canOpTriage, canOpCeo]);
-  const apprTotal = (isApprover ? pendingSvc.length + pendingMov.length + pendingVeh.length : 0) + (canReimbApprove ? pendingReimb.length : 0) + (canOfficePurchase ? pendingOp : 0);
+  // Office purchases, split by layer so counts match what each screen shows.
+  // First-layer HR triage (Pending phase = what super_admin/HR see on their normal My Approvals):
+  const officeTriageCount = useMemo(() => (opAll as any[]).filter((o) => ["pending_hr", "priced", "approved", "under_review"].includes(o.status)).length, [opAll]);
+  // CEO-layer office (the bulk card on the CEO Inbox): awaiting the CEO's decision.
+  const officeCeoCount = useMemo(() => (opAll as any[]).filter((o) => ["pending_approval", "under_review"].includes(o.status)).length, [opAll]);
+  const pendingProc = useMemo(() => (procAll as any[]).filter((o) => ["pending_approval", "under_review"].includes(o.status)).length, [procAll]);
+  const travelPending = useMemo(() => (travelAll as any[]).filter((t) =>
+    (canTravelHr(role) && ["pending_hr", "approved"].includes(t.status)) ||
+    (canTravelCeo(role) && ["pending_approval", "under_review"].includes(t.status))
+  ).length, [travelAll, role]);
+  // Nav-card badge: CEO-layer only when isCeo (reimb+proc+office-CEO); first-layer office when a triage role.
+  const apprTotal = (isCeo ? pendingReimb.length + pendingProc + officeCeoCount : 0) + (canOpTriage ? officeTriageCount : 0);
   // Approver → total awaiting THEIR approval (stage-aware queue). Employee → their own pending claims.
   const pendingReimbAmount = useMemo(() => {
     const rows = canReimbApprove
@@ -151,8 +169,11 @@ export default function CompanyWorkspacePage() {
     return rows.reduce((s: number, r: any) => s + Number(r.totalAmount || 0), 0);
   }, [canReimbApprove, pendingReimb, reimb, user?.id]);
 
-  // The user's own in-flight office purchases (Office Purchase is the current purchase flow).
-  const myOpenOp = useMemo(() => (officePurchases as any[]).filter((o) => ["pending_hr", "priced", "pending_approval", "approved", "ordered"].includes(o.status)).length, [officePurchases]);
+  // The user's own in-flight purchases — office purchases + procurement (both count toward "Pending Purchases").
+  const myOpenOp = useMemo(() =>
+    (officePurchases as any[]).filter((o) => ["pending_hr", "priced", "pending_approval", "approved", "ordered"].includes(o.status)).length +
+    (myProcurement as any[]).filter((o) => o.status === "pending_approval").length
+  , [officePurchases, myProcurement]);
   const myOpen =
     myOpenOp +
     purchases.filter((p: any) => ["draft", "submitted", "pending_ceo", "changes_requested"].includes(p.status)).length +
@@ -181,6 +202,11 @@ export default function CompanyWorkspacePage() {
       const extra = Array.isArray(p.items) && p.items.length > 1 ? ` +${p.items.length - 1} more` : "";
       rows.push({ id: p.id, kind: "office_purchase", raw: p, requester: "You", type: "Office Purchase", details: item0 ? `${item0}${extra}` : (p.reference || "Office Purchase"), status: p.status, date: p.createdAt, approvedBy: "—" });
     });
+    myProcurement.forEach((p: any) => {
+      const item0 = Array.isArray(p.items) && p.items[0]?.description ? p.items[0].description : "";
+      const extra = Array.isArray(p.items) && p.items.length > 1 ? ` +${p.items.length - 1} more` : "";
+      rows.push({ id: p.id, kind: "procurement", raw: p, requester: "You", type: "Procurement", details: item0 ? `${item0}${extra}` : (p.reference || "Procurement"), status: p.status, date: p.createdAt, approvedBy: "—" });
+    });
     reimb.forEach((r: any) => {
       const isOwn = r.requesterId === user?.id;
       const requester = isOwn ? "You" : (nameByUser[r.requesterId] || r.employeeName || "—");
@@ -196,70 +222,155 @@ export default function CompanyWorkspacePage() {
       (movements as any[]).forEach((m) => rows.push({ id: m.id, kind: "logistics", raw: m, requester: reqName(m.requesterId), type: "Logistics", details: m.reference || m.notes || "Stock / asset movement", status: m.status, date: m.createdAt, approvedBy: "—" }));
     }
     return rows.filter((r) => r.date && +new Date(r.date) >= weekAgo).sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 20);
-  }, [purchases, travels, tickets, reimb, officePurchases, svcRequests, movements, isApprover, nameByUser, now, user?.id]);
+  }, [purchases, travels, tickets, reimb, officePurchases, myProcurement, svcRequests, movements, isApprover, nameByUser, now, user?.id]);
 
   const [detail, setDetail] = useState<any>(null);
 
   // ===================== Detailed: My Approvals =====================
   if (view === "approvals") {
-    const tabs = [
-      ...(isApprover ? [
-        { key: "requests", label: "Service Requests", count: pendingSvc.length, icon: TicketIcon },
-        { key: "logistics", label: "Logistics", count: pendingMov.length, icon: Truck },
-        { key: "vehicles", label: "Vehicles", count: pendingVeh.length, icon: Car },
-      ] : []),
-      ...(canReimbApprove ? [{ key: "reimbursements", label: "Reimbursements", count: pendingReimb.length, icon: Receipt }] : []),
-      ...(canOfficePurchase ? [{ key: "office_purchases", label: "Office Purchases", count: pendingOp, icon: ShoppingCart }] : []),
-    ] as { key: string; label: string; count: number; icon: any }[];
-    const effectiveTab = tabs.some((t) => t.key === apprTab) ? apprTab : tabs[0]?.key;
+    // In-place bulk-approval inbox — one card per pure approve/reject category, actioned in a modal (no screen jump).
+    // Reimbursement card = CEO-stage only (finance_approved); finance-stage (submitted) is first-layer, NOT the CEO's —
+    // so the CEO Inbox (super_admin acting as CEO) shows exactly what the CEO sees, never leaks finance-stage claims.
+    const reimbCeoStage = (reimb as any[]).filter((r) => r.status === "finance_approved" && (role === "super_admin" || r.requesterId !== user?.id));
+    const reimbItems = reimbCeoStage.map((r) => ({ id: r.id, primary: r.reference || "Reimbursement", secondary: r.employeeName || reqName(r.requesterId), amount: Number(r.totalAmount) || 0 }));
+    const opPend = (opAll as any[]).filter((o) => o.status === "pending_approval");
+    const procPend = (procAll as any[]).filter((o) => o.status === "pending_approval");
+    const opUR = (opAll as any[]).filter((o) => o.status === "under_review");
+    const procUR = (procAll as any[]).filter((o) => o.status === "under_review");
+    const travelPend = (travelAll as any[]).filter((t) => ["pending_approval", "under_review"].includes(t.status));
+    const amtSum = (arr: any[], k = "totalAmount") => arr.reduce((s, x) => s + (Number(x[k]) || 0), 0);
+    // Main inbox = ONE card per category (total ₹ + count, irrespective of HR grouping); the drill modal shows groups/items.
+    const catCards = ([
+      reimbCeoStage.length ? { key: "reimbursements", label: "Reimbursements", icon: Receipt, count: reimbCeoStage.length, total: amtSum(reimbCeoStage),
+        cfg: { title: "Reimbursements", items: reimbItems, invalidateKey: "/api/reimbursements",
+          approveFn: (ids: string[], note: string) => Promise.all(ids.map((id) => apiRequest("POST", `/api/reimbursements/${id}/approve`, { note }))),
+          rejectFn: (ids: string[], note: string) => Promise.all(ids.map((id) => apiRequest("POST", `/api/reimbursements/${id}/reject`, { note }))) } } : null,
+      opPend.length ? { key: "office_purchases", label: "Office Purchases", icon: ShoppingCart, count: opPend.length, total: amtSum(opPend),
+        cfg: { title: "Office Purchases", kind: "office", grouped: true, basePath: "/api/office-purchases", invalidateKey: "/api/office-purchases" } } : null,
+      procPend.length ? { key: "procurement", label: "Procurement", icon: Package, count: procPend.length, total: amtSum(procPend),
+        cfg: { title: "Procurement", kind: "procurement", basePath: "/api/procurement", invalidateKey: "/api/procurement" } } : null,
+      travelPend.length ? { key: "travel", label: "Travel", icon: Plane, count: travelPend.length, total: amtSum(travelPend, "amount"), cfg: { kind: "travel" } } : null,
+    ].filter(Boolean) as { key: string; label: string; icon: any; count: number; total: number; cfg: any }[]);
+    // "Under review" (queries you raised, on hold) — a separate section below the main cards.
+    const underReviewCards = ([
+      opUR.length ? { key: "op_ur", label: "Office Purchases", icon: ShoppingCart, count: opUR.length, total: amtSum(opUR),
+        cfg: { title: "Office Purchases", lane: "Under Review", statuses: ["under_review"], kind: "office", grouped: true, basePath: "/api/office-purchases", invalidateKey: "/api/office-purchases" } } : null,
+      procUR.length ? { key: "proc_ur", label: "Procurement", icon: Package, count: procUR.length, total: amtSum(procUR),
+        cfg: { title: "Procurement", lane: "Under Review", statuses: ["under_review"], kind: "procurement", basePath: "/api/procurement", invalidateKey: "/api/procurement" } } : null,
+    ].filter(Boolean) as { key: string; label: string; icon: any; count: number; total: number; cfg: any }[]);
+    // Non-CEO approvers get a category tab strip (auto-sorted by pending count = priority); the CEO keeps the bulk-cards inbox.
+    const apprTabs = ([
+      canOpTriage ? { key: "office_purchases", label: "Office Purchases", icon: ShoppingCart, count: officeTriageCount } : null,
+      canTravelApprove ? { key: "travel", label: "Travel", icon: Plane, count: travelPending } : null,
+    ].filter(Boolean) as { key: string; label: string; icon: any; count: number }[]).sort((a, b) => b.count - a.count);
+    const effectiveTab = apprTabs.some((t) => t.key === apprTab) ? apprTab : apprTabs[0]?.key;
+    const headerTotal = isCeo
+      ? catCards.reduce((s, c) => s + c.count, 0) + underReviewCards.reduce((s, c) => s + c.count, 0)
+      : apprTabs.reduce((s, t) => s + t.count, 0);
+    // Completed / decided history across the categories this user approves.
+    const done = (arr: any[], statuses: string[]) => (arr as any[]).filter((x) => statuses.includes(x.status));
+    const completedRows: { key: string; icon: any; title: string; sub: string; amount: number; date: any; status: string }[] = [];
+    if (isCeo) done(reimb, ["approved", "rejected"]).forEach((r) => completedRows.push({ key: `rmb-${r.id}`, icon: Receipt, title: r.reference || "Reimbursement", sub: r.employeeName || reqName(r.requesterId), amount: Number(r.totalAmount) || 0, date: r.updatedAt || r.createdAt, status: r.status }));
+    if (canOfficePurchase) done(opAll, ["approved", "rejected", "ordered", "delivered", "completed"]).forEach((o) => completedRows.push({ key: `op-${o.id}`, icon: ShoppingCart, title: o.reference, sub: o.employeeName || "Employee", amount: Number(o.totalAmount) || 0, date: o.updatedAt || o.createdAt, status: o.status }));
+    if (isCeo) done(procAll, ["approved", "rejected"]).forEach((o) => completedRows.push({ key: `pr-${o.id}`, icon: Package, title: o.reference, sub: o.employeeName || "Employee", amount: Number(o.totalAmount) || 0, date: o.decidedAt || o.updatedAt || o.createdAt, status: o.status }));
+    completedRows.sort((a, b) => +new Date(b.date || 0) - +new Date(a.date || 0));
     return (
       <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
         <div className="flex items-center gap-3">
           <Button variant="secondary" size="icon" className="h-10 w-10 flex-shrink-0" onClick={() => setView("main")} aria-label="Back" data-testid="button-back-workspace"><ChevronLeft className="h-4 w-4" /></Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">My Approvals</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{apprTotal} item{apprTotal !== 1 ? "s" : ""} awaiting your action</p>
+            <h1 className="text-2xl font-bold text-foreground">{actingCeo ? "CEO Inbox" : "My Approvals"}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{actingCeo ? "Super-access — acting on the CEO's behalf | " : ""}{headerTotal} item{headerTotal !== 1 ? "s" : ""} awaiting action</p>
           </div>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
-          {tabs.map((t) => (
-            <Button key={t.key} size="sm" variant={effectiveTab === t.key ? "default" : "secondary"} onClick={() => setApprTab(t.key as any)} data-testid={`appr-tab-${t.key}`}>
-              <t.icon className="h-4 w-4 mr-1" /> {t.label}{t.count > 0 ? ` (${t.count})` : ""}
-            </Button>
-          ))}
-        </div>
+        {isCeo ? (
+          <>
+            <div className="flex gap-2">
+              {(["pending", "completed"] as const).map((v) => (
+                <Button key={v} size="sm" variant={apprView === v ? "default" : "secondary"} onClick={() => setApprView(v)} data-testid={`appr-view-${v}`}>
+                  {v === "pending" ? "Pending" : "Completed"}
+                  {v === "pending" && headerTotal > 0 && <span className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${apprView === "pending" ? "bg-white/25 text-white" : "bg-[#FF6F62] text-white"}`}>{headerTotal}</span>}
+                </Button>
+              ))}
+            </div>
+            {apprView === "pending" ? (
+              (catCards.length === 0 && underReviewCards.length === 0)
+                ? <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">Nothing awaiting your approval.</p></div>
+                : <div className="space-y-8">
+                    {catCards.length > 0 && (
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {catCards.map((c) => (
+                          <div key={c.key} className="card-surface card-hover p-5 flex flex-col" data-testid={`inbox-cat-${c.key}`}>
+                            <div className="flex items-center gap-2.5">
+                              <span className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#206295]/10 text-[#206295]"><c.icon className="h-4 w-4" /></span>
+                              <div className="min-w-0"><p className="text-sm font-semibold text-foreground truncate">{c.label}</p><p className="text-xs text-muted-foreground">{c.count} pending</p></div>
+                            </div>
+                            <p className="mt-4 text-[26px] font-bold tabular-nums leading-none text-[#206295]">{c.total > 0 ? money(c.total) : `${c.count} to review`}</p>
+                            <Button variant="secondary" className="mt-4 w-full" onClick={() => c.cfg.kind === "travel" ? setTravelModal(true) : setBatchCat(c.cfg)} data-testid={`inbox-view-${c.key}`}><Eye className="h-4 w-4 mr-1.5" /> Review</Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {underReviewCards.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-[#FF6F62] flex-shrink-0" />
+                          <h2 className="text-sm font-semibold text-foreground">Under review</h2>
+                          <span className="text-xs text-muted-foreground">queries you raised, awaiting HR</span>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                          {underReviewCards.map((c) => (
+                            <div key={c.key} className="card-surface card-hover p-5 flex flex-col ring-1 ring-[#FF6F62]/25" data-testid={`inbox-ur-${c.key}`}>
+                              <div className="flex items-center gap-2.5">
+                                <span className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#FF6F62]/15 text-[#C4402F]"><c.icon className="h-4 w-4" /></span>
+                                <div className="min-w-0"><p className="text-sm font-semibold text-foreground truncate">{c.label}</p><p className="text-xs text-[#C4402F]">{c.count} under review</p></div>
+                              </div>
+                              <p className="mt-4 text-[26px] font-bold tabular-nums leading-none text-[#C4402F]">{c.total > 0 ? money(c.total) : `${c.count}`}</p>
+                              <Button variant="secondary" className="mt-4 w-full" onClick={() => setBatchCat(c.cfg)} data-testid={`inbox-ur-view-${c.key}`}><Eye className="h-4 w-4 mr-1.5" /> Review</Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+            ) : (
+              <CompletedApprovals rows={completedRows} />
+            )}
+          </>
+        ) : (
+          <>
+            {/* Non-CEO approvers: category tabs at the top, ordered by pending count, active tab highlighted. */}
+            <div className="flex gap-2 flex-wrap">
+              {apprTabs.map((t) => (
+                <Button key={t.key} size="sm" variant={effectiveTab === t.key ? "default" : "secondary"} onClick={() => setApprTab(t.key)} data-testid={`appr-tab-${t.key}`}>
+                  <t.icon className="h-4 w-4 mr-1.5" /> {t.label}
+                  {t.count > 0 && <span className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${effectiveTab === t.key ? "bg-white/25 text-white" : "bg-[#FF6F62] text-white"}`}>{t.count}</span>}
+                </Button>
+              ))}
+            </div>
+            {apprTabs.length === 0 ? (
+              <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">Nothing awaiting your approval.</p></div>
+            ) : (
+              <>
+                {effectiveTab === "office_purchases" && <OfficePurchaseApprovals allItems={opAll} canTriage={canOpTriage} canCeo={false} />}
+                {effectiveTab === "travel" && <TravelApprovals />}
+              </>
+            )}
+          </>
+        )}
 
-        {effectiveTab === "requests" && <ListApprovals allItems={svcRequests} navigate={navigate} name="Service Requests"
-          isPending={(r) => REQ_PENDING.includes(r.status)} dateOf={(r) => r.createdAt} reviewHref={() => "/requests"}
-          render={(r) => ({ title: r.title || cap(r.type) || "Service request", sub: `${reqName(r.requesterId)} · ${cap(r.routeToTeam || "")}`, status: r.status, date: r.createdAt })}
-          columns={[
-            { label: "Request", cell: (r) => <span className="font-medium text-foreground">{r.title || cap(r.type) || "Service request"}</span> },
-            { label: "Requester", cell: (r) => reqName(r.requesterId) },
-            { label: "Team", cell: (r) => <span className="capitalize text-muted-foreground">{cap(r.routeToTeam || "—")}</span> },
-            { label: "Status", cell: (r) => <Badge className={`text-xs ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge> },
-            { label: "Submitted", cell: (r) => (r.createdAt ? fmtDate(r.createdAt) : "—") },
-            { label: "Handled By", cell: (r) => (r.assignedToId ? reqName(r.assignedToId) : "—") },
-          ]}
-          emptyPending="No service requests pending" emptyCompleted="No completed service requests" />}
-
-        {effectiveTab === "logistics" && <LogisticsApprovals items={movements} reqName={reqName} navigate={navigate} canApprove={isApprover} />}
-
-        {effectiveTab === "vehicles" && <ListApprovals allItems={bookings} navigate={navigate} name="Vehicle Bookings"
-          isPending={(b) => b.status !== "cancelled" && +new Date(b.endTime || b.startTime || 0) >= now} dateOf={(b) => b.startTime} reviewHref={() => "/vehicles"}
-          render={(b) => ({ title: b.purpose || "Vehicle booking", sub: `${reqName(b.requesterId)} · ${fmtDate(b.startTime)}`, status: b.status, date: b.startTime })}
-          columns={[
-            { label: "Purpose", cell: (b) => <span className="font-medium text-foreground">{b.purpose || "Vehicle booking"}</span> },
-            { label: "Requester", cell: (b) => reqName(b.requesterId) },
-            { label: "Start", cell: (b) => (b.startTime ? fmtDate(b.startTime) : "—") },
-            { label: "End", cell: (b) => (b.endTime ? fmtDate(b.endTime) : "—") },
-            { label: "Status", cell: (b) => <Badge className={`text-xs ${statusClass(b.status)}`}>{statusLabel(b.status)}</Badge> },
-          ]}
-          emptyPending="No upcoming vehicle bookings" emptyCompleted="No past vehicle bookings" />}
-
-        {effectiveTab === "reimbursements" && <ReimbApprovals items={pendingReimb} allItems={reimb} nameByUser={nameByUser} allowBulk={canCeoReimb} />}
-        {effectiveTab === "office_purchases" && <OfficePurchaseApprovals allItems={opAll} canTriage={canOpTriage} canCeo={canOpCeo} />}
-        {tabs.length === 0 && <Card className="border-0"><CardContent className="p-10 text-center text-sm text-muted-foreground">Nothing awaiting your approval.</CardContent></Card>}
+        {batchCat && (batchCat.kind
+          ? <CeoReviewModal key={batchCat.title + (batchCat.lane || "")} cfg={batchCat} onClose={() => setBatchCat(null)} />
+          : <ApprovalBatchModal key={batchCat.title} cfg={batchCat} open onClose={() => setBatchCat(null)} />)}
+        {travelModal && (
+          <Dialog open onOpenChange={(o) => { if (!o) setTravelModal(false); }}>
+            <DialogContent className="max-w-2xl max-h-[86vh] overflow-y-auto">
+              <DialogHeader><DialogTitle className="flex items-center gap-2"><Plane className="h-5 w-5 text-[#206295]" /> Travel approvals</DialogTitle></DialogHeader>
+              <TravelApprovals />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     );
   }
@@ -342,7 +453,7 @@ export default function CompanyWorkspacePage() {
 
       {/* Service forms (open directly) */}
       <PurchaseForm open={openForm === "purchase"} onClose={() => setOpenForm(null)} />
-      <TravelForm open={openForm === "travel"} onClose={() => setOpenForm(null)} />
+      <NewTravelDialog open={openForm === "travel"} onClose={() => setOpenForm(null)} />
       <TicketForm open={openForm === "ticket"} onClose={() => setOpenForm(null)} />
       <ReimbursementFormDialog open={openForm === "reimbursement"} onClose={() => setOpenForm(null)} />
       <NewRequestDialog open={newReqOpen} onClose={() => setNewReqOpen(false)} />
@@ -393,6 +504,11 @@ function ActivityDetailModal({ row, onClose }: { row: any; onClose: () => void }
       add("Reference", r.reference);
       add("Items", Array.isArray(r.items) ? r.items.map((i: any) => `${i.description || "Item"}${i.quantity ? ` ×${i.quantity}` : ""}`).filter(Boolean).join(", ") : null);
       add("Priority", cap(r.priority)); add("Total", Number(r.totalAmount) > 0 ? money(r.totalAmount) : null); add("Justification", r.justification);
+      break;
+    case "procurement":
+      add("Reference", r.reference);
+      add("Items", Array.isArray(r.items) ? r.items.map((i: any) => `${i.description || "Item"}${i.quantity ? ` ×${i.quantity}` : ""}`).filter(Boolean).join(", ") : null);
+      add("Total", Number(r.totalAmount) > 0 ? money(r.totalAmount) : null); add("Purpose", r.justification);
       break;
     case "request":
       add("Reference", r.reference); add("Type", cap(r.type)); add("Title", r.title); add("Description", r.description); add("Routed To", r.routeToTeam);
@@ -537,501 +653,6 @@ function ViewToggle({ view, onChange }: { view: "card" | "table"; onChange: (v: 
 
 const LIST_PAGE_SIZE = 15;
 
-// Generic Pending/Completed approvals panel for the non-reimbursement tabs (service requests, logistics, vehicles).
-// Mirrors the reimbursement tab layout: phase toggle + date range (+ export on Completed), pending list + completed table.
-function ListApprovals({ allItems, isPending, dateOf, render, navigate, reviewHref, name, columns, actions, emptyPending, emptyCompleted }: {
-  allItems: any[];
-  isPending: (x: any) => boolean;
-  dateOf: (x: any) => any;
-  render: (x: any) => { title: string; sub: string; status: string; date?: any };
-  navigate: (h: string) => void;
-  reviewHref: (x: any) => string;
-  name: string;
-  columns: { label: string; align?: "right" | "center"; cell: (x: any) => any }[];
-  actions?: (x: any) => any;
-  emptyPending: string;
-  emptyCompleted: string;
-}) {
-  const [phase, setPhase] = useState<"pending" | "completed">("pending");
-  const [range, setRange] = useState<{ from?: Date; to?: Date }>({});
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("date_desc");
-  const [view, setView] = useState<"card" | "table">("card");
-  const [page, setPage] = useState(1);
-
-  const baseList = useMemo(() => allItems.filter((x) => (phase === "pending" ? isPending(x) : !isPending(x))), [allItems, phase, isPending]);
-  const statuses = useMemo(() => Array.from(new Set(baseList.map((x) => render(x).status).filter(Boolean))), [baseList, render]);
-  const filtered = useMemo(() => baseList.filter((x) => {
-    if (statusFilter !== "all" && render(x).status !== statusFilter) return false;
-    if (!dayInRange(dateOf(x), range)) return false;
-    return true;
-  }), [baseList, statusFilter, range, dateOf, render]);
-  const sorted = useMemo(() => {
-    const s = [...filtered];
-    s.sort((a, b) => { const da = +new Date(dateOf(a) || 0), db = +new Date(dateOf(b) || 0); return sortBy === "date_asc" ? da - db : db - da; });
-    return s;
-  }, [filtered, sortBy, dateOf]);
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / LIST_PAGE_SIZE));
-  const curPage = Math.min(page, totalPages);
-  const pageItems = sorted.slice((curPage - 1) * LIST_PAGE_SIZE, curPage * LIST_PAGE_SIZE);
-  const hasRange = !!(range.from || range.to);
-
-  const doExport = () => exportXlsx({
-    filename: `${name.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.xlsx`,
-    sheet: name.slice(0, 28),
-    title: `${name}${rangeSuffix(range)}`,
-    headers: ["Request", "Details", "Status", "Date"],
-    rows: sorted.map((x) => { const d = render(x); return [d.title, d.sub, statusLabel(d.status), d.date ? fmtDate(d.date) : ""]; }),
-  });
-
-  const phaseToggle = (
-    <div className="segmented-toggle inline-flex p-0.5 h-9 flex-shrink-0">
-      <button onClick={() => { setPhase("pending"); setPage(1); }} className={`px-3 h-full rounded-[10px] text-xs font-medium ${phase === "pending" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid="phase-pending">Pending</button>
-      <button onClick={() => { setPhase("completed"); setPage(1); }} className={`px-3 h-full rounded-[10px] text-xs font-medium ${phase === "completed" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid="phase-completed">Completed</button>
-    </div>
-  );
-
-  return (
-    <div className="space-y-4">
-      {/* ===== Toolbar: phase toggle · date range · export · pagination ===== */}
-      <div className="flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          {phaseToggle}
-          <div className="h-7 w-px bg-foreground/30 mx-0.5" />
-          <ViewToggle view={view} onChange={setView} />
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[150px] text-xs" data-testid="filter-status"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {statuses.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="h-9 w-[150px] text-xs" data-testid="sort-list"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="date_desc">Newest first</SelectItem>
-              <SelectItem value="date_asc">Oldest first</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <ApprovalDateRange value={range} onChange={(v) => { setRange(v); setPage(1); }} />
-          {phase === "completed" && (
-            <Button variant="secondary" size="sm" className="h-9" disabled={sorted.length === 0} onClick={doExport} data-testid="appr-export"><Download className="h-4 w-4 mr-1.5" /> Export ({sorted.length})</Button>
-          )}
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} data-testid="page-prev"><ChevronLeft className="h-4 w-4" /></Button>
-            <span className="px-1 tabular-nums">{curPage} / {totalPages}</span>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage >= totalPages} onClick={() => setPage(curPage + 1)} data-testid="page-next"><ChevronRight className="h-4 w-4" /></Button>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== Body: card or table for the current phase ===== */}
-      {sorted.length === 0 ? (
-        <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{phase === "pending" ? emptyPending : emptyCompleted}{hasRange ? " in this date range" : ""}.</p></div>
-      ) : view === "table" ? (
-        <div className="card-surface rounded-2xl">
-          <DataTable
-            columns={[
-              ...columns.map((c: any) => ({ key: c.label, header: c.label, align: c.align, render: (x: any) => c.cell(x) })),
-              { key: "__view", header: "", align: "center" as const, render: (x: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); navigate(reviewHref(x)); }} data-testid={`view-row-${x.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> {phase === "pending" ? "Review" : "View"}</Button> },
-            ]}
-            rows={pageItems}
-            getRowKey={(x: any) => x.id}
-            onRowClick={(x: any) => navigate(reviewHref(x))}
-            testIdPrefix="appr-row"
-          />
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          {pageItems.map((x: any) => { const d = render(x); return (
-            <div key={x.id} className="card-surface card-hover p-4 cursor-pointer flex items-center gap-5" onClick={() => navigate(reviewHref(x))} data-testid={`appr-item-${x.id}`}>
-              <div className="flex-1 min-w-0 pr-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">{d.title}</span>
-                  <Badge className={`text-[10px] ${statusClass(d.status)}`}>{statusLabel(d.status)}</Badge>
-                </div>
-                {d.sub && <p className="text-sm text-muted-foreground mt-1 truncate">{d.sub}</p>}
-                {d.date && <p className="text-xs text-muted-foreground mt-1.5 inline-flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 flex-shrink-0" /> {fmtDate(d.date)}</p>}
-              </div>
-              <Separator orientation="vertical" className="h-12 flex-shrink-0" />
-              <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                {actions ? actions(x) : <Button size="sm" variant="ghost" className="h-10 btn-glass text-[#206295] hover:text-[#206295]" onClick={() => navigate(reviewHref(x))} data-testid={`review-${x.id}`}><Eye className="h-4 w-4 mr-1.5" /> Review</Button>}
-              </div>
-            </div>
-          ); })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Logistics wrapper — owns the approve/reject mutation, delegates layout to ListApprovals.
-function LogisticsApprovals({ items, reqName, navigate, canApprove }: { items: any[]; reqName: (u: string) => string; navigate: (h: string) => void; canApprove: boolean; }) {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const act = useMutation({
-    mutationFn: ({ id, action, note }: any) => apiRequest("POST", `/api/logistics/movements/${id}/${action}`, note ? { note } : {}),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/logistics/movements"] }); toast({ title: "Updated" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-  return (
-    <ListApprovals
-      allItems={items}
-      isPending={(m) => MOV_PENDING.includes(m.status)}
-      dateOf={(m) => m.createdAt}
-      render={(m) => ({ title: m.title || m.notes || "Stock / asset movement", sub: `${reqName(m.requesterId)} · ${fmtDate(m.createdAt)}`, status: m.status, date: m.createdAt })}
-      navigate={navigate}
-      reviewHref={() => "/logistics"}
-      name="Logistics Movements"
-      columns={[
-        { label: "Reference", cell: (m) => <span className="font-medium text-foreground">{m.reference || m.title || m.notes || "Movement"}</span> },
-        { label: "Requester", cell: (m) => reqName(m.requesterId) },
-        { label: "Status", cell: (m) => <Badge className={`text-xs ${statusClass(m.status)}`}>{statusLabel(m.status)}</Badge> },
-        { label: "Date", cell: (m) => (m.createdAt ? fmtDate(m.createdAt) : "—") },
-      ]}
-      actions={(m) => (canApprove && m.status === "needs_approval" ? (
-        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" variant="outline" className="h-8 text-xs text-[#FF6F62] border-[#FF6F62]/30" disabled={act.isPending}
-            onClick={() => { const note = window.prompt("Reason for rejection?"); if (note) act.mutate({ id: m.id, action: "reject", note }); }}><X className="h-3.5 w-3.5 mr-1" /> Reject</Button>
-          <Button size="sm" className="h-8 text-xs" disabled={act.isPending} onClick={() => act.mutate({ id: m.id, action: "approve" })}><Check className="h-3.5 w-3.5 mr-1" /> Approve</Button>
-        </div>
-      ) : (
-        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={(e) => { e.stopPropagation(); navigate("/logistics"); }}>Review</Button>
-      ))}
-      emptyPending="No logistics movements pending"
-      emptyCompleted="No completed logistics movements"
-    />
-  );
-}
-
-// Priority is derived purely from the claim amount (brand-only colors).
-const reimbPriority = (amt: number) =>
-  amt >= 50000 ? { label: "High", cls: "bg-[#FF6F62]/15 text-[#FF6F62]" }
-  : amt >= 10000 ? { label: "Medium", cls: "bg-[#206295]/15 text-[#206295]" }
-  : { label: "Low", cls: "bg-[#64748B]/15 text-[#64748B]" };
-
-// Category badge colors drawn from the brand palette (deterministic per category).
-const CAT_PALETTE = ["#206295", "#0E7C7B", "#425B8D", "#64748B"];
-const catStyle = (cat: string) => { const c = CAT_PALETTE[Math.abs([...(cat || "?")].reduce((a, ch) => a + ch.charCodeAt(0), 0)) % CAT_PALETTE.length]; return { color: c, backgroundColor: `${c}1f` }; };
-
-const REIMB_PAGE_SIZE = 15;
-
-// Premium card-based reimbursement approvals list. Finance = individual; CEO = + bulk.
-function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { items: any[]; allItems?: any[]; nameByUser?: Record<string, string>; allowBulk: boolean }) {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const [, navigate] = useLocation();
-  const [sel, setSel] = useState<Set<string>>(new Set());
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [detail, setDetail] = useState<any>(null);
-  const [phase, setPhase] = useState<"pending" | "completed">("pending");
-  const [range, setRange] = useState<{ from?: Date; to?: Date }>({});
-  const [priorityFilter, setPriorityFilter] = useState("all");
-  const [catFilter, setCatFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("date_desc");
-  const [view, setView] = useState<"card" | "table">("card");
-  const [page, setPage] = useState(1);
-  const inRange = (d: any) => dayInRange(d, range);
-  const approvedByName = (r: any) => nameByUser[r.approvedById] || nameByUser[r.financeApprovedById] || "—";
-
-  const invalidate = () => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/reimbursements") });
-  const approve = useMutation({
-    mutationFn: async (ids: string[]) => { for (const id of ids) await apiRequest("POST", `/api/reimbursements/${id}/approve`, {}); },
-    onSuccess: () => { invalidate(); setSel(new Set()); toast({ title: "Reimbursement(s) approved" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-  const reject = useMutation({
-    mutationFn: ({ id, note }: any) => apiRequest("POST", `/api/reimbursements/${id}/reject`, { note }),
-    onSuccess: () => { invalidate(); toast({ title: "Reimbursement rejected" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-  const rejectAll = useMutation({
-    mutationFn: async ({ ids, note }: { ids: string[]; note: string }) => { for (const id of ids) await apiRequest("POST", `/api/reimbursements/${id}/reject`, { note }); },
-    onSuccess: () => { invalidate(); setSel(new Set()); toast({ title: "Reimbursement(s) rejected" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-  const approveAll = () => { if (sel.size === 0) return; if (window.confirm(`Approve all ${sel.size} selected reimbursement(s)? This cannot be undone.`)) approve.mutate([...sel]); };
-  const rejectAllConfirm = () => { if (sel.size === 0) return; const note = window.prompt(`Reject all ${sel.size} selected reimbursement(s)? Enter a reason:`); if (note && note.trim()) rejectAll.mutate({ ids: [...sel], note: note.trim() }); };
-  const doExport = (rows: any[]) => {
-    const data = rows.map((r) => [r.reference, r.employeeName || "", r.employeeCode || "", r.department || "", r.category || "", Number(r.totalAmount || 0), r.createdAt ? format(new Date(r.createdAt), "dd MMM yyyy") : "", r.updatedAt ? format(new Date(r.updatedAt), "dd MMM yyyy") : "", statusLabel(r.status), approvedByName(r)]);
-    exportXlsx({ filename: `reimbursement-approvals-${new Date().toISOString().slice(0, 10)}.xlsx`, sheet: "Reimbursements", title: `Reimbursement Approvals${rangeSuffix(range)}`, headers: ["Reference", "Requester", "Emp Code", "Department", "Category", "Amount (INR)", "Submitted", "Decision Date", "Status", "Approved By"], rows: data });
-  };
-  const toggle = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const openDetail = (r: any) => setDetail(r);
-
-  // Pending = items awaiting this approver; Completed = decided claims (approved / rejected).
-  const baseList = phase === "pending" ? items : (allItems as any[]).filter((r) => ["approved", "rejected"].includes(r.status));
-  const categories = useMemo(() => Array.from(new Set(baseList.map((i) => i.category).filter(Boolean))), [baseList]);
-
-  // filter (priority/category/date) -> sort
-  const filtered = useMemo(() => baseList.filter((r) => {
-    const pr = reimbPriority(Number(r.totalAmount || 0)).label.toLowerCase();
-    if (priorityFilter !== "all" && pr !== priorityFilter) return false;
-    if (catFilter !== "all" && r.category !== catFilter) return false;
-    if (!inRange(r.createdAt)) return false;
-    return true;
-  }), [baseList, priorityFilter, catFilter, range]);
-  const sorted = useMemo(() => {
-    const s = [...filtered];
-    s.sort((a, b) => {
-      if (sortBy === "amount_desc") return Number(b.totalAmount) - Number(a.totalAmount);
-      if (sortBy === "amount_asc") return Number(a.totalAmount) - Number(b.totalAmount);
-      const da = +new Date(a.createdAt || 0), db = +new Date(b.createdAt || 0);
-      return sortBy === "date_asc" ? da - db : db - da;
-    });
-    return s;
-  }, [filtered, sortBy]);
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / REIMB_PAGE_SIZE));
-  const curPage = Math.min(page, totalPages);
-  const pageItems = sorted.slice((curPage - 1) * REIMB_PAGE_SIZE, curPage * REIMB_PAGE_SIZE);
-  const allSelected = sorted.length > 0 && sorted.every((i) => sel.has(i.id));
-  const selectedTotal = items.filter((i) => sel.has(i.id)).reduce((s, i) => s + Number(i.totalAmount || 0), 0);
-  const toggleAll = () => setSel(allSelected ? new Set() : new Set(sorted.map((i) => i.id)));
-  const exitSelection = () => { setSelectionMode(false); setSel(new Set()); };
-
-  // Pending / Completed toggle + date-range control (shared header chrome)
-  const phaseToggle = (
-    <div className="segmented-toggle inline-flex p-0.5 h-9 flex-shrink-0">
-      <button onClick={() => { setPhase("pending"); setPage(1); exitSelection(); }} className={`px-3 h-full rounded-[10px] text-xs font-medium ${phase === "pending" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid="phase-pending">Pending</button>
-      <button onClick={() => { setPhase("completed"); setPage(1); exitSelection(); }} className={`px-3 h-full rounded-[10px] text-xs font-medium ${phase === "completed" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid="phase-completed">Completed</button>
-    </div>
-  );
-  const dateRange = <ApprovalDateRange value={range} onChange={(v) => { setRange(v); setPage(1); }} />;
-
-  return (
-    <div className="space-y-4">
-      {/* ===== Toolbar: filters · sort · pagination · select ===== */}
-      <div className="flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          {phaseToggle}
-          <div className="h-7 w-px bg-foreground/30 mx-0.5" />
-          <ViewToggle view={view} onChange={setView} />
-          <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[130px] text-xs" data-testid="filter-priority"><SelectValue placeholder="Priority" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priority</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={catFilter} onValueChange={(v) => { setCatFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[150px] text-xs" data-testid="filter-category"><SelectValue placeholder="Category" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="h-9 w-[160px] text-xs" data-testid="sort-reimb"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="date_desc">Newest first</SelectItem>
-              <SelectItem value="date_asc">Oldest first</SelectItem>
-              <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
-              <SelectItem value="amount_asc">Amount: Low → High</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          {dateRange}
-          {phase === "completed" && (
-            <Button variant="secondary" size="sm" className="h-9" onClick={() => doExport(sorted)} data-testid="button-export-reimb"><Download className="h-4 w-4 mr-1" /> Export</Button>
-          )}
-          {allowBulk && phase === "pending" && view === "card" && !selectionMode && (
-            <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelectionMode(true)} data-testid="button-select">
-              <MousePointerClick className="h-4 w-4 mr-1" /> Select
-            </Button>
-          )}
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} data-testid="page-prev"><ChevronLeft className="h-4 w-4" /></Button>
-            <span className="px-1 tabular-nums">{curPage} / {totalPages}</span>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage >= totalPages} onClick={() => setPage(curPage + 1)} data-testid="page-next"><ChevronRight className="h-4 w-4" /></Button>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== Selection bar (CEO bulk approval) ===== */}
-      {allowBulk && selectionMode && (
-        <Card className="border-0"><CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={toggleAll} data-testid="button-select-all"><CheckSquare className="h-4 w-4 mr-1" /> Select All</Button>
-            <span className="text-sm font-medium">{sel.size} selected</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-end gap-0.5">
-              <IndianRupee className="h-6 w-6 text-[#206295] mb-0.5" />
-              <span className="text-2xl font-bold text-[#206295] tracking-tight tabular-nums">{selectedTotal.toLocaleString("en-IN")}</span>
-            </div>
-            <div className="h-9 w-px bg-foreground/30" />
-            <Button size="sm" variant="outline" className="h-9 text-[#FF6F62] border-[#FF6F62]/40 hover:bg-[#FF6F62]/10" disabled={sel.size === 0 || rejectAll.isPending} onClick={rejectAllConfirm} data-testid="button-reject-all"><X className="h-4 w-4 mr-1.5" /> Reject All</Button>
-            <Button size="sm" className="h-9 btn-primary-gradient" disabled={sel.size === 0 || approve.isPending} onClick={approveAll} data-testid="button-approve-all"><Check className="h-4 w-4 mr-1.5" /> Approve All</Button>
-            <Button variant="outline" size="icon" className="h-9 w-9 flex-shrink-0" onClick={exitSelection} aria-label="Exit selection" data-testid="button-exit-selection"><X className="h-4 w-4" /></Button>
-          </div>
-        </CardContent></Card>
-      )}
-
-      {/* ===== Table view (either phase) ===== */}
-      {view === "table" && (
-        sorted.length === 0 ? (
-          <div className="card-surface rounded-2xl p-10 text-center text-sm text-muted-foreground">{phase === "pending" ? "No reimbursements awaiting your approval" : "No completed reimbursements"}{range.from || range.to ? " in this date range" : ""}.</div>
-        ) : (
-          <div className="card-surface rounded-2xl">
-            <DataTable
-              columns={[
-                { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground" },
-                { key: "requester", header: "Requester", render: (r: any) => <span className="text-foreground">{r.employeeName || "—"}<span className="text-muted-foreground"> ({r.employeeCode || "—"})</span></span> },
-                { key: "category", header: "Category", cellClassName: "text-muted-foreground capitalize", render: (r: any) => r.category || "—" },
-                { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (r: any) => money(r.totalAmount) },
-                { key: "submitted", header: "Submitted", cellClassName: "text-muted-foreground", render: (r: any) => r.createdAt ? format(new Date(r.createdAt), "dd MMM yyyy") : "—" },
-                { key: "decision", header: "Decision Date", cellClassName: "text-muted-foreground", render: (r: any) => r.updatedAt ? format(new Date(r.updatedAt), "dd MMM yyyy") : "—" },
-                { key: "status", header: "Status", render: (r: any) => <Badge className={`text-xs ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge> },
-                { key: "approvedBy", header: "Approved By", cellClassName: "text-muted-foreground", render: (r: any) => approvedByName(r) },
-                { key: "__view", header: "View", align: "center", render: (r: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); openDetail(r); }} data-testid={`view-completed-${r.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Button> },
-              ]}
-              rows={pageItems}
-              getRowKey={(r: any) => r.id}
-              onRowClick={(r: any) => openDetail(r)}
-              testIdPrefix="completed-reimb"
-            />
-          </div>
-        )
-      )}
-
-      {/* ===== Card view (either phase) ===== */}
-      {view === "card" && (
-        sorted.length === 0 ? (
-          <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{phase === "pending" ? "No reimbursements awaiting your approval" : "No completed reimbursements"}{range.from || range.to ? " in this date range" : ""}.</p></div>
-        ) : (
-      <div className="space-y-3">
-        {pageItems.map((r: any) => {
-          const amt = Number(r.totalAmount || 0);
-          const pr = reimbPriority(amt);
-          return (
-            <div key={r.id} data-testid={`appr-reimb-${r.id}`}
-              className={`group card-surface card-hover relative p-6 cursor-pointer ${selectionMode && sel.has(r.id) ? "ring-2 ring-[#206295]" : ""}`}
-              onClick={() => (selectionMode ? toggle(r.id) : openDetail(r))}>
-              {/* Overflow menu — top-right corner (hidden in selection mode) */}
-              {!selectionMode && (
-                <div className="absolute right-4 top-4" onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" data-testid={`more-reimb-${r.id}`}><MoreVertical className="h-4 w-4" /></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem onClick={() => openDetail(r)}><Eye className="h-4 w-4 mr-2" /> View details</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate(`/my-approvals/reimbursement/${r.id}`)}><Maximize2 className="h-4 w-4 mr-2" /> Open full page</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => exportReimbursement(r)}><Download className="h-4 w-4 mr-2" /> Export</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
-
-              <div className="flex items-center gap-6">
-                {allowBulk && selectionMode && (
-                  <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
-                    <Checkbox checked={sel.has(r.id)} onCheckedChange={() => toggle(r.id)} data-testid={`select-reimb-${r.id}`} />
-                  </div>
-                )}
-
-                {/* Identity — reading flow: reference → amount → employee */}
-                <div className="flex-1 min-w-0 pr-6">
-                  {/* 1 · Reference (heading) */}
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                    <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">{r.reference}</span>
-                    <Badge className="text-[10px] px-2 py-0.5 capitalize" style={catStyle(r.category || "other")}>{r.category || "—"}</Badge>
-                  </div>
-                  {/* 2 · Amount (primary emphasis — blue) */}
-                  <div className="flex items-end gap-1 mt-1.5">
-                    <IndianRupee className="h-7 w-7 text-[#206295] mb-1" />
-                    <span className="text-[2.1rem] leading-none font-bold text-[#206295] tracking-tight tabular-nums">{amt.toLocaleString("en-IN")}</span>
-                  </div>
-                  {/* 3 · Employee · HOD · Purpose (one line, small vertical separators) */}
-                  <div className="flex items-center gap-2.5 mt-2.5 text-sm min-w-0">
-                    <span className="flex-shrink-0">
-                      <span className="font-bold text-foreground">{r.employeeName || "Employee"}</span>
-                      <span className="text-muted-foreground font-normal"> ({r.employeeCode || "—"})</span>
-                    </span>
-                    <Separator orientation="vertical" className="h-3.5 flex-shrink-0" />
-                    <span className="flex-shrink-0">
-                      <span className="text-muted-foreground">HOD: </span>
-                      <span className="font-semibold text-foreground/90">{r.hodName || "—"}</span>
-                    </span>
-                    {r.businessPurpose ? (
-                      <>
-                        <Separator orientation="vertical" className="h-3.5 flex-shrink-0" />
-                        <span className="min-w-0 truncate"><span className="text-muted-foreground">Purpose: </span><span className="text-muted-foreground">{r.businessPurpose}</span></span>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Primary divider — longer, darker & thicker than the inner separators */}
-                <div className="self-center w-[1.4px] h-24 rounded-full bg-foreground/30 flex-shrink-0" />
-
-                {/* Meta group — icon top-right, teal label, bolder value; items divided by separators */}
-                <div className="flex items-stretch gap-6 flex-shrink-0">
-                  <div className="min-w-[104px]">
-                    <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
-                    {(() => { const si = reimbSubmittedInfo(r); return si.resubmitted ? (
-                      <TooltipProvider delayDuration={150}><Tooltip>
-                        <TooltipTrigger asChild><p className="text-[12px] uppercase tracking-wide text-muted-foreground mt-1 underline decoration-dotted underline-offset-2 cursor-help w-fit">{si.label}</p></TooltipTrigger>
-                        <TooltipContent>Originally created {si.originalDate ? format(new Date(si.originalDate), "dd MMM yyyy") : "—"}</TooltipContent>
-                      </Tooltip></TooltipProvider>
-                    ) : (
-                      <p className="text-[12px] uppercase tracking-wide text-muted-foreground mt-1">{si.label}</p>
-                    ); })()}
-                    <p className="text-sm font-semibold text-foreground mt-1">{(() => { const si = reimbSubmittedInfo(r); return si.date ? format(new Date(si.date), "dd MMM yyyy") : "—"; })()}</p>
-                  </div>
-                  <Separator orientation="vertical" className="h-14" />
-                  <div className="min-w-[104px]">
-                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    <p className="text-[12px] uppercase tracking-wide text-muted-foreground mt-1">Department</p>
-                    <p className="text-sm font-semibold text-foreground mt-1 truncate max-w-[150px]">{r.department || "—"}</p>
-                  </div>
-                  <Separator orientation="vertical" className="h-14" />
-                  <div className="min-w-[88px]">
-                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                    <p className="text-[12px] uppercase tracking-wide text-muted-foreground mt-1">Priority</p>
-                    <Badge className={`text-[10px] px-2 py-0.5 mt-1.5 font-semibold ${pr.cls}`}>{pr.label}</Badge>
-                  </div>
-                </div>
-
-                {!selectionMode && (
-                  <>
-                    <Separator orientation="vertical" className="h-16" />
-                    {/* View action */}
-                    <div className="flex-shrink-0 pr-2" onClick={(e) => e.stopPropagation()}>
-                      <Button size="sm" variant="ghost" className="h-10 w-[108px] btn-glass text-[#206295] hover:text-[#206295]" onClick={() => openDetail(r)} data-testid={`view-reimb-${r.id}`}>
-                        <Eye className="h-4 w-4 mr-1.5" /> View
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-        )
-      )}
-
-      {detail && (
-        <ReimbursementApprovalModal
-          reimb={detail}
-          canAct={detail.status !== "approved" && detail.status !== "rejected"}
-          open={!!detail}
-          onClose={() => setDetail(null)}
-          onExpand={() => { const id = detail.id; setDetail(null); navigate(`/my-approvals/reimbursement/${id}`); }}
-        />
-      )}
-    </div>
-  );
-}
 
 // ===================== Office Purchase approvals (HR triage + CEO approval) =====================
 const OP_PRIORITY: Record<string, { label: string; cls: string }> = {
@@ -1039,6 +660,247 @@ const OP_PRIORITY: Record<string, { label: string; cls: string }> = {
   medium: { label: "Medium", cls: "bg-[#206295]/15 text-[#206295]" },
   low: { label: "Low", cls: "bg-[#64748B]/15 text-[#64748B]" },
 };
+// Read-only history of decided items across the categories this user approves.
+function CompletedApprovals({ rows }: { rows: { key: string; icon: any; title: string; sub: string; amount: number; date: any; status: string }[] }) {
+  const { pageItems, page, setPage, totalPages, count, size } = usePaged(rows);
+  if (rows.length === 0) return <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">No completed approvals yet.</p></div>;
+  return (
+    <div className="space-y-2.5">
+      {pageItems.map((r) => (
+        <div key={r.key} className="card-surface p-4 flex items-center gap-4">
+          <span className="h-9 w-9 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><r.icon className="h-4 w-4" /></span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-semibold text-foreground truncate">{r.title}</span><Badge className={`text-[10px] ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge></div>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">{r.sub}{r.date ? ` | ${fmtDate(r.date)}` : ""}</p>
+          </div>
+          {r.amount > 0 && <span className="text-sm font-bold text-[#206295] tabular-nums flex-shrink-0">{money(r.amount)}</span>}
+        </div>
+      ))}
+      <PaginationBar page={page} totalPages={totalPages} count={count} size={size} onPage={setPage} />
+    </div>
+  );
+}
+// Inbox bulk-approval modal — every pending item in one category, X to drop, Approve/Reject all on the rest.
+// CEO review — expand-a-row: compact list, open a row for its receipt + discussion thread + per-item
+// Approve / Reject / Raise Query. Footer keeps Approve-all / Reject-all; tick rows to query several.
+// Live-fetches its category so the list updates as items are decided or moved to Under Review.
+function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void }) {
+  const { data: auth } = useAuth();
+  const meId = auth?.user?.id;
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const base = cfg.basePath as string;
+  const { data: all = [] } = useQuery<any[]>({ queryKey: [base] });
+  const statuses: string[] = cfg.statuses || ["pending_approval"];
+  const rows = (all as any[]).filter((r) => statuses.includes(r.status));
+  const [sortBy, setSortBy] = useState<"amount" | "age">("amount");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [rowForm, setRowForm] = useState<{ id: string; kind: "reject" | "query" } | null>(null);
+  const [rowNote, setRowNote] = useState("");
+  const [bulkMode, setBulkMode] = useState<null | "reject" | "query">(null);
+  const [bulkNote, setBulkNote] = useState("");
+  const allIds = rows.map((r) => r.id);
+  const total = rows.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0);
+  const sortedRows = [...rows].sort((a, b) => sortBy === "amount" ? (Number(b.totalAmount) || 0) - (Number(a.totalAmount) || 0) : (+new Date(a.createdAt || 0)) - (+new Date(b.createdAt || 0)));
+  // Office purchases carry a batchId when HR bundled several requests into one group to send the CEO.
+  const groups = (() => {
+    const seen = new Map<string, any>(); const out: { key: string; batchId: string | null; rows: any[] }[] = [];
+    for (const r of sortedRows) { const bid = r.batchId || null; if (!bid) { out.push({ key: `s-${r.id}`, batchId: null, rows: [r] }); continue; } let e = seen.get(bid); if (!e) { e = { key: `g-${bid}`, batchId: bid, rows: [] }; seen.set(bid, e); out.push(e); } e.rows.push(r); }
+    return out;
+  })();
+  const gTotal = (arr: any[]) => arr.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0);
+  const waitDays = (d: any) => Math.max(0, Math.floor((Date.now() - +new Date(d || Date.now())) / 86400000));
+  const rejectBtn = "border-[#FF6F62]/40 text-[#FF6F62] hover:bg-[#FF6F62]/10 hover:text-[#FF6F62]";
+  const queryBtn = "border-[#D98324]/40 text-[#D98324] hover:bg-[#FFA962]/15 hover:text-[#D98324]";
+  const normUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
+  const shortLink = (u: string) => { try { return new URL(normUrl(u)).host.replace(/^www\./, ""); } catch { return u; } };
+  const invalidate = () => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith(cfg.invalidateKey) });
+  const single = useMutation({ mutationFn: ({ path, id, body }: any) => apiRequest("POST", `${base}/${id}/${path}`, body || {}), onSuccess: (_d, v: any) => { invalidate(); toast({ title: v.msg }); setRowForm(null); setRowNote(""); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
+  const bulk = useMutation({ mutationFn: ({ path, ids, body }: any) => apiRequest("POST", `${base}/${path}`, { ids, ...(body || {}) }), onSuccess: (_d, v: any) => { invalidate(); toast({ title: v.msg }); setSel(new Set()); setBulkMode(null); setBulkNote(""); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
+  const busy = single.isPending || bulk.isPending;
+  const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>{cfg.title} | {cfg.lane || "Pending"} ({rows.length})</DialogTitle></DialogHeader>
+        <div className="flex items-center justify-end gap-1.5">
+          <span className="text-[11px] text-muted-foreground">Sort</span>
+          {(["amount", "age"] as const).map((s) => <button key={s} onClick={() => setSortBy(s)} className={`text-[11px] px-2 py-0.5 rounded-full transition-colors ${sortBy === s ? "bg-[#206295] text-white" : "bg-muted text-muted-foreground hover-elevate"}`} data-testid={`ceo-sort-${s}`}>{s === "amount" ? "Amount" : "Oldest"}</button>)}
+        </div>
+        <ScrollArea className="max-h-[60vh] pr-3 -mr-3">
+          <div className="space-y-2">
+            {sortedRows.length === 0 && <p className="text-sm text-muted-foreground py-10 text-center">Nothing pending here.</p>}
+            {(() => {
+              const renderRow = (r: any) => {
+              const open = expanded === r.id;
+              const amount = Number(r.totalAmount) || 0;
+              const items = (r.items || []) as any[];
+              const cc = (r.comments || []).length;
+              return (
+                <div key={r.id} className="rounded-xl border border-border bg-card overflow-hidden">
+                  <div className="flex items-center gap-3 px-3 py-2.5">
+                    <Checkbox checked={sel.has(r.id)} onCheckedChange={() => toggleSel(r.id)} onClick={(e: any) => e.stopPropagation()} />
+                    <button type="button" className="min-w-0 flex-1 flex items-center gap-3 text-left" onClick={() => setExpanded(open ? null : r.id)}>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold text-foreground truncate">{items.length ? `${items[0]?.description || "Item"}${Number(items[0]?.quantity) > 1 ? ` ×${items[0].quantity}` : ""}${items.length > 1 ? ` +${items.length - 1} more` : ""}` : (r.reference || "Request")}</p>
+                        <p className="text-xs text-muted-foreground truncate">{r.employeeName || "Employee"}{r.department ? ` | ${r.department}` : ""}{items.length ? ` | ${items.length} item${items.length !== 1 ? "s" : ""}` : ""} | {r.reference}</p>
+                      </div>
+                      {waitDays(r.createdAt) >= 1 && <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${waitDays(r.createdAt) >= 3 ? "bg-[#FF6F62]/15 text-[#C4402F]" : "bg-muted text-muted-foreground"}`}>{waitDays(r.createdAt)}d</span>}
+                      {cc > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground flex-shrink-0"><MessageSquare className="h-3.5 w-3.5" />{cc}</span>}
+                      <span className="text-base font-bold text-[#206295] tabular-nums flex-shrink-0">{money(amount)}</span>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+                    </button>
+                  </div>
+                  {open && (
+                    <div className="border-t border-border bg-muted/20 px-3 py-3 space-y-3">
+                      <div className="rounded-lg border border-border/70 bg-card divide-y divide-border/60">
+                        {items.map((it, i) => {
+                          const link = it.finalLink || it.link;
+                          return (
+                            <div key={i} className="flex items-start gap-2 px-3 py-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[13px] text-foreground">{it.description || "Item"} <span className="text-muted-foreground">× {it.quantity || 1}</span></p>
+                                {link && <a href={normUrl(link)} target="_blank" rel="noreferrer" className="text-[11px] text-[#206295] hover:underline inline-flex items-center gap-1 mt-0.5"><ExternalLink className="h-3 w-3" />{shortLink(link)}</a>}
+                              </div>
+                              <span className="text-[13px] font-medium tabular-nums flex-shrink-0">{money((Number(it.unitPrice) || 0) * (Number(it.quantity) || 0))}</span>
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-center justify-between px-3 py-2 bg-muted/40">
+                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Total</span>
+                          <span className="text-sm font-bold text-[#206295] tabular-nums">{money(amount)}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><MessageSquare className="h-3.5 w-3.5" /> Discussion</p>
+                        <CommentThread basePath={base} id={r.id} comments={r.comments || []} invalidateKey={cfg.invalidateKey} meId={meId} />
+                      </div>
+                      {rowForm && rowForm.id === r.id ? (
+                        <div className="space-y-2">
+                          <Textarea autoFocus rows={2} value={rowNote} onChange={(e) => setRowNote(e.target.value)} placeholder={rowForm.kind === "reject" ? "Reason for rejection" : "What do you need from HR?"} />
+                          <div className="flex justify-end gap-2">
+                            <Button variant="secondary" size="sm" disabled={busy} onClick={() => { setRowForm(null); setRowNote(""); }}>Cancel</Button>
+                            {rowForm.kind === "reject"
+                              ? <Button size="sm" variant="outline" className={rejectBtn} disabled={busy || !rowNote.trim()} onClick={() => single.mutate({ path: "reject", id: r.id, body: { note: rowNote }, msg: "Rejected" })}>Confirm reject</Button>
+                              : <Button size="sm" variant="outline" className={queryBtn} disabled={busy || !rowNote.trim()} onClick={() => single.mutate({ path: "query", id: r.id, body: { body: rowNote }, msg: "Query raised" })}>Send query</Button>}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" className={queryBtn} disabled={busy} onClick={() => { setRowForm({ id: r.id, kind: "query" }); setRowNote(""); }}><MessageSquare className="h-4 w-4 mr-1.5" /> Raise Query</Button>
+                          <Button size="sm" variant="outline" className={rejectBtn} disabled={busy} onClick={() => { setRowForm({ id: r.id, kind: "reject" }); setRowNote(""); }}><X className="h-4 w-4 mr-1.5" /> Reject</Button>
+                          <Button size="sm" className="btn-primary-gradient text-white" disabled={busy} onClick={() => single.mutate({ path: "approve", id: r.id, body: {}, msg: "Approved" })}><Check className="h-4 w-4 mr-1.5" /> Approve</Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+              };
+              return cfg.grouped
+                ? groups.map((g) => g.rows.length > 1
+                    ? (
+                      <div key={g.key} className="rounded-xl border border-[#206295]/25 bg-[#206295]/[0.03] p-2 space-y-2">
+                        <div className="flex items-center justify-between px-1.5 pt-0.5">
+                          <span className="text-[11px] font-semibold text-[#206295] uppercase tracking-wide flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> HR group | {g.rows.length} requests</span>
+                          <span className="text-xs font-bold text-[#206295] tabular-nums">{money(gTotal(g.rows))}</span>
+                        </div>
+                        {g.rows.map(renderRow)}
+                      </div>
+                    )
+                    : renderRow(g.rows[0]))
+                : sortedRows.map(renderRow);
+            })()}
+          </div>
+        </ScrollArea>
+        {bulkMode && <Textarea autoFocus rows={2} value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} placeholder={bulkMode === "reject" ? "Reason for rejecting all" : `Message HR about ${sel.size} selected`} />}
+        {!bulkMode && sel.size > 0 && (
+          <div className="flex items-center justify-between rounded-lg bg-[#FFA962]/10 px-3 py-2">
+            <span className="text-xs font-medium text-[#D98324]">{sel.size} selected</span>
+            <Button size="sm" variant="outline" className={queryBtn} disabled={busy} onClick={() => setBulkMode("query")}><MessageSquare className="h-4 w-4 mr-1.5" /> Raise Query on {sel.size}</Button>
+          </div>
+        )}
+        <DialogFooter className="items-center">
+          <div className="mr-auto flex items-center gap-2.5">
+            <span className="text-xl font-bold text-foreground tabular-nums">{money(total)}</span>
+            <span className="h-4 w-px bg-border" /><span className="text-xs text-muted-foreground">{rows.length} item{rows.length !== 1 ? "s" : ""}</span>
+          </div>
+          {bulkMode ? (
+            <>
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => { setBulkMode(null); setBulkNote(""); }}>Cancel</Button>
+              {bulkMode === "reject"
+                ? <Button size="sm" variant="outline" className={rejectBtn} disabled={busy || !bulkNote.trim() || !rows.length} onClick={() => bulk.mutate({ path: "bulk-reject", ids: allIds, body: { note: bulkNote }, msg: "Rejected all" })}><X className="h-4 w-4 mr-1.5" /> Reject all</Button>
+                : <Button size="sm" variant="outline" className={queryBtn} disabled={busy || !bulkNote.trim() || !sel.size} onClick={() => bulk.mutate({ path: "bulk-query", ids: [...sel], body: { body: bulkNote }, msg: `Query raised on ${sel.size}` })}><MessageSquare className="h-4 w-4 mr-1.5" /> Send query</Button>}
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" className={rejectBtn} disabled={busy || !rows.length} onClick={() => setBulkMode("reject")}><X className="h-4 w-4 mr-1.5" /> Reject all</Button>
+              <Button size="sm" className="btn-primary-gradient text-white" disabled={busy || !rows.length} onClick={() => bulk.mutate({ path: "bulk-approve", ids: allIds, body: {}, msg: "Approved all" })}><Check className="h-4 w-4 mr-1.5" /> Approve all</Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+function ApprovalBatchModal({ cfg, open, onClose }: { cfg: any; open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [dropped, setDropped] = useState<Set<string>>(new Set());
+  const [rejecting, setRejecting] = useState(false);
+  const [note, setNote] = useState("");
+  const items: { id: string; primary: string; secondary: string; amount: number }[] = cfg?.items || [];
+  const kept = items.filter((i) => !dropped.has(i.id));
+  const keptIds = kept.map((i) => i.id);
+  const total = kept.reduce((s, i) => s + (i.amount || 0), 0);
+  const invalidate = () => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith(cfg.invalidateKey) });
+  const approve = useMutation({ mutationFn: () => cfg.approveFn(keptIds, note), onSuccess: () => { invalidate(); toast({ title: kept.length > 1 ? `${kept.length} approved` : "Approved" }); onClose(); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
+  const reject = useMutation({ mutationFn: () => cfg.rejectFn(keptIds, note), onSuccess: () => { invalidate(); toast({ title: kept.length > 1 ? `${kept.length} rejected` : "Rejected" }); onClose(); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
+  const busy = approve.isPending || reject.isPending;
+  const rejectBtn = "border-[#FF6F62]/40 text-[#FF6F62] hover:bg-[#FF6F62]/10 hover:text-[#FF6F62]";
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>{cfg.title}</DialogTitle></DialogHeader>
+        <ScrollArea className="max-h-[55vh] pr-3 -mr-3">
+          <div className="space-y-2">
+            {kept.length === 0 && <p className="text-sm text-muted-foreground py-10 text-center">Nothing selected.{dropped.size > 0 && <> <button className="text-[#206295] hover:underline" onClick={() => setDropped(new Set())}>Undo</button></>}</p>}
+            {kept.map((i) => (
+              <div key={i.id} className="rounded-lg border bg-muted/30 px-3 py-2.5 flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate">{i.primary}</p>
+                  <p className="text-xs text-muted-foreground truncate">{i.secondary}</p>
+                </div>
+                {i.amount > 0 && <span className="text-sm font-semibold text-[#206295] tabular-nums flex-shrink-0">{money(i.amount)}</span>}
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-[#FF6F62] flex-shrink-0" disabled={busy} onClick={() => setDropped((p) => { const n = new Set(p); n.add(i.id); return n; })} aria-label="Remove"><X className="h-4 w-4" /></Button>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+        {dropped.size > 0 && kept.length > 0 && <p className="text-xs text-muted-foreground">{dropped.size} removed | <button className="text-[#206295] hover:underline" onClick={() => setDropped(new Set())}>Undo</button></p>}
+        {rejecting && <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason for rejection" rows={2} autoFocus />}
+        <DialogFooter className="items-center">
+          <div className="mr-auto flex items-center gap-2.5">
+            <span className="text-xl font-bold text-foreground tabular-nums">{total > 0 ? money(total) : `${kept.length} item${kept.length !== 1 ? "s" : ""}`}</span>
+            {total > 0 && <><span className="h-4 w-px bg-border" /><span className="text-xs text-muted-foreground">{kept.length} item{kept.length !== 1 ? "s" : ""}</span></>}
+          </div>
+          {rejecting ? (
+            <>
+              <Button variant="secondary" onClick={() => { setRejecting(false); setNote(""); }} disabled={busy}>Cancel</Button>
+              <Button variant="outline" className={rejectBtn} disabled={busy || !note.trim() || !kept.length} onClick={() => reject.mutate()}><X className="h-4 w-4 mr-1.5" /> Reject {kept.length}</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" className={rejectBtn} disabled={busy || !kept.length} onClick={() => setRejecting(true)}><X className="h-4 w-4 mr-1.5" /> Reject all</Button>
+              <Button className="btn-primary-gradient text-white" disabled={busy || !kept.length} onClick={() => approve.mutate()}><Check className="h-4 w-4 mr-1.5" /> Approve all</Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 // One CEO card for a whole HR-sent batch — opens a table with approve/reject-all.
 function OfficePurchaseBatchModal({ items, open, onClose }: { items: any[]; open: boolean; onClose: () => void }) {
   const { toast } = useToast();
@@ -1057,7 +919,7 @@ function OfficePurchaseBatchModal({ items, open, onClose }: { items: any[]; open
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5">
             <span className="h-9 w-9 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Layers className="h-5 w-5" /></span>
-            Purchase group · {items.length} request{items.length !== 1 ? "s" : ""}
+            Purchase group | {items.length} request{items.length !== 1 ? "s" : ""}
           </DialogTitle>
         </DialogHeader>
         <div className="flex items-end gap-1"><IndianRupee className="h-7 w-7 text-[#206295] mb-1" /><span className="text-[2rem] leading-none font-bold text-[#206295] tabular-nums">{total.toLocaleString("en-IN")}</span></div>
@@ -1103,7 +965,7 @@ function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allItems: an
   const baseList = useMemo(() => {
     if (phase === "ordered") return (allItems as any[]).filter((o) => o.status === "ordered");
     if (phase === "completed") return (allItems as any[]).filter((o) => ["delivered", "rejected", "cancelled"].includes(o.status));
-    return (allItems as any[]).filter((o) => (canTriage && ["pending_hr", "priced", "approved"].includes(o.status)) || (canCeo && o.status === "pending_approval"));
+    return (allItems as any[]).filter((o) => (canTriage && ["pending_hr", "priced", "approved", "under_review"].includes(o.status)) || (canCeo && ["pending_approval", "under_review"].includes(o.status)));
   }, [allItems, phase, canTriage, canCeo]);
   const statuses = useMemo(() => Array.from(new Set(baseList.map((o) => o.status))), [baseList]);
   const filtered = useMemo(() => baseList.filter((o) => {
@@ -1150,8 +1012,10 @@ function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allItems: an
     onSuccess: (_d, ids) => { invalidateOp(); setSel(new Set()); setSelMode(false); toast({ title: ids.length > 1 ? "Group sent for approval" : "Sent for approval" }); },
     onError: (e: any) => toast({ title: "Couldn't send", description: e.message, variant: "destructive" }),
   });
-  const pricedCount = useMemo(() => sorted.filter((o) => o.status === "priced").length, [sorted]);
-  const canGroup = canTriage && phase === "pending" && pricedCount > 0;
+  const pricedIds = useMemo(() => sorted.filter((o) => o.status === "priced").map((o) => o.id), [sorted]);
+  const canGroup = canTriage && phase === "pending" && pricedIds.length > 0;
+  const allPricedSelected = pricedIds.length > 0 && pricedIds.every((id) => sel.has(id));
+  const toggleAllPriced = () => setSel(allPricedSelected ? new Set() : new Set(pricedIds));
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const exitSel = () => { setSelMode(false); setSel(new Set()); };
 
@@ -1244,11 +1108,11 @@ function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allItems: an
           <div className="flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-2">
               <Layers className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" />
-              <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">Purchase group · {its.length} requests</span>
+              <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">Purchase group | {its.length} requests</span>
               <Badge className={`text-[10px] ${statusClass("pending_approval")}`}>{statusLabel("pending_approval")}</Badge>
             </div>
             <div className="flex items-end gap-1 mt-1.5"><IndianRupee className="h-6 w-6 text-[#206295] mb-0.5" /><span className="text-[1.9rem] leading-none font-bold text-[#206295] tracking-tight tabular-nums">{total.toLocaleString("en-IN")}</span></div>
-            <p className="text-sm text-muted-foreground mt-2">{itemCount} item{itemCount !== 1 ? "s" : ""} · {requesters} requester{requesters !== 1 ? "s" : ""}</p>
+            <p className="text-sm text-muted-foreground mt-2">{itemCount} item{itemCount !== 1 ? "s" : ""} | {requesters} requester{requesters !== 1 ? "s" : ""}</p>
           </div>
           <div className="self-center w-px h-20 rounded-full bg-border flex-shrink-0" />
           <div className="flex-shrink-0 pr-1" onClick={(e) => e.stopPropagation()}>
@@ -1258,6 +1122,18 @@ function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allItems: an
       </div>
     );
   };
+
+  // Pending is split into HR-stage sections (reimbursement-style) — each shown only if it has items.
+  const opSection = (title: string, items: any[], tone?: "alert", Icon?: any) => items.length === 0 ? null : (
+    <div className="space-y-2.5" key={title}>
+      <div className="flex items-center gap-2">
+        {Icon && <Icon className={`h-3.5 w-3.5 ${tone === "alert" ? "text-[#C4402F]" : "text-muted-foreground"}`} />}
+        <span className={`text-xs font-semibold uppercase tracking-wide ${tone === "alert" ? "text-[#C4402F]" : "text-muted-foreground"}`}>{title}</span>
+        <span className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${tone === "alert" ? "bg-[#FF6F62]/20 text-[#C4402F]" : "bg-muted text-muted-foreground"}`}>{items.length}</span>
+      </div>
+      {items.map((o) => singleCard(o))}
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -1297,18 +1173,23 @@ function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allItems: an
           {canGroup && !selMode && <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelMode(true)} data-testid="op-group"><Layers className="h-4 w-4 mr-1.5" /> Group &amp; send</Button>}
           <ApprovalDateRange value={range} onChange={(v) => { setRange(v); setPage(1); }} />
           {phase === "completed" && <Button variant="secondary" size="sm" className="h-9" disabled={sorted.length === 0} onClick={doExport} data-testid="op-export"><Download className="h-4 w-4 mr-1.5" /> Export ({sorted.length})</Button>}
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} data-testid="page-prev"><ChevronLeft className="h-4 w-4" /></Button>
-            <span className="px-1 tabular-nums">{curPage} / {totalPages}</span>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage >= totalPages} onClick={() => setPage(curPage + 1)} data-testid="page-next"><ChevronRight className="h-4 w-4" /></Button>
-          </div>
+          {!(phase === "pending" && view === "card") && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} data-testid="page-prev"><ChevronLeft className="h-4 w-4" /></Button>
+              <span className="px-1 tabular-nums">{curPage} / {totalPages}</span>
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage >= totalPages} onClick={() => setPage(curPage + 1)} data-testid="page-next"><ChevronRight className="h-4 w-4" /></Button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Selection bar — pick priced requests to send singly or as a group */}
       {selMode && (
         <div className="card-surface rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap">
-          <span className="text-sm font-medium">{sel.size} selected <span className="text-muted-foreground font-normal">· select priced requests to send</span></span>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={toggleAllPriced} disabled={pricedIds.length === 0} data-testid="op-select-all"><CheckSquare className="h-4 w-4 mr-1" /> {allPricedSelected ? "Clear all" : "Select all"}</Button>
+            <span className="text-sm font-medium">{sel.size} selected</span>
+          </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={exitSel} data-testid="op-group-cancel">Cancel</Button>
             <Button size="sm" className="btn-primary-gradient" disabled={sel.size === 0 || send.isPending} onClick={() => send.mutate([...sel])} data-testid="op-group-send"><ArrowRight className="h-4 w-4 mr-1.5" /> Send {sel.size > 1 ? "group " : ""}for approval</Button>
@@ -1338,17 +1219,27 @@ function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allItems: an
             testIdPrefix="op-row"
           />
         </div>
+      ) : phase === "pending" ? (
+        selMode
+          ? <div className="space-y-2.5">{sorted.filter((o) => o.status === "priced").map((o) => singleCard(o))}</div>
+          : <div className="space-y-6">
+              {opSection("Query from CEO", sorted.filter((o) => o.status === "under_review"), "alert", MessageSquare)}
+              {opSection("Needs pricing", sorted.filter((o) => o.status === "pending_hr"))}
+              {opSection("Ready to group & send", sorted.filter((o) => o.status === "priced"))}
+              {opSection("Ready to order", sorted.filter((o) => o.status === "approved"))}
+            </div>
       ) : (
         <div className="space-y-2.5">
           {pageEntries.map((entry: any) => entry.kind === "group" ? groupCard(entry) : singleCard(entry.o))}
         </div>
       )}
 
-      <OfficePurchaseDetailDialog id={detailId} open={!!detailId} onClose={() => setDetailId(null)} />
+      <OfficePurchaseDetailDialog id={detailId} open={!!detailId} onClose={() => setDetailId(null)} context="approver" onPriced={(pid) => { setPhase("pending"); setSelMode(true); setSel(new Set([pid])); }} />
       {batchItems && <OfficePurchaseBatchModal items={batchItems} open={!!batchItems} onClose={() => setBatchItems(null)} />}
     </div>
   );
 }
+
 
 // ===================== Forms =====================
 function useInvalidate() {
@@ -1405,43 +1296,6 @@ function PurchaseForm({ open, onClose }: { open: boolean; onClose: () => void })
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
             <Button type="submit" disabled={mutation.isPending} data-testid="button-save-pr">{mutation.isPending ? "Saving…" : "Save as Draft"}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function TravelForm({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { toast } = useToast();
-  const invalidate = useInvalidate();
-  const form = useForm({ defaultValues: { purpose: "", fromCity: "", toCity: "", travelDate: "", returnDate: "", preferences: "", estimatedBudget: "" } });
-  const mutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/my-requests/travels", { ...data, travelDate: data.travelDate || null, returnDate: data.returnDate || null, estimatedBudget: data.estimatedBudget ? Number(data.estimatedBudget) : null }),
-    onSuccess: () => { invalidate(); toast({ title: "Travel request created as draft" }); form.reset(); onClose(); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-  // Cancel / X discards input (fresh form next open).
-  const handleClose = () => { form.reset(); onClose(); };
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>New Travel Request</DialogTitle></DialogHeader>
-        <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
-          <div className="space-y-1.5"><Label>Purpose *</Label><Textarea rows={2} {...form.register("purpose", { required: true })} placeholder="Business purpose for travel…" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label>From City *</Label><Input {...form.register("fromCity", { required: true })} placeholder="e.g. Bengaluru" /></div>
-            <div className="space-y-1.5"><Label>To City *</Label><Input {...form.register("toCity", { required: true })} placeholder="e.g. Mumbai" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label>Travel Date *</Label><Controller control={form.control} name="travelDate" rules={{ required: true }} render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} />} /></div>
-            <div className="space-y-1.5"><Label>Return Date</Label><Controller control={form.control} name="returnDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} />} /></div>
-          </div>
-          <div className="space-y-1.5"><Label>Preferences / Constraints</Label><Textarea rows={2} {...form.register("preferences")} placeholder="Mode, hotel preferences, dietary needs…" /></div>
-          <div className="space-y-1.5"><Label>Estimated Budget (₹)</Label><Input type="number" min="0" {...form.register("estimatedBudget")} placeholder="0" /></div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-            <Button type="submit" disabled={mutation.isPending} data-testid="button-save-tr">{mutation.isPending ? "Saving…" : "Save as Draft"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

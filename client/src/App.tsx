@@ -28,7 +28,6 @@ import OnboardingPage from "@/pages/onboarding";
 import ATSPage from "@/pages/workspace/ats";
 import HROpsPage from "@/pages/workspace/hr-ops";
 import OfficeAdminPage from "@/pages/workspace/office";
-import ApprovalsPage from "@/pages/workspace/approvals";
 import CompanyWorkspacePage from "@/pages/company-workspace";
 import ReimbursementReviewPage from "@/pages/reimbursement-review";
 import MyRequestsPage from "@/pages/my-requests";
@@ -427,7 +426,7 @@ function Router() {
       <Route path="/workspace/ats" component={() => <ProtectedRoute component={ATSPage} />} />
       <Route path="/workspace/hr-ops" component={() => <ProtectedRoute component={HROpsPage} />} />
       <Route path="/workspace/office" component={() => <ProtectedRoute component={OfficeAdminPage} />} />
-      <Route path="/workspace/approvals" component={() => <ProtectedRoute component={ApprovalsPage} />} />
+      <Route path="/workspace/approvals" component={() => <ProtectedRoute component={CompanyWorkspacePage} />} />
       <Route path="/company-workspace" component={() => <ProtectedRoute component={CompanyWorkspacePage} />} />
       <Route path="/my-approvals" component={() => <ProtectedRoute component={CompanyWorkspacePage} />} />
       <Route path="/my-approvals/reimbursement/:id" component={() => <ProtectedRoute component={ReimbursementReviewPage} />} />

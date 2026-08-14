@@ -455,3 +455,35 @@
   70%  { transform: translateY(-3px) rotate(5deg); }
   100% { transform: translateY(0) rotate(0deg); }
 }
+
+/* Travel chooser — per-category icon motion (real lucide glyphs + animated line elements, travel.tsx).
+   All motion is hover-gated, so it stops the moment the pointer leaves the card. */
+
+/* Flight — diagonal speed streaks trail behind the fixed plane, parallel to its axis */
+.tv-streak { rotate: -45deg; opacity: 0; }
+.group:hover .tv-streak { animation: tv-streak 0.9s ease-in-out infinite; }
+@keyframes tv-streak {
+  0%   { opacity: 0;    translate: 7px -7px; }
+  30%  { opacity: 0.9; }
+  65%  { opacity: 0.35; }
+  100% { opacity: 0;    translate: -11px 11px; }
+}
+
+/* Transport — dashed road streams beneath the fixed bus (shift of one dash period loops seamlessly) */
+.tv-road {
+  background-image: repeating-linear-gradient(to right, currentColor 0 5px, transparent 5px 13px);
+  opacity: 0.6;
+}
+.group:hover .tv-road { animation: tv-road 0.5s linear infinite; }
+@keyframes tv-road {
+  from { background-position-x: 0; }
+  to   { background-position-x: -13px; }
+}
+
+/* Stay — a moon rises over the hotel on hover (overnight cue) */
+.tv-moonrise { opacity: 0; }
+.group:hover .tv-moonrise { animation: tv-moonrise 0.7s ease-out forwards; }
+@keyframes tv-moonrise {
+  0%        { opacity: 0; transform: translateY(35%) scale(0.8); }
+  60%, 100% { opacity: 1; transform: translateY(0)   scale(1); }
+}
