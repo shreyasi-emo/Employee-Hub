@@ -29,8 +29,9 @@ import {
   Cake, Gift, ClipboardCheck, CheckSquare, MousePointerClick,
   HeartHandshake, Sparkles,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { exportXlsx } from "@/lib/export-xlsx";
+import { DateRangePicker, type DateRange } from "@/components/date-range-picker";
 
 // ---- constants ----
 const EMP_TYPES = [
@@ -723,6 +724,8 @@ export default function EmployeesPage() {
   const [showImport, setShowImport] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [exportRange, setExportRange] = useState<DateRange>(() => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }));
 
   // Department is filtered client-side so the full set stays available for the tab counts
   const empQuery = useQuery<any[]>({
@@ -763,6 +766,37 @@ export default function EmployeesPage() {
     exportXlsx({ filename: `employees-${format(now, "yyyy-MM-dd")}.xlsx`, sheet: "Employees", title: `Employees (${data.length})`, headers, rows: data });
   }
 
+  // Date-wise joiners: everyone whose join date falls in the selected range, exported with every detail.
+  const joiners = useMemo(() => {
+    if (!exportRange.from) return [] as any[];
+    const f = format(exportRange.from, "yyyy-MM-dd"), t = format(exportRange.to ?? exportRange.from, "yyyy-MM-dd");
+    return allEmployees.filter((e) => e.joinDate && e.joinDate.slice(0, 10) >= f && e.joinDate.slice(0, 10) <= t)
+      .sort((a, b) => a.joinDate.localeCompare(b.joinDate));
+  }, [allEmployees, exportRange]);
+
+  function exportJoiners() {
+    const deptName = (id: string) => departments.find((d) => d.id === id)?.name || "—";
+    const desigName = (id: string) => designations.find((d) => d.id === id)?.name || "—";
+    const mgr = (id: string) => { const m = allEmployees.find((x) => x.id === id); return m ? `${m.firstName} ${m.lastName}` : "—"; };
+    const fmtD = (d: any) => (d ? format(new Date(d), "dd MMM yyyy") : "");
+    const yn = (b: any) => (b ? "Yes" : "No");
+    const headers = ["Code", "First Name", "Last Name", "Email", "Phone", "Date of Birth", "Gender", "Marital Status", "Join Date", "Confirmation Date", "Last Working Date", "Notice Period (days)", "Probation (days)", "Type", "Status", "Department", "Designation", "Manager", "Work Location", "PAN", "Aadhaar", "UAN", "PF Eligible", "ESI Eligible", "Bank Name", "Bank A/C", "IFSC", "Current Address", "Permanent Address", "Emergency Contact", "Emergency Phone", "Emergency Relation"];
+    const rows = joiners.map((e) => [e.employeeCode, e.firstName, e.lastName, e.email, e.phone || "", fmtD(e.dateOfBirth), e.gender || "", e.maritalStatus || "", fmtD(e.joinDate), fmtD(e.confirmationDate), fmtD(e.lastWorkingDate), e.noticePeriodDays ?? "", e.probationDays ?? "", typeLabel(e.employmentType), e.employmentStatus, deptName(e.departmentId), desigName(e.designationId), mgr(e.managerId), e.workLocation || "", e.panNumber || "", e.aadhaarMasked || "", e.uan || "", yn(e.pfEligible), yn(e.esiEligible), e.bankName || "", e.bankAccountMasked || "", e.ifscCode || "", e.currentAddress || "", e.permanentAddress || "", e.emergencyContactName || "", e.emergencyContactPhone || "", e.emergencyContactRelation || ""]);
+    const f = format(exportRange.from!, "dd MMM yyyy"), t = format(exportRange.to ?? exportRange.from!, "dd MMM yyyy");
+    const span = f === t ? f : `${f} – ${t}`;
+    exportXlsx({ filename: `joiners-${format(exportRange.from!, "yyyy-MM-dd")}.xlsx`, sheet: "Joiners", title: `Joiners · ${span} (${joiners.length})`, headers, rows });
+    setShowExport(false);
+  }
+  const joinPresets = [
+    { label: "This week", from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) },
+    { label: "This month", from: startOfMonth(now), to: endOfMonth(now) },
+    { label: "Last month", from: startOfMonth(subMonths(now, 1)), to: endOfMonth(subMonths(now, 1)) },
+  ];
+  const rangeActive = (p: { from: Date; to: Date }) => !!exportRange.from && format(exportRange.from, "yyyy-MM-dd") === format(p.from, "yyyy-MM-dd") && format(exportRange.to ?? exportRange.from, "yyyy-MM-dd") === format(p.to, "yyyy-MM-dd");
+  const spanLabel = exportRange.from
+    ? (format(exportRange.from, "yyyy-MM-dd") === format(exportRange.to ?? exportRange.from, "yyyy-MM-dd") ? format(exportRange.from, "dd MMM yyyy") : `${format(exportRange.from, "dd MMM yyyy")} – ${format(exportRange.to!, "dd MMM yyyy")}`)
+    : "Pick a date or range";
+
   const viewButtons: { v: typeof viewMode; icon: any; label: string }[] = [
     { v: "card", icon: LayoutGrid, label: "Card" }, { v: "table", icon: TableIcon, label: "Table" },
   ];
@@ -783,6 +817,7 @@ export default function EmployeesPage() {
               <div className="h-8 w-px bg-border mx-1" />
               <Button variant="secondary" size="sm" onClick={() => setShowInsights(true)} data-testid="button-insights"><BarChart3 className="h-4 w-4 mr-1" /> View Insights</Button>
               <Button variant="secondary" size="sm" onClick={() => setShowImport(true)} data-testid="button-import"><Upload className="h-4 w-4 mr-1" /> Import</Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowExport(true)} data-testid="button-joiners-report"><Download className="h-4 w-4 mr-1" /> Joiners Report</Button>
               <Button size="sm" onClick={() => setShowAdd(true)} data-testid="button-add-employee"><UserPlus className="h-4 w-4 mr-1" /> Add Employee</Button>
             </div>
           )}
@@ -902,6 +937,30 @@ export default function EmployeesPage() {
       <ImportDialog open={showImport} onOpenChange={setShowImport} departments={departments} designations={designations} />
       <InsightsPanel open={showInsights} onOpenChange={setShowInsights} employees={allEmployees} departments={departments} />
       <BulkUpdateDialog open={showBulk} onOpenChange={setShowBulk} ids={[...selected]} departments={departments} locations={allLocations} onDone={clearSel} />
+
+      <Dialog open={showExport} onOpenChange={setShowExport}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Joiners Report</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {joinPresets.map((p) => (
+                <Button key={p.label} size="sm" variant={rangeActive(p) ? "default" : "secondary"} onClick={() => setExportRange({ from: p.from, to: p.to })} data-testid={`export-preset-${p.label.replace(/\s+/g, "-").toLowerCase()}`}>{p.label}</Button>
+              ))}
+              <DateRangePicker value={exportRange} onChange={setExportRange} align="end" testId="export-range" />
+            </div>
+            <div className="rounded-xl bg-muted/40 px-4 py-3 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{spanLabel}</p>
+                <p className="text-xs text-muted-foreground">employees joined</p>
+              </div>
+              <span className="text-2xl font-bold text-[#206295] tabular-nums flex-shrink-0">{joiners.length}</span>
+            </div>
+            <Button className="w-full" disabled={!exportRange.from || joiners.length === 0} onClick={exportJoiners} data-testid="button-download-joiners">
+              <Download className="h-4 w-4 mr-1.5" /> Download Excel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

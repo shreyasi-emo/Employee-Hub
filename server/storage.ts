@@ -10,7 +10,7 @@ import {
   notifications, shifts, shiftAssignments, employmentHistory,
   onboardingTemplates, onboardingTasks, onboardingInstances, onboardingTaskItems,
   movementLocations, logisticsMovements, movementEvents,
-  companyVehicles, vehicleBookings, reimbursements, officePurchases,
+  companyVehicles, vehicleBookings, reimbursements, officePurchases, procurementRequests, tripRequests,
   zohoConfig, zohoSyncJobs, requests as requestsTable, requestComments,
   ceoApprovalNotes, referenceDocs,
 
@@ -1490,6 +1490,51 @@ export const storage = {
   },
   async updateOfficePurchase(id: string, data: any) {
     const [r] = await db.update(officePurchases).set({ ...data, updatedAt: new Date() }).where(eq(officePurchases.id, id)).returning();
+    return r;
+  },
+
+  async listProcurementRequests(filters: { requesterId?: string; status?: string } = {}) {
+    let q = db.select().from(procurementRequests).$dynamic();
+    const conds: any[] = [];
+    if (filters.requesterId) conds.push(eq(procurementRequests.requesterId, filters.requesterId));
+    if (filters.status) conds.push(eq(procurementRequests.status, filters.status));
+    if (conds.length) q = q.where(and(...conds));
+    return q.orderBy(desc(procurementRequests.createdAt));
+  },
+  async getProcurementRequest(id: string) {
+    const [r] = await db.select().from(procurementRequests).where(eq(procurementRequests.id, id));
+    return r;
+  },
+  async createProcurementRequest(data: any) {
+    const ref = `PRQ-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const [r] = await db.insert(procurementRequests).values({ ...data, reference: ref }).returning();
+    return r;
+  },
+  async updateProcurementRequest(id: string, data: any) {
+    const [r] = await db.update(procurementRequests).set({ ...data, updatedAt: new Date() }).where(eq(procurementRequests.id, id)).returning();
+    return r;
+  },
+
+  // ----- Travel (trip requests) -----
+  async listTripRequests(filters: { requesterId?: string; status?: string } = {}) {
+    let q = db.select().from(tripRequests).$dynamic();
+    const conds: any[] = [];
+    if (filters.requesterId) conds.push(eq(tripRequests.requesterId, filters.requesterId));
+    if (filters.status) conds.push(eq(tripRequests.status, filters.status));
+    if (conds.length) q = q.where(and(...conds));
+    return q.orderBy(desc(tripRequests.createdAt));
+  },
+  async getTripRequest(id: string) {
+    const [r] = await db.select().from(tripRequests).where(eq(tripRequests.id, id));
+    return r;
+  },
+  async createTripRequest(data: any) {
+    const ref = `TRV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const [r] = await db.insert(tripRequests).values({ ...data, reference: ref }).returning();
+    return r;
+  },
+  async updateTripRequest(id: string, data: any) {
+    const [r] = await db.update(tripRequests).set({ ...data, updatedAt: new Date() }).where(eq(tripRequests.id, id)).returning();
     return r;
   },
 

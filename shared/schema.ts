@@ -932,6 +932,39 @@ export const travelBookings = pgTable("travel_bookings", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Travel (rebuilt) — Flights / Stays / Transport. Employee requests → HR prices + books → CEO approves
+// (auto-approved if the trip starts within 24h). Legacy travelRequests/travelBookings above are dormant.
+export const tripRequests = pgTable("trip_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reference: text("reference").notNull(),                          // TRV-YYYY-NNNNNN
+  requesterId: varchar("requester_id").notNull(),
+  groupId: varchar("group_id"),                                    // ties multiple legs of one trip
+  category: text("category").notNull(),                            // flight | stay | transport
+  purpose: text("purpose"),
+  details: jsonb("details").notNull().default({}),                 // employee, category-specific
+  attendees: jsonb("attendees").notNull().default([]),             // [{userId, name}] travellers incl. self — powers calendar
+  startDate: date("start_date"),                                   // normalized (depart / check-in / travel) for calendar + <24h
+  endDate: date("end_date"),                                       // normalized (return / check-out)
+  notes: text("notes"),
+  status: text("status").notNull().default("pending_hr"),          // pending_hr → pending_approval → under_review → approved → booked (+ rejected/cancelled)
+  // HR pricing / booking
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  hrDetails: jsonb("hr_details").notNull().default({}),            // HR, category-specific (airline/pnr/hotel/rate…)
+  reviewedById: varchar("reviewed_by_id"), reviewedAt: timestamp("reviewed_at"),
+  // CEO decision
+  approvedById: varchar("approved_by_id"), decisionNote: text("decision_note"), decidedAt: timestamp("decided_at"),
+  autoApproved: boolean("auto_approved").notNull().default(false),
+  // Booking
+  document: jsonb("document"),                                     // {fileName, fileType, fileData} — ticket / voucher
+  bookedById: varchar("booked_by_id"), bookedAt: timestamp("booked_at"),
+  comments: jsonb("comments").notNull().default([]),               // CEO ⇄ HR thread (same shape as officePurchases.comments)
+  employeeName: text("employee_name"), employeeCode: text("employee_code"), department: text("department"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertTripRequestSchema = createInsertSchema(tripRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export type TripRequest = typeof tripRequests.$inferSelect;
+
 // Office Admin — Payments
 export const workspacePayments = pgTable("workspace_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1401,8 +1434,19 @@ export const officePurchases = pgTable("office_purchases", {
   orderPlacedAt: timestamp("order_placed_at"),
   deliveredById: varchar("delivered_by_id"),
   deliveredAt: timestamp("delivered_at"),
+  // Purchase type + documents + Finance payment
+  purchaseType: text("purchase_type").notNull().default("online"), // online (Amazon etc.) | vendor (offline, proforma)
+  vendorName: text("vendor_name"),
+  proformaInvoice: jsonb("proforma_invoice"),                     // {fileName, fileType, fileData} — vendor quote at pricing
+  invoice: jsonb("invoice"),                                      // {fileName, fileType, fileData} — final invoice at order
+  paymentStatus: text("payment_status"),                          // null | pending (vendor, awaiting Finance) | paid
+  paidById: varchar("paid_by_id"),
+  paidAt: timestamp("paid_at"),
+  paymentRef: text("payment_ref"),
   linkedTicketId: varchar("linked_ticket_id"),                    // set when the employee flags a delivery issue
   batchId: varchar("batch_id"),                                   // groups requests HR sent to the CEO together (one bulk-approval card)
+  // CEO ⇄ HR discussion thread: [{ id, authorId, authorName, authorRole, body, at, kind? }]
+  comments: jsonb("comments").notNull().default([]),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1478,6 +1522,26 @@ export const insertMovementEventSchema = createInsertSchema(movementEvents).omit
 export const insertCompanyVehicleSchema = createInsertSchema(companyVehicles).omit({ id: true, createdAt: true });
 export const insertVehicleBookingSchema = createInsertSchema(vehicleBookings).omit({ id: true, createdAt: true });
 export const insertReimbursementSchema = createInsertSchema(reimbursements).omit({ id: true, createdAt: true, updatedAt: true });
+// Procurement — employee-priced purchases that go straight to the CEO (no HR triage).
+// For now everything is an Amazon buy; `category` leaves room for vendor / other flows later.
+export const procurementRequests = pgTable("procurement_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reference: text("reference").notNull(),
+  requesterId: varchar("requester_id").notNull(),
+  category: text("category").notNull().default("amazon"),        // amazon | vendor | other (future)
+  items: jsonb("items").notNull().default([]),                   // [{ description, quantity, link, unitPrice }]
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  justification: text("justification"),
+  status: text("status").notNull().default("pending_approval"),  // pending_approval → under_review → approved / rejected / cancelled
+  employeeName: text("employee_name"), employeeCode: text("employee_code"), department: text("department"),
+  approvedById: varchar("approved_by_id"), decisionNote: text("decision_note"), decidedAt: timestamp("decided_at"),
+  comments: jsonb("comments").notNull().default([]),             // CEO ⇄ HR thread (same shape as officePurchases.comments)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertProcurementRequestSchema = createInsertSchema(procurementRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export type ProcurementRequest = typeof procurementRequests.$inferSelect;
+
 export const insertOfficePurchaseSchema = createInsertSchema(officePurchases).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRequestSchema = createInsertSchema(requests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRequestCommentSchema = createInsertSchema(requestComments).omit({ id: true, createdAt: true });

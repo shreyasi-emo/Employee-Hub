@@ -12,7 +12,6 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { DateField, TimeField, DateInput } from "@/components/datetime-field";
@@ -305,9 +304,6 @@ function EmployeeAttendanceView() {
   const [preset, setPreset] = useState<"today" | "week" | "month" | "custom">("today");
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({ from: today, to: today });
   const [showOverride, setShowOverride] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [deptFilter, setDeptFilter] = useState("all");
-  const [empSearch, setEmpSearch] = useState("");
   const [chartView, setChartView] = useState<"monthly" | "weekly">("weekly");
   const [stateFilter, setStateFilter] = useState<string>("all");
   const [presentFilter, setPresentFilter] = useState<"all" | "wfo" | "wfh" | "on_duty">("all");
@@ -539,12 +535,6 @@ function EmployeeAttendanceView() {
   });
   const notPresentFiltered = notPresentList.filter((e) => notPresentFilter === "all" || viewStatus.get(e.id) === notPresentFilter);
 
-  const panelEmployees = employees.filter((e) => {
-    if (deptFilter !== "all" && e.departmentId !== deptFilter) return false;
-    const q = empSearch.trim().toLowerCase();
-    return !q || `${e.firstName} ${e.lastName} ${e.employeeCode}`.toLowerCase().includes(q);
-  });
-
   // Export the current attendance snapshot (as of the selected date/filter) to Excel
   const STATUS_DISPLAY: Record<string, string> = {
     present: "Present (WFO)", wfh: "WFH", on_duty: "On Duty",
@@ -646,61 +636,6 @@ function EmployeeAttendanceView() {
           <Button variant="secondary" size="sm" onClick={() => setReportOpen(true)} data-testid="button-report-attendance">
             <Download className="h-4 w-4 mr-1" /> Report
           </Button>
-          <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
-            <SheetTrigger asChild>
-              <Button variant="secondary" size="sm" data-testid="button-browse-employees">
-                <Users className="h-4 w-4 mr-1" /> Browse Employees
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="w-full sm:max-w-md flex flex-col">
-              <SheetHeader><SheetTitle>Employees · {format(rangeStart, "MMM yyyy")}</SheetTitle></SheetHeader>
-              <div className="flex items-center gap-2 mt-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={empSearch} onChange={(e) => setEmpSearch(e.target.value)} placeholder="Search…" className="pl-9" data-testid="input-panel-search" />
-                </div>
-                <Select value={deptFilter} onValueChange={setDeptFilter}>
-                  <SelectTrigger className="w-36"><SelectValue placeholder="Dept" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Depts</SelectItem>
-                    {departments.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <ScrollArea className="flex-1 mt-3 -mx-2 px-2">
-                <div className="list-divider">
-                  {panelEmployees.map((e: any) => {
-                    const st = attStats[e.id] || { present: 0, half: 0, absent: 0, leave: 0 };
-                    return (
-                      <div key={e.id} className="w-full flex items-center gap-2 py-3 px-1 hover-elevate rounded-lg">
-                        <button
-                          onClick={() => { setPanelOpen(false); navigate(`/employees/${e.id}`); }}
-                          className="flex items-center gap-3 min-w-0 flex-1 text-left"
-                          data-testid={`panel-emp-${e.id}`}
-                        >
-                          <EmpAvatar emp={e} className="h-9 w-9" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p>
-                            <p className="text-xs text-muted-foreground truncate">{e.employeeCode} · {deptName(e.departmentId)}</p>
-                            <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap mt-1.5 text-[11px] text-muted-foreground">
-                              <span className="whitespace-nowrap">Present: <span className="font-semibold" style={{ color: "#206295" }}>{st.present}</span></span>
-                              <span className="whitespace-nowrap">Half Days: <span className="font-semibold" style={{ color: "#566069" }}>{st.half}</span></span>
-                              <span className="whitespace-nowrap">Absent: <span className="font-semibold" style={{ color: "#C24A3E" }}>{st.absent}</span></span>
-                              <span className="whitespace-nowrap">On Leave: <span className="font-semibold" style={{ color: "#1F8F8C" }}>{st.leave}</span></span>
-                            </div>
-                          </div>
-                        </button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[10px] shrink-0 text-muted-foreground" title="Download this employee's report" onClick={() => downloadEmployeeReport(e.id, `${e.firstName} ${e.lastName}`, format(startOfMonth(rangeStart), "yyyy-MM-dd"), format(endOfMonth(rangeStart), "yyyy-MM-dd"))} data-testid={`download-emp-${e.id}`}>
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                  {panelEmployees.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">No employees</p>}
-                </div>
-              </ScrollArea>
-            </SheetContent>
-          </Sheet>
           {isHR(user!) && <Button size="sm" onClick={() => setShowOverride(true)} data-testid="button-override">Override Attendance</Button>}
         </div>
       </div>
@@ -1149,9 +1084,19 @@ function MyAttendanceView() {
   const { data: holidays = [] } = useQuery<any[]>({ queryKey: [`/api/holidays?year=${y}`] });
   const { data: myEmp } = useQuery<any>({ queryKey: ["/api/employees/me"] });
   const { data: todayList = [] } = useQuery<any[]>({ queryKey: ["/api/attendance/today-list"] });
+  const { data: myTrips = [] } = useQuery<any[]>({ queryKey: ["/api/travel?mine=true"] });
 
   const dstr = (d: Date) => format(d, "yyyy-MM-dd");
   const byDate = useMemo(() => { const map: Record<string, any> = {}; (records as any[]).forEach((r) => { map[r.date] = r; }); return map; }, [records]);
+  // Booked trips overlay the calendar (read-time, like leave): each covered day gets a travel marker.
+  const travelDays = useMemo(() => {
+    const map: Record<string, string> = {};
+    (myTrips as any[]).filter((t) => t.status === "booked" && t.startDate).forEach((t) => {
+      const end = new Date(`${t.endDate || t.startDate}T00:00:00`);
+      for (let d = new Date(`${t.startDate}T00:00:00`); d <= end; d.setDate(d.getDate() + 1)) map[format(d, "yyyy-MM-dd")] = t.category;
+    });
+    return map;
+  }, [myTrips]);
   const holidaySet = useMemo(() => new Set((holidays as any[]).map((h) => h.date)), [holidays]);
   const todayStr = dstr(now);
   // Employment window — nothing is "Present" before joining or after the last working day.
@@ -1375,12 +1320,13 @@ function MyAttendanceView() {
                   const todaySolid = isToday && !!color && !pendingWfh; // today is a solid filled box
                   const solidText = todaySolid ? textOn(blendWhite(color!, TODAY_FILL_ALPHA)) : undefined;
                   const label = pendingWfh ? "WFH · Pending" : statusLabelOf(st || undefined);
+                  const trip = inM ? travelDays[key] : undefined;
                   return (
                     <button key={day.toISOString()} onClick={() => setSelected(day)}
                       className={`min-h-[72px] rounded-lg border p-1.5 text-left flex flex-col transition-colors hover-elevate ${isSel ? "ring-2 ring-[#206295] ring-offset-2 ring-offset-background" : (isToday && !todaySolid) ? "ring-2 ring-[#206295]" : ""} ${inM ? (isWeekend ? "bg-muted/30 border-border/60" : "bg-background border-border/80") : "bg-muted/30 border-transparent text-muted-foreground/50"}`}
                       style={todaySolid ? { backgroundColor: `${color}80`, borderColor: color! } : (showFill ? { backgroundColor: `${color}33` } : undefined)}
                       data-testid={`myatt-day-${format(day, "yyyy-MM-dd")}`}>
-                      <span className="self-start text-sm font-semibold" style={solidText ? { color: solidText } : undefined}>{format(day, "d")}</span>
+                      <span className="self-start w-full flex items-center justify-between text-sm font-semibold" style={solidText ? { color: solidText } : undefined}>{format(day, "d")}{trip && <Plane className="h-3 w-3 text-[#206295]" aria-label="Travel booked" />}</span>
                       {showLabel && (showFill
                         ? <span className="mt-auto max-w-full truncate text-[11px] font-medium" style={{ color: solidText ?? (LABEL_COLOR[st || ""] || color!) }} title={label}>{label}</span>
                         : <span className="mt-auto self-start inline-flex max-w-full truncate rounded-md border px-1.5 py-0.5 text-[10px] font-semibold" style={{ color: LABEL_COLOR[st || ""] || color!, borderColor: `${color}80` }} title={label}>{label}</span>

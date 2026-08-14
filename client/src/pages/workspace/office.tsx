@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useForm, Controller } from "react-hook-form";
 import { DateInput } from "@/components/datetime-field";
-import { Plus, Building2, ShoppingCart, Car, CreditCard, Send, UserCheck, Plane, Hotel } from "lucide-react";
+import { Plus, Building2, ShoppingCart, CreditCard, Send } from "lucide-react";
 import { format } from "date-fns";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -40,24 +40,13 @@ export default function OfficeAdminPage() {
   const [tab, setTab] = useState("vendors");
   const [showVendorForm, setShowVendorForm] = useState(false);
   const [showPRForm, setShowPRForm] = useState(false);
-  const [showTRForm, setShowTRForm] = useState(false);
   const [showPayForm, setShowPayForm] = useState(false);
-  const [showAssignDialog, setShowAssignDialog] = useState(false);
-  const [showBookingDialog, setShowBookingDialog] = useState(false);
-  const [selectedTR, setSelectedTR] = useState<any>(null);
-  const [bookingTR, setBookingTR] = useState<any>(null);
-  const [assigneeId, setAssigneeId] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const { data: vendors = [], isLoading: loadingVendors } = useQuery<any[]>({ queryKey: ["/api/workspace/vendors"] });
-  const { data: workspaceUsers = [] } = useQuery<any[]>({ queryKey: ["/api/workspace/users"] });
   const { data: purchaseRequests = [], isLoading: loadingPRs } = useQuery<any[]>({
     queryKey: ["/api/workspace/purchase-requests", statusFilter],
     queryFn: () => apiRequest("GET", statusFilter !== "all" ? `/api/workspace/purchase-requests?status=${statusFilter}` : "/api/workspace/purchase-requests"),
-  });
-  const { data: travelRequests = [], isLoading: loadingTRs } = useQuery<any[]>({
-    queryKey: ["/api/workspace/travel-requests", statusFilter],
-    queryFn: () => apiRequest("GET", statusFilter !== "all" ? `/api/workspace/travel-requests?status=${statusFilter}` : "/api/workspace/travel-requests"),
   });
   const { data: payments = [], isLoading: loadingPayments } = useQuery<any[]>({
     queryKey: ["/api/workspace/payments", statusFilter],
@@ -67,7 +56,6 @@ export default function OfficeAdminPage() {
   // Forms — use correct DB field names
   const vendorForm = useForm({ defaultValues: { name: "", category: "supplier", contactName: "", email: "", phone: "", gstNumber: "", panNumber: "" } });
   const prForm = useForm({ defaultValues: { category: "office_supplies", notes: "", estimatedCost: "", neededByDate: "" } });
-  const trForm = useForm({ defaultValues: { purpose: "", fromCity: "", toCity: "", travelDate: "", returnDate: "", preferences: "", estimatedBudget: "" } });
   const payForm = useForm({ defaultValues: { vendorId: "", paymentType: "vendor_payment", amount: "", currency: "INR", description: "" } });
 
   const createVendorMutation = useMutation({
@@ -100,79 +88,9 @@ export default function OfficeAdminPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/workspace/purchase-requests"] }),
   });
 
-  const createTRMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/workspace/travel-requests", {
-      purpose: data.purpose,
-      fromCity: data.fromCity,
-      toCity: data.toCity,
-      travelDate: data.travelDate || null,
-      returnDate: data.returnDate || null,
-      preferences: data.preferences || null,
-      estimatedBudget: data.estimatedBudget ? String(data.estimatedBudget) : null,
-      status: "draft",
-    }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/travel-requests"] }); setShowTRForm(false); trForm.reset(); toast({ title: "Travel request created" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const submitTRMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/workspace/travel-requests/${id}/submit`, {}),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/travel-requests"] }); toast({ title: "Submitted for CEO approval" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const updateTRMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => apiRequest("PUT", `/api/workspace/travel-requests/${id}`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/workspace/travel-requests"] }),
-  });
-
-  const assignTRMutation = useMutation({
-    mutationFn: ({ id, assignedTo }: { id: string; assignedTo: string }) =>
-      apiRequest("POST", `/api/workspace/travel-requests/${id}/assign`, { assignedTo }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/workspace/travel-requests"] });
-      setShowAssignDialog(false);
-      setSelectedTR(null);
-      setAssigneeId("");
-      toast({ title: "Travel request assigned" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
   const createPayMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/workspace/payments", { ...data, amount: Number(data.amount), status: "requested" }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/payments"] }); setShowPayForm(false); payForm.reset(); toast({ title: "Payment created" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const bookingForm = useForm({
-    defaultValues: {
-      type: "flight",
-      providerName: "",
-      pnrOrTicket: "",
-      departureTime: "",
-      arrivalTime: "",
-      checkInDate: "",
-      checkOutDate: "",
-      cost: "",
-      notes: "",
-    },
-  });
-
-  const createBookingMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("POST", "/api/workspace/travel-bookings", {
-        ...data,
-        travelRequestId: bookingTR?.id,
-        cost: data.cost ? String(data.cost) : null,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/workspace/travel-requests"] });
-      setShowBookingDialog(false);
-      setBookingTR(null);
-      bookingForm.reset();
-      toast({ title: "Booking details saved", description: "The requester has been notified via notification and email." });
-    },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -209,7 +127,6 @@ export default function OfficeAdminPage() {
         <TabsList>
           <TabsTrigger value="vendors">Vendors</TabsTrigger>
           <TabsTrigger value="purchase">Purchase Requests</TabsTrigger>
-          <TabsTrigger value="travel">Travel Requests</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
         </TabsList>
 
@@ -300,79 +217,6 @@ export default function OfficeAdminPage() {
                 </Card>
               ))}
               {(purchaseRequests as any[]).length === 0 && <Card className="py-10"><CardContent className="text-center text-muted-foreground text-sm">No purchase requests.</CardContent></Card>}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* TRAVEL REQUESTS */}
-        <TabsContent value="travel" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between">
-            {filterControls}
-            <Button size="sm" onClick={() => setShowTRForm(true)} data-testid="button-new-tr">
-              <Plus className="h-4 w-4 mr-1.5" /> New Request
-            </Button>
-          </div>
-          {loadingTRs ? <Skeleton className="h-24 w-full" /> : (
-            <div className="space-y-3">
-              {(travelRequests as any[]).map((tr: any) => (
-                <Card key={tr.id} data-testid={`card-tr-${tr.id}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <Car className="h-4 w-4 text-primary flex-shrink-0" />
-                          <span className="font-medium text-sm text-foreground">{tr.fromCity} → {tr.toCity}</span>
-                          <Badge className={`text-xs border-0 ${STATUS_COLORS[tr.status] || STATUS_COLORS.draft}`}>{formatStatus(tr.status)}</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{tr.purpose}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {tr.travelDate && `Travel: ${formatDate(tr.travelDate)}`}
-                          {tr.returnDate && ` → ${formatDate(tr.returnDate)}`}
-                          {tr.estimatedBudget && ` · Budget: ₹${Number(tr.estimatedBudget).toLocaleString()}`}
-                        </p>
-                        {tr.preferences && <p className="text-xs text-muted-foreground">Pref: {tr.preferences}</p>}
-                        {tr.assignedToName && (
-                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5 flex items-center gap-1">
-                            <UserCheck className="h-3 w-3" /> Assigned to: {tr.assignedToName}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                        {tr.status === "draft" && (
-                          <Button variant="outline" size="sm" onClick={() => submitTRMutation.mutate(tr.id)} data-testid={`button-submit-tr-${tr.id}`}>
-                            <Send className="h-3.5 w-3.5 mr-1.5" /> Submit
-                          </Button>
-                        )}
-                        {tr.status === "approved" && (
-                          <>
-                            <Button variant="outline" size="sm" onClick={() => { setSelectedTR(tr); setAssigneeId(tr.assignedTo || ""); setShowAssignDialog(true); }} data-testid={`button-assign-tr-${tr.id}`}>
-                              <UserCheck className="h-3.5 w-3.5 mr-1.5" />
-                              {tr.assignedToName ? `Reassign` : "Assign"}
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => { setBookingTR(tr); bookingForm.reset({ type: "flight", providerName: "", pnrOrTicket: "", departureTime: "", arrivalTime: "", checkInDate: "", checkOutDate: "", cost: "", notes: "" }); setShowBookingDialog(true); }} data-testid={`button-add-booking-${tr.id}`}>
-                              <Plane className="h-3.5 w-3.5 mr-1.5" /> Add Booking
-                            </Button>
-                            <Button size="sm" onClick={() => updateTRMutation.mutate({ id: tr.id, status: "booked" })} data-testid={`button-book-tr-${tr.id}`}>
-                              Mark Booked
-                            </Button>
-                          </>
-                        )}
-                        {tr.status === "booked" && (
-                          <>
-                            <Button variant="outline" size="sm" onClick={() => { setBookingTR(tr); bookingForm.reset({ type: "flight", providerName: "", pnrOrTicket: "", departureTime: "", arrivalTime: "", checkInDate: "", checkOutDate: "", cost: "", notes: "" }); setShowBookingDialog(true); }} data-testid={`button-add-booking-booked-${tr.id}`}>
-                              <Plane className="h-3.5 w-3.5 mr-1.5" /> Add Booking
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => updateTRMutation.mutate({ id: tr.id, status: "completed" })} data-testid={`button-complete-tr-${tr.id}`}>
-                              Mark Completed
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {(travelRequests as any[]).length === 0 && <Card className="py-10"><CardContent className="text-center text-muted-foreground text-sm">No travel requests.</CardContent></Card>}
             </div>
           )}
         </TabsContent>
@@ -491,32 +335,6 @@ export default function OfficeAdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Travel Request Dialog */}
-      <Dialog open={showTRForm} onOpenChange={setShowTRForm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>New Travel Request</DialogTitle></DialogHeader>
-          <form onSubmit={trForm.handleSubmit(data => createTRMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5"><Label>Purpose *</Label><Textarea rows={2} {...trForm.register("purpose", { required: true })} data-testid="textarea-tr-purpose" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>From City *</Label><Input {...trForm.register("fromCity", { required: true })} data-testid="input-tr-from" /></div>
-              <div className="space-y-1.5"><Label>To City *</Label><Input {...trForm.register("toCity", { required: true })} data-testid="input-tr-to" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Travel Date *</Label><Controller control={trForm.control} name="travelDate" rules={{ required: true }} render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-tr-travel-date" />} /></div>
-              <div className="space-y-1.5"><Label>Return Date</Label><Controller control={trForm.control} name="returnDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-tr-return" />} /></div>
-            </div>
-            <div className="space-y-1.5"><Label>Preferences</Label><Textarea rows={2} {...trForm.register("preferences")} placeholder="Mode of travel, hotel, dietary..." data-testid="textarea-tr-prefs" /></div>
-            <div className="space-y-1.5"><Label>Budget (₹)</Label><Input type="number" min="0" {...trForm.register("estimatedBudget")} data-testid="input-tr-budget" /></div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowTRForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={createTRMutation.isPending} data-testid="button-save-tr">
-                {createTRMutation.isPending ? "Creating..." : "Create Request"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
       {/* Payment Dialog */}
       <Dialog open={showPayForm} onOpenChange={setShowPayForm}>
         <DialogContent className="max-w-md">
@@ -570,117 +388,6 @@ export default function OfficeAdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Booking Details Dialog */}
-      <Dialog open={showBookingDialog} onOpenChange={(o) => { if (!o) { setShowBookingDialog(false); setBookingTR(null); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Booking Details</DialogTitle>
-          </DialogHeader>
-          {bookingTR && (
-            <div className="bg-muted/40 rounded-lg p-3 text-sm mb-1">
-              <p className="font-medium">{bookingTR.fromCity} → {bookingTR.toCity}</p>
-              <p className="text-muted-foreground text-xs mt-0.5">{bookingTR.purpose}</p>
-              {bookingTR.travelDate && <p className="text-muted-foreground text-xs">Travel: {formatDate(bookingTR.travelDate)}{bookingTR.returnDate ? ` → ${formatDate(bookingTR.returnDate)}` : ""}</p>}
-              {bookingTR.preferences && <p className="text-muted-foreground text-xs">Pref: {bookingTR.preferences}</p>}
-            </div>
-          )}
-          <form onSubmit={bookingForm.handleSubmit(data => createBookingMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Booking Type</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["flight", "hotel"] as const).map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => bookingForm.setValue("type", t)}
-                    data-testid={`button-booking-type-${t}`}
-                    className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-md border text-sm font-medium transition-colors ${bookingForm.watch("type") === t ? "bg-primary text-primary-foreground border-primary" : "border-border text-foreground hover:bg-accent"}`}
-                  >
-                    {t === "flight" ? <Plane className="h-4 w-4" /> : <Hotel className="h-4 w-4" />}
-                    {t === "flight" ? "Flight" : "Hotel"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {bookingForm.watch("type") === "flight" ? (
-              <>
-                <div className="space-y-1.5"><Label>Airline Name *</Label><Input {...bookingForm.register("providerName", { required: true })} placeholder="e.g. IndiGo, Air India" data-testid="input-booking-provider" /></div>
-                <div className="space-y-1.5"><Label>PNR / Ticket Number *</Label><Input {...bookingForm.register("pnrOrTicket", { required: true })} placeholder="e.g. ABC123" data-testid="input-booking-pnr" /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><Label>Departure Time</Label><Input {...bookingForm.register("departureTime")} placeholder="e.g. 09:00 AM" data-testid="input-booking-departure" /></div>
-                  <div className="space-y-1.5"><Label>Arrival Time</Label><Input {...bookingForm.register("arrivalTime")} placeholder="e.g. 11:30 AM" data-testid="input-booking-arrival" /></div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="space-y-1.5"><Label>Hotel Name *</Label><Input {...bookingForm.register("providerName", { required: true })} placeholder="e.g. Taj Hotel" data-testid="input-booking-hotel" /></div>
-                <div className="space-y-1.5"><Label>Booking Reference *</Label><Input {...bookingForm.register("pnrOrTicket", { required: true })} placeholder="e.g. HTL-456789" data-testid="input-booking-ref" /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><Label>Check-in Date</Label><Controller control={bookingForm.control} name="checkInDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-booking-checkin" />} /></div>
-                  <div className="space-y-1.5"><Label>Check-out Date</Label><Controller control={bookingForm.control} name="checkOutDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-booking-checkout" />} /></div>
-                </div>
-              </>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Cost (₹)</Label><Input type="number" min="0" {...bookingForm.register("cost")} data-testid="input-booking-cost" /></div>
-            </div>
-            <div className="space-y-1.5"><Label>Additional Notes</Label><Textarea rows={2} {...bookingForm.register("notes")} placeholder="Any additional details..." data-testid="textarea-booking-notes" /></div>
-
-            <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
-              <Plane className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-              <span>The requester will receive an in-app notification and email with the booking details once saved.</span>
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setShowBookingDialog(false); setBookingTR(null); }}>Cancel</Button>
-              <Button type="submit" disabled={createBookingMutation.isPending} data-testid="button-save-booking">
-                {createBookingMutation.isPending ? "Saving..." : "Save & Notify"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign Travel Request Dialog */}
-      <Dialog open={showAssignDialog} onOpenChange={(o) => { if (!o) { setShowAssignDialog(false); setSelectedTR(null); setAssigneeId(""); } }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Assign Travel Booking</DialogTitle>
-          </DialogHeader>
-          {selectedTR && (
-            <div className="space-y-4">
-              <div className="bg-muted/40 rounded-lg p-3 text-sm">
-                <p className="font-medium">{selectedTR.fromCity} → {selectedTR.toCity}</p>
-                <p className="text-muted-foreground text-xs mt-0.5">{selectedTR.purpose}</p>
-                {selectedTR.travelDate && <p className="text-muted-foreground text-xs">Travel: {formatDate(selectedTR.travelDate)}</p>}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Assign to</Label>
-                <Select value={assigneeId} onValueChange={setAssigneeId}>
-                  <SelectTrigger data-testid="select-tr-assignee"><SelectValue placeholder="Select team member..." /></SelectTrigger>
-                  <SelectContent>
-                    {(workspaceUsers as any[]).map((u: any) => (
-                      <SelectItem key={u.id} value={u.id}>{u.username} <span className="text-muted-foreground capitalize ml-1">({u.role.replace(/_/g, " ")})</span></SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowAssignDialog(false); setSelectedTR(null); setAssigneeId(""); }}>Cancel</Button>
-            <Button
-              disabled={!assigneeId || assignTRMutation.isPending}
-              onClick={() => selectedTR && assignTRMutation.mutate({ id: selectedTR.id, assignedTo: assigneeId })}
-              data-testid="button-confirm-assign-tr"
-            >
-              {assignTRMutation.isPending ? "Assigning..." : "Assign"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

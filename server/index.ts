@@ -54,7 +54,13 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        let body = JSON.stringify(capturedJsonResponse);
+        // Strip base64 data-URLs (uploaded invoices/proformas/documents) so they don't flood the terminal
+        body = body.replace(/"data:[^"]{40,}"/g, '"data:…"');
+        logLine += ` :: ${body}`;
+      }
+      if (logLine.length > 200) {
+        logLine = logLine.slice(0, 199) + "…";
       }
 
       log(logLine);

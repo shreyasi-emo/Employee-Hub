@@ -3,7 +3,7 @@
 const GREY = "bg-[#64748B]/15 text-[#64748B]";
 const BLUE = "bg-[#206295]/15 text-[#206295]";
 const TEAL = "bg-[#4BDCD9]/25 text-[#0E7C7B]";
-const CORAL = "bg-[#FF6F62]/20 text-[#FF6F62]";
+const CORAL = "bg-[#FF6F62]/20 text-[#C4402F]";
 
 const STATUS_CLASS: Record<string, string> = {
   // Grey — inactive
@@ -15,8 +15,8 @@ const STATUS_CLASS: Record<string, string> = {
   pending_hr: BLUE, pending_approval: BLUE, priced: BLUE,
   // Teal — success / completed end states
   approved: TEAL, fulfilled: TEAL, booked: TEAL, confirmed: TEAL, completed: TEAL, done: TEAL, resolved: TEAL, delivered: TEAL,
-  // Coral — negative
-  changes_requested: CORAL, rejected: CORAL,
+  // Coral — negative / needs attention
+  under_review: CORAL, changes_requested: CORAL, rejected: CORAL,
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -25,7 +25,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending: "Pending", requested: "Requested", needs_approval: "Needs Approval", in_review: "In Review",
   in_progress: "In Progress", need_info: "Need Info", open: "Open", ordered: "Ordered", accepted: "Accepted",
   dispatched: "Dispatched", in_transit: "In Transit",
-  pending_hr: "Pending HR", pending_approval: "Pending Approval", priced: "Ready to Send",
+  pending_hr: "Pending HR", pending_approval: "Pending Approval", priced: "Ready to Send", under_review: "Under Review",
   approved: "Approved", fulfilled: "Fulfilled", booked: "Booked", confirmed: "Confirmed", completed: "Completed",
   done: "Done", resolved: "Resolved", delivered: "Delivered",
   changes_requested: "Changes Requested", rejected: "Rejected",
