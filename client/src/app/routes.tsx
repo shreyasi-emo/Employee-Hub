@@ -7,7 +7,7 @@ import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 import EmployeesPage from "@/pages/employees";
 import EmployeeProfilePage from "@/pages/employee-profile";
-import AttendancePage from "@/pages/attendance";
+import AttendancePage from "@/features/attendance/pages/attendance-page";
 import LeavePage from "@/pages/leave";
 import HolidaysPage from "@/pages/holidays";
 import PayrollPage from "@/pages/payroll";
