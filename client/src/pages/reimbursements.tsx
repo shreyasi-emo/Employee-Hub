@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth, isFinance } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -110,7 +110,7 @@ function ApprovalActions({ id }: { id: string }) {
 function PurchaseInvoicesTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: ops = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases"] });
+  const { data: ops = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases/invoices"] });
   const relevant = (ops as any[]).filter((o) => o.paymentStatus || o.invoice?.fileData || o.proformaInvoice?.fileData);
   const due = relevant.filter((o) => o.paymentStatus === "pending");
   const records = relevant.filter((o) => o.paymentStatus !== "pending");
@@ -173,7 +173,8 @@ function PurchaseInvoicesTab() {
 
 export default function ReimbursementsPage() {
   const { data: auth } = useAuth();
-  const finance = isFinance(auth?.user ?? null);
+  // Finance reimbursement stage = finance / super_admin only (matches the backend). HR is NOT finance here.
+  const finance = ["finance", "super_admin"].includes(auth?.user?.role || "");
 
   const { data: mine = [], isLoading: mineLoading } = useQuery<any[]>({ queryKey: ["/api/reimbursements"] });
   const { data: pending = [] } = useQuery<any[]>({

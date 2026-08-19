@@ -25,15 +25,29 @@ export function registerReimbursementRoutes(app: Express) {
   const canFinanceStage = (r: Request) => hasRole(r, "super_admin", ...FINANCE_ROLES);
   const canCeoStage = (r: Request) => hasRole(r, "super_admin", ...CEO_FINAL_ROLES);
 
+  // List payloads are huge — every claim carries a base64 invoice image on every line. `?summary=true`
+  // strips that heavy data (keeping a `hasFile` flag); callers that need the images fetch the full record
+  // via GET /:id. Used by the CEO Inbox + sidebar badge so they don't drag megabytes on every load.
+  const isDataUrl = (s: any) => typeof s === "string" && s.startsWith("data:");
+  const liteReimb = (r: any) => ({
+    ...r,
+    invoiceUrl: isDataUrl(r.invoiceUrl) ? null : r.invoiceUrl,
+    lines: Array.isArray(r.lines)
+      ? r.lines.map((l: any) => { const { fileData, ...rest } = l || {}; return { ...rest, hasFile: !!fileData }; })
+      : r.lines,
+  });
+
   app.get("/api/reimbursements", requireAuth, async (req, res) => {
     // Finance + CEO + admin can see all claims; everyone else sees only their own.
     // `?mine=true` forces own-only regardless of role (used by the My Requests page).
     const isApprover = hasRole(req, "super_admin", "finance", "ceo_approver");
     const mineOnly = req.query.mine === "true" || req.query.mine === "1";
+    const summary = req.query.summary === "true" || req.query.summary === "1";
     const filters: any = {};
     if (!isApprover || mineOnly) filters.requesterId = req.currentUser!.id;
     if (req.query.status) filters.status = req.query.status;
-    res.json(await storage.listReimbursements(filters));
+    const rows = await storage.listReimbursements(filters);
+    res.json(summary ? rows.map(liteReimb) : rows);
   });
 
   app.get("/api/reimbursements/:id", requireAuth, async (req, res) => {

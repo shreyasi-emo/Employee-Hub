@@ -41,6 +41,8 @@ export function ProcurementDetailDialog({ id, open, onClose, context = "owner" }
   const { toast } = useToast();
   const qc = useQueryClient();
   const [note, setNote] = useState("");
+  const [resItems, setResItems] = useState<any[] | null>(null);  // requester's edits when answering a CEO query
+  const [resJust, setResJust] = useState<string | null>(null);
   const { data: order } = useQuery<any>({ queryKey: [`/api/procurement/${id}`], enabled: !!id && open });
 
   const act = useMutation({
@@ -50,6 +52,16 @@ export function ProcurementDetailDialog({ id, open, onClose, context = "owner" }
       const MSG: Record<string, string> = { approve: "Approved", reject: "Rejected", cancel: "Request cancelled" };
       toast({ title: MSG[vars.path] || "Done" }); setNote("");
     },
+    onError: (e: any) => toast({ title: "Action failed", description: e.message, variant: "destructive" }),
+  });
+
+  // Requester answering a query: save the edited items + note, then flip back to the CEO with a resubmitted marker.
+  const resubmit = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/procurement/${id}/resubmit`, {
+      items: (resItems ?? (order?.items || [])).map((it: any) => ({ description: it.description, quantity: Number(it.quantity) || 1, link: it.link || "", unitPrice: Number(it.unitPrice) || 0 })),
+      justification: resJust ?? order?.justification ?? null,
+    }),
+    onSuccess: () => { invalidateProcurement(qc); qc.invalidateQueries({ queryKey: [`/api/procurement/${id}`] }); toast({ title: "Resubmitted for approval" }); onClose(); },
     onError: (e: any) => toast({ title: "Action failed", description: e.message, variant: "destructive" }),
   });
 
@@ -64,6 +76,9 @@ export function ProcurementDetailDialog({ id, open, onClose, context = "owner" }
   const items: any[] = Array.isArray(order.items) ? order.items : [];
   const isOwner = order.requesterId === meId;
   const total = Number(order.totalAmount) || 0;
+  const canEditResubmit = isOwner && order.status === "under_review";  // owner answers the CEO's query here
+  const rItems = resItems ?? items.map((it) => ({ ...it }));
+  const setEdit = (i: number, patch: any) => setResItems((prev) => (prev ?? items.map((it) => ({ ...it }))).map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -92,7 +107,7 @@ export function ProcurementDetailDialog({ id, open, onClose, context = "owner" }
           </div>
         </div>
 
-        {order.justification && (
+        {!canEditResubmit && order.justification && (
           <p className="text-sm text-foreground/80"><span className="text-xs uppercase tracking-wide text-muted-foreground mr-2">Note</span>{order.justification}</p>
         )}
 
@@ -100,18 +115,27 @@ export function ProcurementDetailDialog({ id, open, onClose, context = "owner" }
 
         {/* Items */}
         <div className="space-y-2">
-          {items.map((it, i) => {
-            const line = (Number(it.unitPrice) || 0) * (Number(it.quantity) || 0);
-            return (
-              <div key={i} className="rounded-xl border border-border/60 p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-foreground min-w-0 truncate">{it.description || `Item ${i + 1}`} <span className="text-muted-foreground font-normal">× {it.quantity}</span></p>
-                  <span className="text-sm font-semibold text-foreground flex-shrink-0">{money(line)}</span>
-                </div>
-                {it.link && <div className="flex flex-wrap items-center gap-1.5"><span className="text-[11px] font-medium text-muted-foreground flex-shrink-0">Link:</span><LinkChip url={it.link} /></div>}
+          {canEditResubmit
+            ? rItems.map((it: any, i: number) => (
+              <div key={i} className="rounded-xl border border-border/60 p-3 grid grid-cols-12 gap-2 items-center">
+                <Input className="col-span-12 sm:col-span-5 h-8 text-xs" value={it.description || ""} onChange={(e) => setEdit(i, { description: e.target.value })} placeholder="Item description" />
+                <Input className="col-span-3 sm:col-span-2 h-8 text-xs" type="number" min="1" value={it.quantity ?? 1} onChange={(e) => setEdit(i, { quantity: Number(e.target.value) || 1 })} placeholder="Qty" />
+                <Input className="col-span-4 sm:col-span-2 h-8 text-xs" type="number" min="0" value={it.unitPrice ?? 0} onChange={(e) => setEdit(i, { unitPrice: Number(e.target.value) || 0 })} placeholder="₹ each" />
+                <Input className="col-span-5 sm:col-span-3 h-8 text-xs" value={it.link || ""} onChange={(e) => setEdit(i, { link: e.target.value })} placeholder="Link (optional)" />
               </div>
-            );
-          })}
+            ))
+            : items.map((it, i) => {
+              const line = (Number(it.unitPrice) || 0) * (Number(it.quantity) || 0);
+              return (
+                <div key={i} className="rounded-xl border border-border/60 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-foreground min-w-0 truncate">{it.description || `Item ${i + 1}`} <span className="text-muted-foreground font-normal">× {it.quantity}</span></p>
+                    <span className="text-sm font-semibold text-foreground flex-shrink-0">{money(line)}</span>
+                  </div>
+                  {it.link && <div className="flex flex-wrap items-center gap-1.5"><span className="text-[11px] font-medium text-muted-foreground flex-shrink-0">Link:</span><LinkChip url={it.link} /></div>}
+                </div>
+              );
+            })}
         </div>
 
         {/* Discussion thread — CEO queries + requester replies. */}
@@ -130,6 +154,15 @@ export function ProcurementDetailDialog({ id, open, onClose, context = "owner" }
               <Button variant="outline" className="flex-1 text-[#FF6F62] border-[#FF6F62]/40" disabled={act.isPending} onClick={() => act.mutate({ path: "reject", body: { note } })}>Reject</Button>
               <Button className="btn-primary-gradient flex-1" disabled={act.isPending} onClick={() => act.mutate({ path: "approve", body: { note } })}><CircleCheck className="h-4 w-4 mr-1.5" /> Approve</Button>
             </div>
+          </div>
+        )}
+
+        {/* Requester: answer the CEO's query → edit items above, then resubmit */}
+        {canEditResubmit && (
+          <div className="rounded-xl border border-[#206295]/30 bg-[#206295]/[0.05] p-3 space-y-2">
+            <p className="text-xs text-muted-foreground">The CEO raised a query. Update the items above (and the note), then resend for approval.</p>
+            <Input value={resJust ?? order.justification ?? ""} onChange={(e) => setResJust(e.target.value)} placeholder="Note (optional)" className="h-9" />
+            <Button className="btn-primary-gradient w-full" disabled={resubmit.isPending || !rItems.some((it: any) => String(it.description || "").trim())} onClick={() => resubmit.mutate()}><CircleCheck className="h-4 w-4 mr-1.5" /> Resubmit for approval</Button>
           </div>
         )}
 
