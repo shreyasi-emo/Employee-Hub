@@ -13,10 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DataTable } from "@/components/data-table";
+import { DataTable } from "@/components/shared/data-table";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { DateInput } from "@/components/datetime-field";
+import { DateInput } from "@/components/shared/datetime-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -25,11 +25,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { exportXlsx } from "@/lib/export-xlsx";
-import { NewRequestDialog, OfficePurchaseDetailDialog, canHrTriage, canCeoApprove } from "@/components/office-purchase";
-import { canProcureApprove } from "@/components/procurement";
-import { CommentThread } from "@/components/comment-thread";
-import { TravelApprovals, NewTravelDialog, canTravelHr, canTravelCeo } from "@/components/travel";
-import { ReimbursementApprovalModal, exportReimbursement } from "@/components/reimbursement-approval-detail";
+import { NewRequestDialog, OfficePurchaseDetailDialog, canHrTriage, canCeoApprove } from "@/features/requests/office-purchases/components/office-purchase";
+import { canProcureApprove } from "@/features/requests/procurement/components/procurement";
+import { CommentThread } from "@/components/shared/comment-thread";
+import { TravelApprovals, NewTravelDialog, canTravelHr, canTravelCeo } from "@/features/requests/travel/components/travel";
+import { ReimbursementApprovalModal, exportReimbursement } from "@/features/requests/reimbursements/components/reimbursement-approval-detail";
 import {
   ShoppingCart, Car, Plane, TicketIcon, Receipt, Plus, Trash2, ClipboardList,
   ShieldCheck, ArrowRight, ChevronLeft, Check, X, Users, ChevronRight, ChevronDown, MessageSquare,
@@ -38,7 +38,7 @@ import {
   LayoutGrid, Table as TableIcon, CheckCircle2, Layers, Package,
 } from "lucide-react";
 import { format } from "date-fns";
-import { ReimbursementFormDialog } from "@/components/reimbursement-form";
+import { ReimbursementFormDialog } from "@/features/requests/reimbursements/components/reimbursement-form";
 import { statusClass, statusLabel } from "@/lib/status";
 
 // ---- helpers ----

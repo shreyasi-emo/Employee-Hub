@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as RangeCalendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CalCaption } from "@/components/date-range-picker";
+import { CalCaption } from "@/components/shared/date-range-picker";
 import { format } from "date-fns";
 import { CalendarDays, Clock } from "lucide-react";
 

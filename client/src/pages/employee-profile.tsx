@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm, Controller } from "react-hook-form";
-import { DateInput } from "@/components/datetime-field";
+import { DateInput } from "@/components/shared/datetime-field";
 import {
   ChevronLeft, Mail, Phone, MapPin, Calendar, Briefcase, Building2,
   Edit, Plus, DollarSign, FileText, Package, Clock, Shield,

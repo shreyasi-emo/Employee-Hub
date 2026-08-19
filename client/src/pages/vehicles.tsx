@@ -19,10 +19,10 @@ import { Calendar as RangeCalendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { EmployeePicker } from "@/components/employee-picker";
-import { GlassBackButton } from "@/components/glass-back-button";
-import { DateRangePicker, CalCaption } from "@/components/date-range-picker";
-import { TimeField } from "@/components/datetime-field";
+import { EmployeePicker } from "@/components/shared/employee-picker";
+import { GlassBackButton } from "@/components/shared/glass-back-button";
+import { DateRangePicker, CalCaption } from "@/components/shared/date-range-picker";
+import { TimeField } from "@/components/shared/datetime-field";
 import { useToast } from "@/hooks/use-toast";
 import {
   Car, Plus, Users, User, Check, X, ChevronLeft, ChevronRight, ChevronDown, MapPin,
@@ -594,7 +594,7 @@ function BookingDateField({ value, onChange }: { value: { from?: Date; to?: Date
   );
 }
 
-// Date + time form fields (TimeField) now live in the shared @/components/datetime-field.
+// Date + time form fields (TimeField) now live in the shared @/components/shared/datetime-field.
 
 // Fair company-car assignment: cover `pax` seats using the available vehicles, favouring
 // (1) capacity match — least wasted seats, (2) load balance — least-booked driver/vehicle first,
@@ -1375,7 +1375,7 @@ function MiniBooking({ b, canCancel, onCancel, onOpen }: any) {
   );
 }
 
-// Date-range picker + CalCaption now come from the shared @/components/date-range-picker.
+// Date-range picker + CalCaption now come from the shared @/components/shared/date-range-picker.
 
 // ============================ Track Usage side panel (HR) ============================
 // Slide-in Sheet (same primitive as Workforce Insights). Two views inside one panel:

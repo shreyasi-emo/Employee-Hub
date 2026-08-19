@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DataTable } from "@/components/data-table";
+import { DataTable } from "@/components/shared/data-table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,7 +18,7 @@ import {
   Plane, Plus, Calendar, Clock, Info, Search, FileText, CheckCircle2, XCircle, Pencil,
 } from "lucide-react";
 import { format, parseISO, startOfDay } from "date-fns";
-import { DateField } from "@/components/datetime-field";
+import { DateField } from "@/components/shared/datetime-field";
 
 // "yyyy-MM-dd" string → local Date (avoids the UTC shift of new Date("yyyy-MM-dd")).
 const parseYmd = (s?: string): Date | undefined => { if (!s) return undefined; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };

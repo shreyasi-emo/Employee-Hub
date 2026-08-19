@@ -13,8 +13,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DateRangePicker } from "@/components/date-range-picker";
-import { DateField, TimeField, DateInput } from "@/components/datetime-field";
+import { DateRangePicker } from "@/components/shared/date-range-picker";
+import { DateField, TimeField, DateInput } from "@/components/shared/datetime-field";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -33,7 +33,7 @@ import {
   isSameDay, isSameMonth, eachDayOfInterval, addMonths, subMonths,
 } from "date-fns";
 import { exportXlsx } from "@/lib/export-xlsx";
-import { DataTable, type DataTableColumn } from "@/components/data-table";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -117,7 +117,7 @@ function StatCard({ title, value, subtitle, icon: Icon, color }: {
 }
 
 // Date-range picker (single date + "End date" toggle) now lives in a shared component:
-//   @/components/date-range-picker → <DateRangePicker /> + CalCaption
+//   @/components/shared/date-range-picker → <DateRangePicker /> + CalCaption
 
 function AdminAttendanceDialog({ open, onOpenChange, employees }: { open: boolean; onOpenChange: (v: boolean) => void; employees: any[] }) {
   const { toast } = useToast();

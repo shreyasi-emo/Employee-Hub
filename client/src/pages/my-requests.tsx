@@ -5,8 +5,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/data-table";
-import { usePaged, PaginationBar } from "@/components/pagination";
+import { DataTable } from "@/components/shared/data-table";
+import { usePaged, PaginationBar } from "@/components/shared/pagination";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -15,12 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { NewRequestDialog, OfficePurchaseDetailDialog } from "@/components/office-purchase";
-import { NewTravelDialog, TravelDetailDialog, TRAVEL_CATS } from "@/components/travel";
-import { ProcurementDetailDialog } from "@/components/procurement";
+import { NewRequestDialog, OfficePurchaseDetailDialog } from "@/features/requests/office-purchases/components/office-purchase";
+import { NewTravelDialog, TravelDetailDialog, TRAVEL_CATS } from "@/features/requests/travel/components/travel";
+import { ProcurementDetailDialog } from "@/features/requests/procurement/components/procurement";
 import { useToast } from "@/hooks/use-toast";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
-import { DateInput } from "@/components/datetime-field";
+import { DateInput } from "@/components/shared/datetime-field";
 import {
   Plus, ShoppingCart, Car, TicketIcon, Send, Receipt, ChevronLeft, ChevronRight, Package,
   MessageSquare, ChevronDown, ChevronUp, Trash2, FileText,
@@ -32,7 +32,7 @@ import { format } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { ReimbursementFormDialog, reimbDraftComplete } from "@/components/reimbursement-form";
+import { ReimbursementFormDialog, reimbDraftComplete } from "@/features/requests/reimbursements/components/reimbursement-form";
 import { StatusBadge } from "./reimbursements";
 import { statusClass, statusLabel } from "@/lib/status";
 

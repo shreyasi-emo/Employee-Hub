@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { statusClass, statusLabel } from "@/lib/status";
 import { format } from "date-fns";
 import { Package, ExternalLink, IndianRupee, CircleCheck, X, User, CalendarClock, Copy, MessageSquare } from "lucide-react";
-import { CommentThread } from "@/components/comment-thread";
+import { CommentThread } from "@/components/shared/comment-thread";
 
 export const canProcureApprove = (role?: string) => !!role && (role === "super_admin" || role === "ceo_approver");
 const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;

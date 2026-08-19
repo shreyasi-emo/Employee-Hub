@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useForm, Controller } from "react-hook-form";
-import { DateInput } from "@/components/datetime-field";
+import { DateInput } from "@/components/shared/datetime-field";
 import { Plus, CheckSquare, Trash2, ClipboardList, TicketIcon, CheckCircle2, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";

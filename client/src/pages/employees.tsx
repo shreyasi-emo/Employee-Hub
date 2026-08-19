@@ -20,8 +20,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { DataTable, type DataTableColumn } from "@/components/data-table";
-import { usePaged, PaginationBar } from "@/components/pagination";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { usePaged, PaginationBar } from "@/components/shared/pagination";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
   Search, Users, Briefcase, Building2, UserPlus, CheckCircle2, X, MapPin, Calendar,
@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { exportXlsx } from "@/lib/export-xlsx";
-import { DateRangePicker, type DateRange } from "@/components/date-range-picker";
+import { DateRangePicker, type DateRange } from "@/components/shared/date-range-picker";
 
 // ---- constants ----
 const EMP_TYPES = [

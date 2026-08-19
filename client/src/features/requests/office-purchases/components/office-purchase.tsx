@@ -18,8 +18,8 @@ import {
   CircleCheck, AlertTriangle, ExternalLink, IndianRupee, Copy, MoreVertical,
   User, CalendarClock, Clock, Building2, FileText, MessageSquare,
 } from "lucide-react";
-import { CommentThread } from "@/components/comment-thread";
-import { FileUpload, type UploadedFile } from "@/components/file-upload";
+import { CommentThread } from "@/components/shared/comment-thread";
+import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;

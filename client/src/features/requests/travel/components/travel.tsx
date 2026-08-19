@@ -13,11 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { statusClass, statusLabel } from "@/lib/status";
 import { format } from "date-fns";
 import { Plane, Hotel, Moon, Bus, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon } from "lucide-react";
-import { CommentThread } from "@/components/comment-thread";
-import { FileUpload, type UploadedFile } from "@/components/file-upload";
-import { EmployeePicker } from "@/components/employee-picker";
+import { CommentThread } from "@/components/shared/comment-thread";
+import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
+import { EmployeePicker } from "@/components/shared/employee-picker";
 import { Textarea } from "@/components/ui/textarea";
-import { DateInput } from "@/components/datetime-field";
+import { DateInput } from "@/components/shared/datetime-field";
 
 export const canTravelHr = (role?: string) => !!role && ["super_admin", "hr_admin", "hr_executive"].includes(role);
 export const canTravelCeo = (role?: string) => !!role && ["super_admin", "ceo_approver"].includes(role);
