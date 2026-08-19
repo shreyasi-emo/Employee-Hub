@@ -5,8 +5,8 @@ import { ProtectedRoute } from "./protected-route";
 
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
-import EmployeesPage from "@/pages/employees";
-import EmployeeProfilePage from "@/pages/employee-profile";
+import EmployeesPage from "@/features/employees/pages/employees-page";
+import EmployeeProfilePage from "@/features/employees/pages/employee-profile-page";
 import AttendancePage from "@/features/attendance/pages/attendance-page";
 import LeavePage from "@/features/leave/pages/leave-page";
 import HolidaysPage from "@/features/holidays/pages/holidays-page";
