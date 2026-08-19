@@ -67,26 +67,26 @@ rule → `lib/`.
 
 ## Features
 
-- **`features/admin/`** — api, components, lib, pages
+- **`features/admin/`** — components, pages
 - **`features/announcements/`** — api, components, lib, pages
 - **`features/assets/`** — api, components, lib, pages
 - **`features/attendance/`** — api, components, lib, pages
 - **`features/audit/`** — api, components, lib, pages
-- **`features/auth/`** — api, lib, pages
-- **`features/dashboard/`** — api, components, lib, pages
+- **`features/auth/`** — pages
+- **`features/dashboard/`** — components, lib, pages
 - **`features/employees/`** — api, components, lib, pages
 - **`features/holidays/`** — api, components, lib, pages
-- **`features/hr-workspace/`** — api, components, lib, pages
+- **`features/hr-workspace/`** — pages
 - **`features/leave/`** — api, components, lib, pages
 - **`features/logistics/`** — api, components, lib, pages
 - **`features/notifications/`** — components, lib
-- **`features/onboarding/`** — api, components, lib, pages
-- **`features/payroll/`** — api, components, lib, pages
+- **`features/onboarding/`** — pages
+- **`features/payroll/`** — components, lib, pages
 - **`features/performance/`** — api, components, lib, pages
-- **`features/requests/`** — office-purchases, pages, procurement, reimbursements, shared, tickets, travel
+- **`features/requests/`** — components, office-purchases, pages, procurement, reimbursements, shared, tickets, travel
 - **`features/resources/`** — api, components, lib, pages
 - **`features/settings/`** — api, components, lib, pages
-- **`features/shifts/`** — api, components, lib, pages
+- **`features/shifts/`** — components, lib, pages
 - **`features/vehicles/`** — api, components, lib, pages
 
 ## Conventions
