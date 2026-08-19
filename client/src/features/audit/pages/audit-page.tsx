@@ -1,39 +1,14 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useAuth, isAdmin } from "@/lib/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, Search, Filter, Activity } from "lucide-react";
+import { Shield, Search, Activity } from "lucide-react";
 import { format } from "date-fns";
-
-const actionColors: Record<string, string> = {
-  create: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  update: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  delete: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-  salary_change: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-  payroll_lock: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-  payroll_unlock: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-  attendance_override: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
-  leave_approved: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  leave_rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-  login: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
-  role_change: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300",
-};
-
-const entityTypeLabels: Record<string, string> = {
-  employee: "Employee",
-  salary: "Salary",
-  payroll: "Payroll",
-  attendance: "Attendance",
-  leave: "Leave",
-  user: "User",
-  announcement: "Announcement",
-  asset: "Asset",
-  holiday: "Holiday",
-};
+import { entityTypeLabels, actionColorFor } from "../lib/audit-labels";
+import { useAuditLogs } from "../api/audit.api";
 
 export default function AuditPage() {
   const { data: auth } = useAuth();
@@ -42,10 +17,7 @@ export default function AuditPage() {
   const [entityFilter, setEntityFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState("all");
 
-  const { data: auditLogs = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/audit-logs"],
-    enabled: isAdmin(user!),
-  });
+  const { data: auditLogs = [], isLoading } = useAuditLogs(isAdmin(user!));
 
   if (!isAdmin(user!)) {
     return (
@@ -148,7 +120,7 @@ export default function AuditPage() {
       ) : (
         <div className="space-y-2">
           {filtered.map((log: any) => {
-            const actionColor = Object.entries(actionColors).find(([k]) => log.action?.includes(k))?.[1] || actionColors.update;
+            const actionColor = actionColorFor(log.action);
 
             return (
               <Card key={log.id} data-testid={`audit-log-${log.id}`}>
