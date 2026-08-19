@@ -1,11 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval,
-} from "date-fns";
-import { Home, Route, UserCheck, CircleCheck, Briefcase, CalendarDays } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import {
   parseMeta, buildWfhApproval, buildEffectiveStatus, monthStats, travelDaysFrom,
@@ -13,7 +8,7 @@ import {
 import {
   useMyAttendanceMonth, useTodayAttendanceList, useEndOnDuty, useEndLeave,
 } from "../api/attendance.api";
-import { StatCard } from "./attendance-ui";
+import { MyAttendanceHeader, MyAttendanceStats } from "./my-attendance-sections";
 import { MyAttendanceCalendar } from "./my-attendance-calendar";
 import { ActivityDetailsCard } from "./activity-details-card";
 import { TodaysAttendanceCard } from "./todays-attendance-card";
@@ -66,13 +61,12 @@ export function MyAttendanceView() {
   const effectiveStatus = buildEffectiveStatus({ byDate, holidaySet, todayStr, joinStr, exitStr, wfhApproval });
 
   const monthDays = useMemo(() => eachDayOfInterval({ start: startOfWeek(startOfMonth(cursor)), end: endOfWeek(endOfMonth(cursor)) }), [cursor]);
-
-  // Counts derived from effectiveStatus over the elapsed working days, so they match the calendar.
   const stats = useMemo(
     () => monthStats({ cursor, now, effectiveStatus }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [records, cursor, holidaySet, now],
   );
+  const timeline = useMemo(() => [...(records as any[])].sort((a, b) => (a.date < b.date ? 1 : -1)), [records]);
 
   const selRec = byDate[dstr(selected)];
   const selMeta = useMemo(() => { const j = parseMeta(selRec); return j && j.kind === "on_duty" ? j : null; }, [selRec]);
@@ -83,59 +77,14 @@ export function MyAttendanceView() {
   const todayOnDuty = byDate[todayStr]?.status === "on_duty";
   const canEndLeave = (selStatus === "leave" || selStatus === "half_day") && !!selRec?.leaveRequestId && dstr(selected) >= todayStr;
 
-  const timeline = useMemo(() => [...(records as any[])].sort((a, b) => (a.date < b.date ? 1 : -1)), [records]);
-
   return (
     <div className="p-6 space-y-5 max-w-[92rem] mx-auto">
-      {/* Header + primary CTA */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <span className="h-10 w-10 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center"><UserCheck className="h-5 w-5" /></span>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">My Attendance</h1>
-            <p className="text-sm text-muted-foreground">View your attendance history and update your work status.</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" className="h-10 text-[12px]" onClick={() => setWfhOpen(true)} data-testid="apply-wfh"><Home className="h-4 w-4 mr-1.5" /> Apply Work from Home</Button>
-          <Button className="btn-primary-gradient h-10 text-[12px]" onClick={() => todayOnDuty ? toast({ title: "On Duty already marked for today" }) : setDutyOpen(true)} data-testid="mark-on-duty"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</Button>
-        </div>
-      </div>
+      <MyAttendanceHeader
+        onApplyWfh={() => setWfhOpen(true)}
+        onMarkOnDuty={() => todayOnDuty ? toast({ title: "On Duty already marked for today" }) : setDutyOpen(true)}
+      />
 
-      {/* Overview cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-0 card-hover">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="space-y-1 flex-1 min-w-0">
-                <p className="text-sm text-muted-foreground">Present This Month</p>
-                <p className="text-[33px] leading-tight font-bold text-foreground tabular-nums">{stats.present}<span className="text-[16px] font-normal text-muted-foreground align-baseline">/{stats.working}</span></p>
-                <p className="text-xs text-muted-foreground"><span className="font-semibold text-foreground">{stats.pct}%</span> attendance rate</p>
-              </div>
-              <div className="p-2.5 rounded-xl flex-shrink-0 bg-[#4BDCD9]/25 text-[#0E7C7B]"><CircleCheck className="h-5 w-5" /></div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 card-hover">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-muted-foreground">Work Mode This Month</p>
-                <div className="mt-2 grid grid-cols-3 divide-x divide-foreground/25">
-                  {[{ label: "Office", n: stats.office, c: "#206295" }, { label: "WFH", n: stats.wfh, c: "#0E7C7B" }, { label: "On Duty", n: stats.onDuty, c: "#4A90C2" }].map((x) => (
-                    <div key={x.label} className="px-3 first:pl-0 last:pr-0">
-                      <p className="text-[26px] leading-tight font-bold text-foreground tabular-nums">{x.n}</p>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: x.c }} />{x.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="p-2.5 rounded-xl flex-shrink-0 bg-[#425B8D]/15 text-[#425B8D]"><Briefcase className="h-5 w-5" /></div>
-            </div>
-          </CardContent>
-        </Card>
-        <StatCard title="Not Present This Month" value={`${stats.notPresent}`} icon={CalendarDays} color="bg-[#FF6F62]/20 text-[#FF6F62]" subtitle={<p className="text-xs text-muted-foreground">Absent: <span className="font-semibold text-foreground">{stats.absent}</span> | Leave: <span className="font-semibold text-foreground">{stats.leave}</span></p>} />
-      </div>
+      <MyAttendanceStats stats={stats} />
 
       {/* Bottom row — aligned to the 3-col overview above (calendar = 2 cols, bento = 1 col, same gap).
           Columns stretch to equal height so the right column's last card bottom-aligns with the calendar. */}
@@ -151,9 +100,8 @@ export function MyAttendanceView() {
           byDate={byDate} travelDays={travelDays}
         />
 
-        {/* Right — activity details + upcoming holidays. The inner stack is absolutely positioned on
-            lg so it fills the calendar's height WITHOUT its own content dictating the row height
-            (that's what kept stretching the calendar). The holidays list just scrolls within. */}
+        {/* Right column: the inner stack is absolutely positioned on lg so it fills the
+            calendar's height WITHOUT its own content dictating the row height. */}
         <div className="lg:col-span-1 relative min-h-0">
           <div className="flex flex-col gap-4 lg:absolute lg:inset-0">
             <ActivityDetailsCard
@@ -165,7 +113,6 @@ export function MyAttendanceView() {
               onEndOnDuty={() => endOnDuty.mutate()}
               onEndLeave={() => endOnLeave.mutate(selRec.leaveRequestId)}
             />
-
             <TodaysAttendanceCard todayList={todayList as any[]} myEmp={myEmp} />
           </div>
         </div>

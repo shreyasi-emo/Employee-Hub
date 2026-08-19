@@ -41,6 +41,9 @@ import { ManageVehicleDialog } from "../components/manage-vehicle-dialog";
 import { MyTimeline } from "../components/my-timeline";
 import { RentalRequestCard } from "../components/rental-request-card";
 import { TrackUsagePanel } from "../components/track-usage-panel";
+import { VehiclesHeader } from "../components/vehicles-header";
+import { VehiclesOverviewStats } from "../components/vehicles-overview-stats";
+import { RentalRequestsList } from "../components/rental-requests-list";
 import {
   useVehicles, useVehicleBookings, useCancelBooking, useRentalDecision, useOptOutOfBooking,
 } from "../api/vehicles.api";
@@ -166,62 +169,28 @@ export default function VehiclesPage() {
   const onWeekSlot = (start: Date, end: Date) => { setSelectedSlot({ start, end }); openForm({ start, end }); };
   const canCancel = (b: any) => (b.requesterId === me || isHrAdmin) && b.status !== "cancelled" && b.status !== "rejected" && new Date(b.endTime) >= now;
 
-  // Overview stat: line 1 = icon + heading, line 2 = big number + small text (or a status badge).
-  const OverviewStat = ({ icon: Icon, heading, value, sub, badge, valueClass = "text-foreground" }: any) => (
-    <div className="flex-1 min-w-[130px]">
-      <div className="flex items-center gap-1.5 text-muted-foreground"><Icon className="h-4 w-4" /><span className="text-[11px] uppercase tracking-wide font-medium">{heading}</span></div>
-      {badge ? (
-        <div className="mt-1.5">{badge}</div>
-      ) : (
-        <p className="mt-1 flex items-baseline gap-1.5"><span className={`text-2xl font-bold tracking-tight tabular-nums ${valueClass}`}>{value}</span><span className="text-xs text-muted-foreground">{sub}</span></p>
-      )}
-    </div>
-  );
 
   return (
     <div className="p-6 space-y-5 max-w-[92rem] mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <span className="h-10 w-10 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center"><Car className="h-5 w-5" /></span>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Vehicles</h1>
-            <p className="text-sm text-muted-foreground">Book the company car directly, or request a rental</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isHrAdmin && (
-            <>
-              <div className="segmented-toggle inline-flex p-0.5 h-10">
-                <button onClick={() => setMode("calendar")} className={`px-3 h-full rounded-[10px] text-xs font-medium ${mode === "calendar" ? "btn-primary-gradient text-white" : "text-foreground/70"}`} data-testid="mode-calendar">Manage Bookings</button>
-                <button onClick={() => setMode("requests")} className={`px-3 h-full rounded-[10px] text-xs font-medium ${mode === "requests" ? "btn-primary-gradient text-white" : "text-foreground/70"}`} data-testid="mode-requests">Rental Requests{pendingRentals.length ? ` (${pendingRentals.length})` : ""}</button>
-              </div>
-              {/* Divider between the primary mode toggle and the secondary action buttons */}
-              <Separator orientation="vertical" className="h-8 self-center bg-border mx-1" />
-              <Button variant="outline" size="sm" className="h-10" onClick={() => setUsageOpen(true)} data-testid="track-usage"><BarChart3 className="h-4 w-4 mr-1.5" /> Track Usage</Button>
-              <Button variant="outline" size="sm" className="h-10" onClick={() => setManageOpen(true)} data-testid="manage-vehicle"><Settings className="h-4 w-4 mr-1.5" /> Manage Vehicles</Button>
-            </>
-          )}
-        </div>
-      </div>
+      <VehiclesHeader
+        isHrAdmin={isHrAdmin}
+        mode={mode} onMode={setMode}
+        pendingRentalCount={pendingRentals.length}
+        onTrackUsage={() => setUsageOpen(true)}
+        onManageVehicles={() => setManageOpen(true)}
+      />
 
       {/* ===== Calendar mode: 75:25 ===== */}
       {mode === "calendar" && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 lg:items-stretch">
           {/* Left 75% — stats (same width as calendar) then the calendar */}
           <div className="lg:col-span-3 space-y-5">
-            <Card className="border-0">
-              <CardContent className="p-4 flex items-stretch gap-4">
-                <OverviewStat icon={Car} heading="Company Vehicles" value={activeVehicles.length} sub="total" valueClass="text-[#206295]" />
-                <Separator orientation="vertical" className="h-12 self-center bg-foreground/25" />
-                <OverviewStat icon={CircleCheck} heading="Confirmed" value={confirmedToday} sub="today" />
-                <Separator orientation="vertical" className="h-12 self-center bg-foreground/25" />
-                <OverviewStat icon={Clock} heading="Slots Available" value={slotsThisWeek} sub="this week" valueClass="text-[#0E7C7B]" />
-                <Separator orientation="vertical" className="h-12 self-center bg-foreground/25" />
-                <OverviewStat icon={ShieldCheck} heading="Rental Backup"
-                  badge={<Badge className={rentalAvailable ? "bg-[#4BDCD9]/25 text-[#0E7C7B]" : "bg-[#64748B]/15 text-[#64748B]"}>{rentalAvailable ? "Available on request" : "Unavailable"}</Badge>} />
-              </CardContent>
-            </Card>
+            <VehiclesOverviewStats
+              vehicleCount={activeVehicles.length}
+              confirmedToday={confirmedToday}
+              slotsThisWeek={slotsThisWeek}
+              rentalAvailable={rentalAvailable}
+            />
             {/* Calendar-area controls: switch between the shared Calendar and the user's travel timeline, plus search */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="segmented-toggle inline-flex p-0.5 h-10">
@@ -371,15 +340,12 @@ export default function VehiclesPage() {
 
       {/* ===== Rental Requests mode (HR) ===== */}
       {mode === "requests" && isHrAdmin && (
-        <div className="space-y-3">
-          <h2 className="text-base font-semibold text-foreground inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-[#206295]" /> Rental Requests — Awaiting Approval</h2>
-          {isLoading ? <Skeleton className="h-24 w-full" /> :
-            pendingRentals.length === 0 ? (
-              <div className="card-surface rounded-2xl py-16 text-center"><CircleDashed className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">No rental requests awaiting your approval.</p></div>
-            ) : [...pendingRentals].sort((a, b) => Number(isDueSoon(b)) - Number(isDueSoon(a)) || +new Date(a.startTime) - +new Date(b.startTime)).map((b) => (
-              <RentalRequestCard key={b.id} b={b} nameByUser={nameByUser} onOpen={setDetailBooking} />
-            ))}
-        </div>
+        <RentalRequestsList
+          pendingRentals={pendingRentals}
+          isLoading={isLoading}
+          nameByUser={nameByUser}
+          onOpen={setDetailBooking}
+        />
       )}
 
       {formOpen && <BookingForm open={formOpen} onClose={() => { setFormOpen(false); setEditBooking(null); }} prefillSlot={prefillSlot} vehicleId={prefillVehicleId} editBooking={editBooking} companyBookings={companyBookings} employees={employees} me={me} myName={myName} vehicles={vehicles} />}
