@@ -30,7 +30,7 @@ import TeamRequestsPage from "@/pages/team-requests";
 import LogisticsPage from "@/features/logistics/pages/logistics-page";
 import RequestsPage from "@/pages/requests";
 import ApprovalNotesPage from "@/pages/approval-notes";
-import VehiclesPage from "@/pages/vehicles";
+import VehiclesPage from "@/features/vehicles/pages/vehicles-page";
 import ResourcesPage from "@/features/resources/pages/resources-page";
 import ReimbursementsPage from "@/pages/reimbursements";
 import NotFound from "@/pages/not-found";
