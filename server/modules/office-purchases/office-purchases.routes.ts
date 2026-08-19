@@ -37,12 +37,22 @@ export function registerOfficePurchaseRoutes(app: Express) {
   };
 
   // ----- List / get -----
+  // Lists never need the uploaded file blobs (only the detail + the finance invoices view do) — strip base64 so list payloads stay small.
+  const stripFile = (f: any) => (f && f.fileData ? { fileName: f.fileName, fileType: f.fileType, hasFile: true } : f);
+  const liteOp = (o: any) => ({ ...o, invoice: stripFile(o.invoice), proformaInvoice: stripFile(o.proformaInvoice) });
   app.get("/api/office-purchases", requireAuth, async (req, res) => {
     const mineOnly = req.query.mine === "true" || req.query.mine === "1";
     const filters: any = {};
     if (!isApprover(req) || mineOnly) filters.requesterId = req.currentUser!.id;
     if (req.query.status) filters.status = req.query.status as string;
-    res.json(await storage.listOfficePurchases(filters));
+    res.json((await storage.listOfficePurchases(filters)).map(liteOp));
+  });
+
+  // Finance-only: full records (WITH file blobs) for the Purchase Invoices hub — the one place the list actually needs the attachments.
+  app.get("/api/office-purchases/invoices", requireAuth, async (req, res) => {
+    if (!isFinance(req)) return res.status(403).json({ error: "Finance only" });
+    const all = await storage.listOfficePurchases({});
+    res.json((all as any[]).filter((o: any) => o.paymentStatus || o.invoice?.fileData || o.proformaInvoice?.fileData));
   });
 
   app.get("/api/office-purchases/:id", requireAuth, async (req, res) => {
@@ -88,7 +98,7 @@ export function registerOfficePurchaseRoutes(app: Express) {
     if (!isHrTriage(req)) return res.status(403).json({ error: "HR only" });
     const r = await storage.getOfficePurchase(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    if (!["pending_hr", "priced"].includes(r.status)) return res.status(400).json({ error: `Cannot price a request in '${r.status}' state` });
+    if (!["pending_hr", "priced", "under_review"].includes(r.status)) return res.status(400).json({ error: `Cannot price a request in '${r.status}' state` });
     const items = Array.isArray(req.body?.items) ? req.body.items : r.items;
     const priority = ["low", "medium", "high"].includes(req.body?.priority) ? req.body.priority : (r.priority || "medium");
     const purchaseType = ["online", "vendor"].includes(req.body?.purchaseType) ? req.body.purchaseType : (r.purchaseType || "online");
@@ -97,7 +107,8 @@ export function registerOfficePurchaseRoutes(app: Express) {
       purchaseType, vendorName: purchaseType === "vendor" ? (req.body?.vendorName || null) : null,
       proformaInvoice: purchaseType === "vendor" ? (req.body?.proformaInvoice ?? r.proformaInvoice ?? null) : null,
       reviewedById: req.currentUser!.id, reviewNote: req.body?.reviewNote || null, reviewedAt: new Date(),
-      status: "priced",
+      // Editing a queried item keeps it Under Review until HR explicitly resends; a fresh price → priced.
+      status: r.status === "under_review" ? "under_review" : "priced",
     });
     await log(req, "OFFICE_PURCHASE_PRICE", "office_purchase", r.id, r, updated);
     res.json(updated);
@@ -133,6 +144,18 @@ export function registerOfficePurchaseRoutes(app: Express) {
     }
     await notifyApprovers(results.length, total);
     res.json({ batchId, sent: results.length, total: total.toFixed(2), items: results });
+  });
+
+  // ----- HR: resend a queried (Under Review) request back to the CEO, with a "resubmitted" marker -----
+  app.post("/api/office-purchases/:id/resend", requireAuth, async (req, res) => {
+    if (!isHrTriage(req)) return res.status(403).json({ error: "HR only" });
+    const r = await storage.getOfficePurchase(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.status !== "under_review") return res.status(400).json({ error: `Only a queried request can be resent (is '${r.status}')` });
+    const updated = await storage.updateOfficePurchase(req.params.id, { status: "pending_approval", comments: [...((r.comments as any[]) || []), mkComment(req, await actorName(req), "Updated and resent for approval.", "resubmitted")] });
+    await log(req, "OFFICE_PURCHASE_RESEND", "office_purchase", r.id, r, updated);
+    try { await storage.notifyByRole([...CEO_ROLES, "super_admin"], { type: "office_purchase_pending", title: "Office Purchase — Resubmitted", body: `${r.reference} (${r.employeeName || "Employee"}) was updated and resent for your approval.`, link: "/my-approvals" }); } catch { /* best-effort */ }
+    res.json(updated);
   });
 
   // ----- CEO: approve (single) -----

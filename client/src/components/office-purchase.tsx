@@ -15,7 +15,7 @@ import { statusClass, statusLabel } from "@/lib/status";
 import { format } from "date-fns";
 import {
   ShoppingCart, Plus, X, Link2, ChevronRight, ChevronLeft, Check, Truck,
-  CircleCheck, AlertTriangle, ExternalLink, Hash, IndianRupee, Copy, MoreVertical,
+  CircleCheck, AlertTriangle, ExternalLink, IndianRupee, Copy, MoreVertical,
   User, CalendarClock, Clock, Building2, FileText, MessageSquare,
 } from "lucide-react";
 import { CommentThread } from "@/components/comment-thread";
@@ -273,7 +273,7 @@ export function NewRequestDialog({ open, onClose, initialKind, onSaveDraft, init
 // employees see "Approval"; approvers (HR/CEO) see "CEO Approval" (their own triage isn't a milestone).
 // `cur` is the stage the request is *waiting on* — nodes before it are done, that node is current.
 // doneCount = milestones achieved; currentIdx = node in progress (-1 while it's still with HR or fully done).
-const OP_DONE_COUNT: Record<string, number> = { pending_hr: 1, priced: 1, pending_approval: 1, approved: 2, ordered: 3, delivered: 4 };
+const OP_DONE_COUNT: Record<string, number> = { pending_hr: 1, priced: 1, pending_approval: 1, under_review: 1, approved: 2, ordered: 3, delivered: 4 };
 function Stepper({ status, approver }: { status: string; approver: boolean }) {
   const stages = ["Submitted", approver ? "CEO Approval" : "Approval", "Ordered", "Delivered"];
   const doneCount = OP_DONE_COUNT[status] ?? 0;
@@ -367,6 +367,16 @@ export function OfficePurchaseDetailDialog({ id, open, onClose, onPriced, contex
     onError: (e: any) => toast({ title: "Action failed", description: e.message, variant: "destructive" }),
   });
 
+  // Resend a queried (Under Review) item: save the HR edits, then flip it back to the CEO with a resubmitted marker.
+  const resendMut = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/office-purchases/${id}/price`, { items: editItems.map((it) => ({ ...it, unitPrice: Number(it.unitPrice) || 0 })), priority, reviewNote: note, purchaseType, vendorName: purchaseType === "vendor" ? vendorName : null, proformaInvoice: purchaseType === "vendor" ? proforma : null });
+      return apiRequest("POST", `/api/office-purchases/${id}/resend`, {});
+    },
+    onSuccess: () => { invalidate(qc); qc.invalidateQueries({ queryKey: [`/api/office-purchases/${id}`] }); toast({ title: "Resent for approval" }); onClose(); },
+    onError: (e: any) => toast({ title: "Action failed", description: e.message, variant: "destructive" }),
+  });
+
   // Seed editable fields from the request when it loads.
   useEffect(() => {
     if (!order) return;
@@ -390,7 +400,7 @@ export function OfficePurchaseDetailDialog({ id, open, onClose, onPriced, contex
   const isOwner = order.requesterId === meId;
   const canAct = context === "approver"; // triage/approve actions only on the approvals page, never from My Requests
   const approver = canHrTriage(role) || canCeoApprove(role);
-  const isHrPriceEdit = canAct && canHrTriage(role) && ["pending_hr", "priced"].includes(order.status);
+  const isHrPriceEdit = canAct && canHrTriage(role) && ["pending_hr", "priced", "under_review"].includes(order.status);
   const editItems = priced ?? items.map((it) => ({ ...it }));
   const setEdit = (i: number, patch: Partial<Item>) => setPriced((prev) => (prev ?? items.map((it) => ({ ...it }))).map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   const rows = isHrPriceEdit ? editItems : items;
@@ -401,7 +411,10 @@ export function OfficePurchaseDetailDialog({ id, open, onClose, onPriced, contex
   // Suggested links are the employee's proposals — HR (triage) and the requester see them; the CEO only sees the final link.
   const showSuggested = canHrTriage(role) || isOwner;
 
-  const showCeoAct = canAct && canCeoApprove(role) && ["pending_approval", "under_review"].includes(order.status);
+  // The CEO approves office purchases in the CEO Inbox (CeoReviewModal), not on this HR triage screen. So when the
+  // HR editor is active (incl. answering a query on an under_review item), never also show CEO Approve/Reject —
+  // that only happened for super_admin (who is both HR and CEO) and produced a confusing "Resend + Approve" footer.
+  const showCeoAct = canAct && canCeoApprove(role) && ["pending_approval", "under_review"].includes(order.status) && !isHrPriceEdit;
   const showOrderAct = canAct && canHrTriage(role) && order.status === "approved";
   const showDeliverAct = canAct && canHrTriage(role) && order.status === "ordered";
   const hasFooter = grandTotal > 0 || isHrPriceEdit || showCeoAct || showOrderAct || showDeliverAct;
@@ -573,7 +586,10 @@ export function OfficePurchaseDetailDialog({ id, open, onClose, onPriced, contex
         {hasFooter && (
           <div className="flex-shrink-0 border-t border-border px-6 py-3 flex items-center gap-2 justify-end bg-background">
             {grandTotal > 0 && <div className="mr-auto flex items-baseline gap-2"><span className="text-xl font-bold text-[#206295] tabular-nums">{money(grandTotal)}</span><span className="text-xs text-muted-foreground">total</span></div>}
-            {isHrPriceEdit && <Button className="btn-primary-gradient" disabled={!canSend || act.isPending} data-testid="op-save-group" onClick={() => act.mutate({ path: "price", body: { items: editItems.map((it) => ({ ...it, unitPrice: Number(it.unitPrice) || 0 })), priority, reviewNote: note, purchaseType, vendorName: purchaseType === "vendor" ? vendorName : null, proformaInvoice: purchaseType === "vendor" ? proforma : null } })}>Save &amp; add to group</Button>}
+            {isHrPriceEdit && (order.status === "under_review"
+              ? <Button className="btn-primary-gradient" disabled={!canSend || resendMut.isPending} data-testid="op-resend" onClick={() => resendMut.mutate()}>Resend to CEO</Button>
+              : <Button className="btn-primary-gradient" disabled={!canSend || act.isPending} data-testid="op-save-group" onClick={() => act.mutate({ path: "price", body: { items: editItems.map((it) => ({ ...it, unitPrice: Number(it.unitPrice) || 0 })), priority, reviewNote: note, purchaseType, vendorName: purchaseType === "vendor" ? vendorName : null, proformaInvoice: purchaseType === "vendor" ? proforma : null } })}>Save &amp; add to group</Button>
+            )}
             {showCeoAct && <>
               <Button variant="outline" className="text-[#FF6F62] border-[#FF6F62]/40" disabled={act.isPending} onClick={() => act.mutate({ path: "reject", body: { note } })}>Reject</Button>
               <Button className="btn-primary-gradient" disabled={act.isPending} onClick={() => act.mutate({ path: "approve", body: { note } })}><CircleCheck className="h-4 w-4 mr-1.5" /> Approve</Button>
@@ -589,45 +605,3 @@ export function OfficePurchaseDetailDialog({ id, open, onClose, onPriced, contex
 
 // ============================ Approvals / queue list (HR + CEO) ============================
 // Compact card that lists office purchases needing attention and opens the detail dialog.
-export function OfficePurchaseQueue() {
-  const { data: auth } = useAuth();
-  const role = auth?.user?.role;
-  const { data: orders = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases"] });
-  const [openId, setOpenId] = useState<string | null>(null);
-
-  // Show anything actionable/in-flight; hide finished/cancelled from the queue.
-  const active = (orders as any[]).filter((o) => !["cancelled", "rejected", "delivered"].includes(o.status));
-  const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 };
-  active.sort((a, b) => (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1) || (a.createdAt < b.createdAt ? -1 : 1));
-
-  return (
-    <>
-      <div className="card-surface rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-base font-semibold text-foreground inline-flex items-center gap-2"><ShoppingCart className="h-4 w-4 text-[#206295]" /> Office Purchases <span className="text-xs font-normal text-muted-foreground">({active.length})</span></p>
-        </div>
-        {active.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">No office purchases need attention.</p>
-        ) : (
-          <div className="list-divider">
-            {active.map((o) => {
-              const needsYou = (canHrTriage(role) && ["pending_hr", "approved", "ordered"].includes(o.status)) || (canCeoApprove(role) && o.status === "pending_approval");
-              return (
-                <button key={o.id} onClick={() => setOpenId(o.id)} className="w-full flex items-center gap-3 py-2.5 text-left hover-elevate rounded-lg px-1" data-testid={`op-queue-${o.id}`}>
-                  <span className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Hash className="h-4 w-4" /></span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">{o.reference} | {o.employeeName || "Employee"}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">{(o.items || []).length} item{(o.items || []).length !== 1 ? "s" : ""}{Number(o.totalAmount) > 0 ? ` | ${money(o.totalAmount)}` : ""} | {o.priority} priority</p>
-                  </div>
-                  {needsYou && <span className="h-2 w-2 rounded-full bg-[#FF6F62] flex-shrink-0" title="Needs your action" />}
-                  <Badge className={`text-[10px] ${statusClass(o.status)} flex-shrink-0`}>{statusLabel(o.status)}</Badge>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-      <OfficePurchaseDetailDialog id={openId} open={!!openId} onClose={() => setOpenId(null)} />
-    </>
-  );
-}

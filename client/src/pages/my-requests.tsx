@@ -104,6 +104,11 @@ const subOf = (type: string, it: any): string =>
   : (it.businessPurpose || it.category || "");
 const searchText = (type: string, it: any): string =>
   [titleOf(type, it), subOf(type, it), it.status, it.reference].filter(Boolean).join(" ").toLowerCase();
+// First item's description as a compact headline, e.g. "Mouse +1 more" (mirrors the office/procurement card title).
+const itemsHeadline = (items: any[]): string => {
+  const l = Array.isArray(items) ? items : [];
+  return l.length ? `${l[0]?.description || "Item"}${l.length > 1 ? ` +${l.length - 1} more` : ""}` : "—";
+};
 
 // Clean table view of requests for the current tab.
 function RequestTable({ type, items, onOpen }: { type: string; items: any[]; onOpen: (it: any) => void }) {
@@ -485,30 +490,33 @@ function RequestCard({ item, type, onOpen }: { item: any; type: "purchase" | "tr
   );
 }
 
-// Office Purchase card — same columnar layout as RequestCard, wired to the office-purchase lifecycle.
-function OfficePurchaseCard({ item, onOpen }: { item: any; onOpen: (id: string) => void }) {
+// Purchase-request card (office + procurement) — the shared columnar layout used across the requests list.
+function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: any; onOpen: (id: string) => void; kind?: "office" | "procurement" }) {
   const { toast } = useToast();
-  const reference = item.reference || `OP-${String(item.id || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()}`;
+  const isProc = kind === "procurement";
+  const basePath = isProc ? "/api/procurement" : "/api/office-purchases";
+  const reference = item.reference || `${isProc ? "PR" : "OP"}-${String(item.id || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()}`;
   const lines = Array.isArray(item.items) ? item.items : [];
-  const title = lines.length ? `${lines[0]?.description || "Item"}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}` : "Office Purchase";
+  const title = lines.length ? `${lines[0]?.description || "Item"}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}` : (isProc ? "Procurement" : "Office Purchase");
   const amt = Number(item.totalAmount) || 0;
-  const canCancel = ["pending_hr", "pending_approval"].includes(item.status);
+  // Office can be cancelled pre-CEO (pending_hr / pending_approval); procurement only while pending_approval.
+  const canCancel = isProc ? item.status === "pending_approval" : ["pending_hr", "pending_approval"].includes(item.status);
   const cancel = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/office-purchases/${item.id}/cancel`, {}),
-    onSuccess: () => { queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/office-purchases") }); toast({ title: "Request cancelled" }); },
+    mutationFn: () => apiRequest("POST", `${basePath}/${item.id}/cancel`, {}),
+    onSuccess: () => { queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith(basePath) }); toast({ title: "Request cancelled" }); },
     onError: (e: any) => toast({ title: "Could not cancel", description: e.message, variant: "destructive" }),
   });
   return (
-    <Card data-testid={`card-op-${item.id}`} className="border-0 hover-elevate active-elevate-2 cursor-pointer" onClick={() => onOpen(item.id)}>
+    <Card data-testid={`card-${kind}-${item.id}`} className="border-0 hover-elevate active-elevate-2 cursor-pointer" onClick={() => onOpen(item.id)}>
       <CardContent className="p-[17px]">
         <div className="flex items-stretch gap-0">
           <div className="flex-1 min-w-0 flex items-start gap-3 pr-5">
-            <div className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0 mt-1"><ShoppingCart className="h-4 w-4" /></div>
+            <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-1 ${isProc ? "bg-[#0E7C7B]/10 text-[#0E7C7B]" : "bg-[#206295]/10 text-[#206295]"}`}>{isProc ? <Package className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}</div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-semibold text-muted-foreground tracking-wide">{reference}</span>
                 <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(reference); toast({ title: "Reference copied" }); }} aria-label="Copy reference" className="h-5 w-5 rounded inline-flex items-center justify-center text-muted-foreground hover:text-[#206295] hover:bg-muted"><Copy className="h-3 w-3" /></button>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">{item.priority || "medium"}</Badge>
+                {!isProc && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">{item.priority || "medium"}</Badge>}
               </div>
               <h3 className="text-[18px] leading-tight font-semibold text-foreground tracking-tight truncate mt-0.5">{title}</h3>
               <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 flex-shrink-0" /> Created · {formatDate(item.createdAt)}</p>
@@ -534,12 +542,12 @@ function OfficePurchaseCard({ item, onOpen }: { item: any; onOpen: (id: string) 
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">Amount</p>
             {amt > 0
               ? <p className="text-2xl font-bold text-[#206295] tracking-tight tabular-nums mt-1.5"><span className="font-semibold mr-0.5">₹</span>{amt.toLocaleString("en-IN")}</p>
-              : <p className="text-sm text-muted-foreground mt-1.5">Not priced yet</p>}
+              : <p className="text-sm text-muted-foreground mt-1.5">{isProc ? "—" : "Not priced yet"}</p>}
           </div>
 
           <div className="flex-shrink-0 flex items-center pl-2" onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" data-testid={`more-op-${item.id}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" data-testid={`more-${kind}-${item.id}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onClick={() => onOpen(item.id)}><Eye className="h-4 w-4 mr-2" /> View details</DropdownMenuItem>
                 {canCancel && <DropdownMenuItem className="text-[#FF6F62] focus:text-[#FF6F62]" disabled={cancel.isPending} onClick={() => { if (window.confirm("Cancel this request? This cannot be undone.")) cancel.mutate(); }}><Ban className="h-4 w-4 mr-2" /> Cancel</DropdownMenuItem>}
@@ -679,19 +687,6 @@ function ReimbCardView({ items, onOpen }: { items: any[]; onOpen: (it: any) => v
   );
 }
 
-// Section header to break a request list into "In progress" / "Completed" (renders only if it has items).
-function ReqSection({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
-  if (count === 0) return null;
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
-        <span className="text-[10px] font-bold rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">{count}</span>
-      </div>
-      {children}
-    </div>
-  );
-}
 const DONE_STATUS: Record<string, string[]> = {
   office: ["delivered", "rejected", "cancelled"],
   procurement: ["approved", "rejected", "cancelled"],
@@ -717,6 +712,7 @@ export default function MyRequestsPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("status_change");
   const [view, setView] = useState<"card" | "table">("card");
+  const [phase, setPhase] = useState<"active" | "completed">("active"); // In Progress / Completed — mirrors the approval screens' phase toggle
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ type: string; item: any } | null>(null);
   const [showPRForm, setShowPRForm] = useState(false);
@@ -989,15 +985,27 @@ export default function MyRequestsPage() {
     return r;
   };
 
-  // Shared header controls (search · status filter · sort · view toggle · primary button)
-  const controls = (newBtn: React.ReactNode) => (
+  // In Progress / Completed toggle — same segmented control as the approval screens (replaces the old sections).
+  const phaseToggle = (
+    <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0" data-testid="req-phase-toggle">
+      {(["active", "completed"] as const).map((p) => (
+        <button key={p} onClick={() => setPhase(p)} data-testid={`req-phase-${p}`} className={`px-3 h-full rounded-[10px] text-xs font-medium ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}>
+          {p === "active" ? "In Progress" : "Completed"}
+        </button>
+      ))}
+    </div>
+  );
+
+  // Shared header controls (view · phase · search · status filter · sort · primary button)
+  const controls = (newBtn: React.ReactNode, showPhase = false) => (
     <div className="flex items-center gap-3">
-      {/* View toggle — left-most, icon only */}
+      {/* View toggle — icon only */}
       <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
         <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
         <button onClick={() => setView("table")} aria-label="Table view" data-testid="view-table" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
       </div>
       <div className="h-10 w-px flex-shrink-0 bg-foreground/30" />
+      {showPhase && phaseToggle}
       {/* Search — fills available width */}
       <div className="relative flex-1 min-w-0">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -1091,7 +1099,7 @@ export default function MyRequestsPage() {
             <Button size="sm" onClick={() => { setEditingDraftId(null); setTripInitial(null); setShowNewTravel(true); }} data-testid="button-new-travel">
               <Plus className="h-4 w-4 mr-1.5" /> New Travel Request
             </Button>
-          )}
+          , true)}
           {loadTrips ? <Skeleton className="h-24 w-full" /> :
             (myTrips as any[]).length === 0 ? renderEmpty("No travel requests yet.") :
             (() => {
@@ -1111,12 +1119,9 @@ export default function MyRequestsPage() {
               };
               const done = (myTrips as any[]).filter((t) => DONE_STATUS.trip.includes(t.status));
               const active = (myTrips as any[]).filter((t) => !DONE_STATUS.trip.includes(t.status));
-              return (
-                <div className="space-y-6">
-                  <ReqSection label="In progress" count={active.length}><div className="space-y-3">{active.map(tripCard)}</div></ReqSection>
-                  <ReqSection label="Completed" count={done.length}><div className="space-y-3">{done.map(tripCard)}</div></ReqSection>
-                </div>
-              );
+              const shown = phase === "active" ? active : done;
+              if (shown.length === 0) return renderEmpty(phase === "active" ? "No trips in progress." : "No completed trips.");
+              return <div className="space-y-3">{shown.map(tripCard)}</div>;
             })()
           }
         </TabsContent>
@@ -1160,34 +1165,33 @@ export default function MyRequestsPage() {
             <Button size="sm" onClick={() => { setEditingDraftId(null); setNewInitialData(null); setNewKind("office"); setOpNewOpen(true); }} data-testid="button-new-office-purchase">
               <Plus className="h-4 w-4 mr-1.5" /> New Office Purchase
             </Button>
-          )}
+          , true)}
           {loadOP ? <Skeleton className="h-24 w-full" /> :
             fOP.length === 0 ? renderEmpty((officePurchases as any[]).length === 0 ? "No office purchases yet." : "No office purchases match this filter.") :
-            view === "table" ? (
-              <Card className="border-0"><CardContent className="p-0">
-                <DataTable
-                  columns={[
-                    { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
-                    { key: "items", header: "Items", cellClassName: "text-muted-foreground", render: (o: any) => `${(o.items || []).length} item${(o.items || []).length !== 1 ? "s" : ""}` },
-                    { key: "priority", header: "Priority", cellClassName: "capitalize text-muted-foreground", render: (o: any) => o.priority || "medium" },
-                    { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
-                    { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
-                    { key: "created", header: "Created", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? formatDate(o.createdAt) : "—" },
-                  ]}
-                  rows={fOP}
-                  getRowKey={(o: any) => o.id}
-                  onRowClick={(o: any) => setOpDetailId(o.id)}
-                  testIdPrefix="op-row"
-                />
-              </CardContent></Card>
-            ) : (() => {
+            (() => {
               const done = fOP.filter((o: any) => DONE_STATUS.office.includes(o.status));
               const active = fOP.filter((o: any) => !DONE_STATUS.office.includes(o.status));
-              return (
-                <div className="space-y-6">
-                  <ReqSection label="In progress" count={active.length}><div className="space-y-3">{active.map((o: any) => <OfficePurchaseCard key={o.id} item={o} onOpen={setOpDetailId} />)}</div></ReqSection>
-                  <ReqSection label="Completed" count={done.length}><div className="space-y-3">{done.map((o: any) => <OfficePurchaseCard key={o.id} item={o} onOpen={setOpDetailId} />)}</div></ReqSection>
-                </div>
+              const shown = phase === "active" ? active : done;
+              if (shown.length === 0) return renderEmpty(phase === "active" ? "Nothing in progress." : "Nothing completed yet.");
+              return view === "table" ? (
+                <Card className="border-0"><CardContent className="p-0">
+                  <DataTable
+                    columns={[
+                      { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
+                      { key: "item", header: "Item", cellClassName: "text-foreground max-w-[20rem] truncate", render: (o: any) => itemsHeadline(o.items) },
+                      { key: "priority", header: "Priority", cellClassName: "capitalize text-muted-foreground", render: (o: any) => o.priority || "medium" },
+                      { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
+                      { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
+                      { key: "created", header: "Created", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? formatDate(o.createdAt) : "—" },
+                    ]}
+                    rows={shown}
+                    getRowKey={(o: any) => o.id}
+                    onRowClick={(o: any) => setOpDetailId(o.id)}
+                    testIdPrefix="op-row"
+                  />
+                </CardContent></Card>
+              ) : (
+                <div className="space-y-3">{shown.map((o: any) => <PurchaseRequestCard key={o.id} item={o} kind="office" onOpen={setOpDetailId} />)}</div>
               );
             })()
           }
@@ -1198,44 +1202,32 @@ export default function MyRequestsPage() {
             <Button size="sm" onClick={() => { setEditingDraftId(null); setNewInitialData(null); setNewKind("procurement"); setOpNewOpen(true); }} data-testid="button-new-procurement">
               <Plus className="h-4 w-4 mr-1.5" /> New Procurement
             </Button>
-          )}
+          , true)}
           {loadProc ? <Skeleton className="h-24 w-full" /> :
             fProc.length === 0 ? renderEmpty((procurement as any[]).length === 0 ? "No procurement requests yet." : "No procurement requests match this filter.") :
-            view === "table" ? (
-              <Card className="border-0"><CardContent className="p-0">
-                <DataTable
-                  columns={[
-                    { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
-                    { key: "items", header: "Items", cellClassName: "text-muted-foreground", render: (o: any) => `${(o.items || []).length} item${(o.items || []).length !== 1 ? "s" : ""}` },
-                    { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
-                    { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
-                    { key: "created", header: "Created", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? formatDate(o.createdAt) : "—" },
-                  ]}
-                  rows={fProc}
-                  getRowKey={(o: any) => o.id}
-                  onRowClick={(o: any) => setProcDetailId(o.id)}
-                  testIdPrefix="proc-row"
-                />
-              </CardContent></Card>
-            ) : (() => {
-              const procCard = (o: any) => (
-                <button key={o.id} onClick={() => setProcDetailId(o.id)} className="w-full text-left card-surface rounded-[16px] p-4 hover-elevate flex items-center gap-3" data-testid={`proc-card-${o.id}`}>
-                  <span className="h-10 w-10 rounded-xl bg-[#0E7C7B]/10 text-[#0E7C7B] flex items-center justify-center flex-shrink-0"><Package className="h-5 w-5" /></span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground truncate">{o.reference} | {(o.items || []).length} item{(o.items || []).length !== 1 ? "s" : ""}</p>
-                    <p className="text-xs text-muted-foreground truncate">{(o.items || []).map((it: any) => it.description).filter(Boolean).join(", ") || "—"}</p>
-                  </div>
-                  {Number(o.totalAmount) > 0 && <span className="text-sm font-bold text-[#206295] flex-shrink-0 tabular-nums">{money(o.totalAmount)}</span>}
-                  <Badge className={`text-xs ${statusClass(o.status)} flex-shrink-0`}>{statusLabel(o.status)}</Badge>
-                </button>
-              );
+            (() => {
               const done = fProc.filter((o: any) => DONE_STATUS.procurement.includes(o.status));
               const active = fProc.filter((o: any) => !DONE_STATUS.procurement.includes(o.status));
-              return (
-                <div className="space-y-6">
-                  <ReqSection label="In progress" count={active.length}><div className="space-y-3">{active.map(procCard)}</div></ReqSection>
-                  <ReqSection label="Completed" count={done.length}><div className="space-y-3">{done.map(procCard)}</div></ReqSection>
-                </div>
+              const shown = phase === "active" ? active : done;
+              if (shown.length === 0) return renderEmpty(phase === "active" ? "Nothing in progress." : "Nothing completed yet.");
+              return view === "table" ? (
+                <Card className="border-0"><CardContent className="p-0">
+                  <DataTable
+                    columns={[
+                      { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
+                      { key: "item", header: "Item", cellClassName: "text-foreground max-w-[20rem] truncate", render: (o: any) => itemsHeadline(o.items) },
+                      { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
+                      { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
+                      { key: "created", header: "Created", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? formatDate(o.createdAt) : "—" },
+                    ]}
+                    rows={shown}
+                    getRowKey={(o: any) => o.id}
+                    onRowClick={(o: any) => setProcDetailId(o.id)}
+                    testIdPrefix="proc-row"
+                  />
+                </CardContent></Card>
+              ) : (
+                <div className="space-y-3">{shown.map((o: any) => <PurchaseRequestCard key={o.id} item={o} kind="procurement" onOpen={setProcDetailId} />)}</div>
               );
             })()
           }

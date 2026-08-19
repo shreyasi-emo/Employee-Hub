@@ -87,9 +87,12 @@ export function reimbDraftComplete(data: any) {
 
 export function ReimbursementFormDialog({ open, onClose, onSuccess, initialData, onSaveDraft, reimbursementId, decisionNote, editable, autoValidate }: { open: boolean; onClose: () => void; onSuccess?: () => void; initialData?: any; onSaveDraft?: (data: any) => void; reimbursementId?: string; decisionNote?: string; editable?: { fields: string[]; lines: number[] }; autoValidate?: boolean }) {
   const isResubmit = !!reimbursementId;
-  const hasScope = isResubmit && !!editable && ((editable.fields?.length || 0) + (editable.lines?.length || 0)) > 0;
-  const canEditField = (k: string) => !hasScope || editable!.fields.includes(k);
-  const canEditLine = (i: number) => !hasScope || editable!.lines.includes(i);
+  // Field- and line-editability are scoped INDEPENDENTLY: scoping specific line items must NOT lock the header fields (and vice-versa).
+  const hasFieldScope = isResubmit && !!editable && (editable.fields?.length || 0) > 0;
+  const hasLineScope = isResubmit && !!editable && (editable.lines?.length || 0) > 0;
+  const hasScope = hasFieldScope || hasLineScope;
+  const canEditField = (k: string) => !hasFieldScope || editable!.fields.includes(k);
+  const canEditLine = (i: number) => !hasLineScope || editable!.lines.includes(i);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -223,7 +226,7 @@ export function ReimbursementFormDialog({ open, onClose, onSuccess, initialData,
             <div className="rounded-[16px] border border-[#FF6F62]/40 bg-[#FF6F62]/[0.06] p-3.5">
               <p className="text-xs font-semibold text-[#FF6F62] uppercase tracking-wide mb-1">Changes requested</p>
               <p className="text-sm text-foreground">{decisionNote}</p>
-              {hasScope && <p className="text-[11px] text-muted-foreground mt-1.5">Only the highlighted fields below are editable.</p>}
+              {hasScope && <p className="text-[11px] text-muted-foreground mt-1.5">The items to update are highlighted below.</p>}
             </div>
           )}
           {/* Business purpose + period */}
@@ -247,7 +250,7 @@ export function ReimbursementFormDialog({ open, onClose, onSuccess, initialData,
               <span className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</span>
             </div>
             {items.map((it, i) => (
-              <div key={i} className={`rounded-[16px] border p-3 space-y-3 bg-muted/30 ${isResubmit && !canEditLine(i) ? "opacity-60 pointer-events-none border-border" : hasScope && canEditLine(i) ? "border-[#206295]/50 ring-1 ring-[#206295]/30" : "border-border"}`} data-testid={`reimb-item-${i}`}>
+              <div key={i} className={`rounded-[16px] border p-3 space-y-3 bg-muted/30 ${isResubmit && !canEditLine(i) ? "opacity-60 pointer-events-none border-border" : hasLineScope && canEditLine(i) ? "border-[#206295]/50 ring-1 ring-[#206295]/30" : "border-border"}`} data-testid={`reimb-item-${i}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-muted-foreground">Item {i + 1}</span>
                   {!isResubmit && (

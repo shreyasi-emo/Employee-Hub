@@ -22,7 +22,18 @@ export function registerTravelRoutes(app: Express) {
     if (category === "stay") return { startDate: dateOnly(d?.checkIn), endDate: dateOnly(d?.checkOut) || dateOnly(d?.checkIn) };
     return { startDate: dateOnly(d?.dateTime), endDate: dateOnly(d?.dateTime) };
   };
-  const within24h = (startDate: any) => { if (!startDate) return false; return new Date(String(startDate)).getTime() - Date.now() <= 24 * 3600 * 1000; };
+  // Auto-approve only when the trip is imminent (starts today or tomorrow — too soon for a CEO round-trip).
+  // Fixes the old bug where any PAST date also satisfied "<= 24h" and got auto-approved.
+  const within24h = (startDate: any) => {
+    if (!startDate) return false;
+    const start = new Date(`${String(startDate).slice(0, 10)}T00:00:00`);
+    if (isNaN(start.getTime())) return false;
+    const now = new Date();
+    const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+    const todayDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const diffDays = Math.round((startDay - todayDay) / 86400000);
+    return diffDays === 0 || diffDays === 1;
+  };
 
   async function requesterContext(userId: string, username: string) {
     const u = await storage.getUser(userId);
@@ -41,12 +52,19 @@ export function registerTravelRoutes(app: Express) {
   };
 
   // ----- List / get -----
+  // Lists never use the ticket/voucher blob (only the detail does) — strip the base64 so list payloads stay small.
+  const lite = (t: any) => (t?.document?.fileData ? { ...t, document: { fileName: t.document.fileName, fileType: t.document.fileType, hasFile: true } } : t);
   app.get("/api/travel", requireAuth, async (req, res) => {
     const mineOnly = req.query.mine === "true" || req.query.mine === "1";
+    const uid = req.currentUser!.id;
+    if (mineOnly || !isApprover(req)) {
+      // "Mine" = trips I requested OR am a co-traveller (attendee) on, so co-travellers see booked trips + calendar highlights.
+      const all = await storage.listTripRequests(req.query.status ? { status: req.query.status as string } : {});
+      return res.json((all as any[]).filter((t) => t.requesterId === uid || ((t.attendees || []) as any[]).some((a) => a?.userId === uid)).map(lite));
+    }
     const filters: any = {};
-    if (!isApprover(req) || mineOnly) filters.requesterId = req.currentUser!.id;
     if (req.query.status) filters.status = req.query.status as string;
-    res.json(await storage.listTripRequests(filters));
+    res.json((await storage.listTripRequests(filters)).map(lite));
   });
   app.get("/api/travel/:id", requireAuth, async (req, res) => {
     const r = await storage.getTripRequest(req.params.id);
@@ -82,15 +100,18 @@ export function registerTravelRoutes(app: Express) {
     if (!["pending_hr", "pending_approval", "under_review"].includes(r.status)) return res.status(400).json({ error: `Cannot price a request in '${r.status}' state` });
     const auto = within24h(r.startDate);
     const amount = String(Number(req.body?.amount) || 0);
+    const wasQueried = r.status === "under_review";  // HR answering a CEO query → resend for approval
+    const resubmitComment = wasQueried ? mkComment(req, await actorName(req), "Updated and resent for approval.", "resubmitted") : null;
     const updated = await storage.updateTripRequest(req.params.id, {
       amount, hrDetails: req.body?.hrDetails || r.hrDetails || {}, reviewedById: req.currentUser!.id, reviewedAt: new Date(),
       status: auto ? "approved" : "pending_approval", autoApproved: auto,
+      ...(resubmitComment ? { comments: [...((r.comments as any[]) || []), resubmitComment] } : {}),
       ...(auto ? { approvedById: req.currentUser!.id, decidedAt: new Date(), decisionNote: "Auto-approved — travel within 24h" } : {}),
     });
     await log(req, "TRAVEL_PRICE", "trip", r.id, r, updated);
     try {
       if (auto) await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_approved", title: "Auto-approved — book it", body: `${r.reference} starts within 24h — approved automatically, please book.`, link: "/company-workspace" });
-      else await storage.notifyByRole([...CEO_ROLES, "super_admin"], { type: "travel_pending", title: "Travel — Approval Needed", body: `${r.reference} (${r.employeeName || "Employee"}, ₹${(Number(req.body?.amount) || 0).toLocaleString("en-IN")}) needs your approval.`, link: "/my-approvals" });
+      else await storage.notifyByRole([...CEO_ROLES, "super_admin"], { type: "travel_pending", title: wasQueried ? "Travel — Resubmitted for approval" : "Travel — Approval Needed", body: `${r.reference} (${r.employeeName || "Employee"}, ₹${(Number(req.body?.amount) || 0).toLocaleString("en-IN")}) ${wasQueried ? "was updated and resent." : "needs your approval."}`, link: "/my-approvals" });
     } catch { /* best-effort */ }
     res.json(updated);
   });

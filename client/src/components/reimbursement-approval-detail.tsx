@@ -393,7 +393,7 @@ export function ReimbursementDetailView({
             {crMode === "changes" && (
               <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                 <Checkbox checked={crAllowAll} onCheckedChange={() => setCrAllowAll((v) => !v)} data-testid="cr-allow-all" />
-                Allow Requester to edit all fields.
+                Let the requester edit the whole claim (otherwise flag the items to fix below).
               </label>
             )}
             <div className="flex items-center justify-end gap-2">
@@ -442,6 +442,10 @@ export function ReimbursementApprovalModal({ reimb, canAct, open, onClose, onExp
   const { toast } = useToast();
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/reimbursements") });
+  // Approver lists are served slim (no base64 invoice images). Fetch the full record so the thumbnails render;
+  // the passed `reimb` gives instant metadata while the full payload loads.
+  const { data: full } = useQuery<any>({ queryKey: [`/api/reimbursements/${reimb.id}`], enabled: open && !!reimb.id });
+  const view = full || reimb;
 
   const act = useMutation({
     mutationFn: ({ kind, note, sel }: { kind: string; note?: string; sel?: { fields: string[]; lines: number[] } }) => apiRequest("POST", `/api/reimbursements/${reimb.id}/${kind}`, { ...(note ? { note } : {}), ...(sel || {}) }),
@@ -449,7 +453,7 @@ export function ReimbursementApprovalModal({ reimb, canAct, open, onClose, onExp
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const doExport = async () => { try { await exportReimbursement(reimb); } catch (e: any) { toast({ title: "Export failed", description: e.message, variant: "destructive" }); } };
+  const doExport = async () => { try { await exportReimbursement(view); } catch (e: any) { toast({ title: "Export failed", description: e.message, variant: "destructive" }); } };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -471,7 +475,7 @@ export function ReimbursementApprovalModal({ reimb, canAct, open, onClose, onExp
           </DialogClose>
         </div>
         <ReimbursementDetailView
-          reimb={reimb}
+          reimb={view}
           canAct={canAct}
           busy={act.isPending}
           showTimeline={false}

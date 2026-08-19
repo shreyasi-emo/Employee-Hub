@@ -76,7 +76,7 @@ export function AppSidebar() {
   // CEO Inbox badge = CEO-stage items awaiting action (mirrors the page's count): finance-approved
   // reimbursements + office/procurement pending_approval or under_review. Super-admin only (they own the tab).
   const isSuper = user?.role === "super_admin";
-  const { data: ceoReimb = [] } = useQuery<any[]>({ queryKey: ["/api/reimbursements"], enabled: isSuper, refetchInterval: 60000 });
+  const { data: ceoReimb = [] } = useQuery<any[]>({ queryKey: ["/api/reimbursements?summary=true"], enabled: isSuper, refetchInterval: 60000 });
   const { data: ceoOps = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases"], enabled: isSuper, refetchInterval: 60000 });
   const { data: ceoProcs = [] } = useQuery<any[]>({ queryKey: ["/api/procurement"], enabled: isSuper, refetchInterval: 60000 });
   const ceoInboxCount = isSuper

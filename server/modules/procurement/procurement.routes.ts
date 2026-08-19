@@ -10,7 +10,7 @@ import { log } from "../../shared/audit";
 export function registerProcurementRoutes(app: Express) {
   const CEO_ROLES = ["ceo_approver"];
   const isCeo = (r: Request) => hasRole(r, "super_admin", ...CEO_ROLES);
-  const isApprover = (r: Request) => hasRole(r, "super_admin", ...CEO_ROLES, "finance");
+  const isApprover = (r: Request) => hasRole(r, "super_admin", ...CEO_ROLES);  // procurement goes straight to the CEO — finance has no role here
 
   const sumItems = (items: any): string => {
     const total = (Array.isArray(items) ? items : []).reduce((s: number, it: any) => s + (Number(it?.unitPrice) || 0) * (Number(it?.quantity) || 0), 0);
@@ -187,5 +187,26 @@ export function registerProcurementRoutes(app: Express) {
     const results: any[] = [];
     for (const id of ids) { const u = await queryOne(req, id, body, name); if (u) results.push(u); }
     res.json({ queried: results.length, items: results });
+  });
+
+  // ----- Requester: edit + resubmit a queried (Under Review) request → back to the CEO with a resubmitted marker -----
+  app.post("/api/procurement/:id/resubmit", requireAuth, async (req, res) => {
+    const r = await storage.getProcurementRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.requesterId !== req.currentUser!.id && req.currentUser!.role !== "super_admin") return res.status(403).json({ error: "Only the requester can resubmit." });
+    if (r.status !== "under_review") return res.status(400).json({ error: "Only a queried request can be resubmitted." });
+    const items = (Array.isArray(req.body?.items) ? req.body.items : r.items)
+      .map((it: any) => ({ description: String(it?.description || "").trim(), quantity: Number(it?.quantity) || 1, link: String(it?.link || "").trim(), unitPrice: Number(it?.unitPrice) || 0 }))
+      .filter((it: any) => it.description);
+    if (!items.length) return res.status(400).json({ error: "Add at least one item with a description." });
+    const updated = await storage.updateProcurementRequest(req.params.id, {
+      items, totalAmount: sumItems(items),
+      justification: req.body?.justification ?? r.justification ?? null,
+      status: "pending_approval",
+      comments: [...((r.comments as any[]) || []), mkComment(req, await actorName(req), "Updated and resubmitted for approval.", "resubmitted")],
+    });
+    await log(req, "PROCUREMENT_RESUBMIT", "procurement", r.id, r, updated);
+    try { await storage.notifyByRole([...CEO_ROLES, "super_admin"], { type: "procurement_submitted", title: "Procurement — Resubmitted", body: `${r.reference} (${r.employeeName || "Employee"}) was updated and resent for your approval.`, link: "/my-approvals" }); } catch { /* best-effort */ }
+    res.json(updated);
   });
 }

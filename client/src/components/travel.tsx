@@ -23,6 +23,8 @@ export const canTravelHr = (role?: string) => !!role && ["super_admin", "hr_admi
 export const canTravelCeo = (role?: string) => !!role && ["super_admin", "ceo_approver"].includes(role);
 const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const invalidateTravel = (qc: ReturnType<typeof useQueryClient>) => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/travel") });
+// A trip is "resubmitted" when the latest query/resubmit marker in its thread is a resubmit (HR answered the CEO's query).
+const isResubmitted = (t: any) => { const m = ((t?.comments || []) as any[]).filter((c) => c.kind === "query" || c.kind === "resubmitted"); return m.length > 0 && m[m.length - 1].kind === "resubmitted"; };
 
 // Chooser icons compose real lucide glyphs (accurate, crisp) with thin animated line
 // elements layered around them. Motion is driven by the hover-gated tv-* classes in index.css.
@@ -248,7 +250,7 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
 }
 
 // ============================ Travel detail (all roles) ============================
-export function TravelDetailDialog({ id, open, onClose, context = "owner" }: { id: string | null; open: boolean; onClose: () => void; context?: "owner" | "approver" }) {
+export function TravelDetailDialog({ id, open, onClose, context = "owner", scope = "hr" }: { id: string | null; open: boolean; onClose: () => void; context?: "owner" | "approver"; scope?: "ceo" | "hr" }) {
   const { data: auth } = useAuth();
   const role = auth?.user?.role;
   const meId = auth?.user?.id;
@@ -277,9 +279,11 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner" }: { i
   const cat = TRAVEL_CATS[t.category] || TRAVEL_CATS.flight;
   const isOwner = t.requesterId === meId;
   const canAct = context === "approver";
-  const isHrPrice = canAct && canTravelHr(role) && ["pending_hr", "pending_approval", "under_review"].includes(t.status);
-  const isHrBook = canAct && canTravelHr(role) && t.status === "approved";
-  const isCeoDecision = canAct && canTravelCeo(role) && ["pending_approval", "under_review"].includes(t.status);
+  const hrScope = canAct && scope !== "ceo" && canTravelHr(role);   // HR prices + books
+  const ceoScope = canAct && scope !== "hr" && canTravelCeo(role);  // CEO approves/rejects/queries
+  const isHrPrice = hrScope && ["pending_hr", "pending_approval", "under_review"].includes(t.status);
+  const isHrBook = hrScope && t.status === "approved";
+  const isCeoDecision = ceoScope && ["pending_approval", "under_review"].includes(t.status);
   const amt = Number(t.amount) || 0;
   const route = t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "") : `${t.details?.from || "?"} → ${t.details?.to || "?"}`;
 
@@ -291,6 +295,7 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner" }: { i
             <span className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${cat.tint}1a`, color: cat.tint }}><cat.icon className="h-5 w-5" /></span>
             <span className="truncate">{t.reference}</span>
             <Badge className={`text-[10px] flex-shrink-0 ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge>
+            {isResubmitted(t) && <Badge className="text-[10px] flex-shrink-0 bg-[#206295]/15 text-[#206295]">Resubmitted</Badge>}
             {t.autoApproved && <Badge className="text-[10px] flex-shrink-0 bg-[#4BDCD9]/25 text-[#0E7C7B]">Auto</Badge>}
           </DialogTitle>
         </DialogHeader>
@@ -357,27 +362,29 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner" }: { i
 }
 
 // ============================ Travel approvals (HR price/book + CEO decide) ============================
-export function TravelApprovals() {
-  const { data: auth } = useAuth();
-  const role = auth?.user?.role;
+export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
   const [phase, setPhase] = useState<"pending" | "booked" | "completed">("pending");
   const [detailId, setDetailId] = useState<string | null>(null);
   const { data: all = [] } = useQuery<any[]>({ queryKey: ["/api/travel"] });
+  // CEO surface reviews (approve/reject/query); HR surface prices + books. Scope keeps them separate for super_admin.
+  const pendingStatuses = scope === "ceo" ? ["pending_approval", "under_review"] : ["pending_hr", "approved", "under_review"];
   const list = (all as any[]).filter((t) => {
     if (phase === "booked") return t.status === "booked";
     if (phase === "completed") return ["rejected", "cancelled"].includes(t.status);
-    return (canTravelHr(role) && ["pending_hr", "approved"].includes(t.status)) || (canTravelCeo(role) && ["pending_approval", "under_review"].includes(t.status));
+    return pendingStatuses.includes(t.status);
   }).sort((a, b) => +new Date(b.createdAt || 0) - +new Date(a.createdAt || 0));
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold text-foreground flex items-center gap-2"><Plane className="h-4 w-4 text-[#206295]" /> Travel</span>
-        <div className="segmented-toggle inline-flex p-0.5 h-8 ml-1">
-          {(["pending", "booked", "completed"] as const).map((p) => (
-            <button key={p} onClick={() => setPhase(p)} className={`px-3 h-full rounded-[9px] text-xs font-medium capitalize ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`travel-phase-${p}`}>{p}</button>
-          ))}
+      {scope === "hr" && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-foreground flex items-center gap-2"><Plane className="h-4 w-4 text-[#206295]" /> Travel</span>
+          <div className="segmented-toggle inline-flex p-0.5 h-8 ml-1">
+            {(["pending", "booked", "completed"] as const).map((p) => (
+              <button key={p} onClick={() => setPhase(p)} className={`px-3 h-full rounded-[9px] text-xs font-medium capitalize ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`travel-phase-${p}`}>{p}</button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       {list.length === 0 ? (
         <div className="card-surface rounded-2xl py-10 text-center"><Check className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" /><p className="text-sm text-muted-foreground">Nothing here.</p></div>
       ) : (
@@ -390,7 +397,7 @@ export function TravelApprovals() {
               <div key={t.id} className="card-surface card-hover p-4 flex items-center gap-4 cursor-pointer" onClick={() => setDetailId(t.id)} data-testid={`travel-appr-${t.id}`}>
                 <span className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${cat.tint}1a`, color: cat.tint }}><cat.icon className="h-4 w-4" /></span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-semibold text-foreground truncate">{t.reference}</span><Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge></div>
+                  <div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-semibold text-foreground truncate">{t.reference}</span><Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge>{isResubmitted(t) && <Badge className="text-[10px] bg-[#206295]/15 text-[#206295]">Resubmitted</Badge>}</div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{cat.label} | {t.employeeName || "Employee"} | {route}{t.startDate ? ` | ${format(new Date(t.startDate), "MMM d")}` : ""}</p>
                 </div>
                 {amt > 0 && <span className="text-base font-bold text-[#206295] tabular-nums flex-shrink-0">{money(amt)}</span>}
@@ -400,7 +407,7 @@ export function TravelApprovals() {
           })}
         </div>
       )}
-      <TravelDetailDialog id={detailId} open={!!detailId} onClose={() => setDetailId(null)} context="approver" />
+      <TravelDetailDialog id={detailId} open={!!detailId} onClose={() => setDetailId(null)} context="approver" scope={scope} />
     </div>
   );
 }
