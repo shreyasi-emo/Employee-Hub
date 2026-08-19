@@ -16,12 +16,11 @@ import { Plus, Check, X, ExternalLink, ChevronLeft, FileText } from "lucide-reac
 import { format } from "date-fns";
 import { ReimbursementFormDialog } from "@/features/requests/reimbursements/components/reimbursement-form";
 import { statusClass, statusLabel } from "@/lib/status";
+import { StatusBadge } from "../components/status-badge";
 
 const CATEGORIES = ["Travel", "Food & Meals", "Office Supplies", "Software", "Training", "Other"];
 
-export function StatusBadge({ status }: { status: string }) {
-  return <Badge className={`text-xs ${statusClass(status)}`}>{statusLabel(status)}</Badge>;
-}
+
 
 function money(v: any) {
   const n = parseFloat(v || "0");

@@ -33,7 +33,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ReimbursementFormDialog, reimbDraftComplete } from "@/features/requests/reimbursements/components/reimbursement-form";
-import { StatusBadge } from "./reimbursements";
+import { StatusBadge } from "../reimbursements/components/status-badge";
 import { statusClass, statusLabel } from "@/lib/status";
 
 function formatStatus(s: string) { return s?.replace(/_/g, " ") || ""; }
