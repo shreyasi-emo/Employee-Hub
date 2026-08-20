@@ -20,7 +20,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             letting <main> span the full height (scrollbar not cut off by the header) */}
         <div className="relative flex flex-col flex-1 overflow-hidden" style={{ background: SHELL_BG }}>
           <AppHeader />
-          <main className="flex-1 overflow-y-auto bg-transparent pt-[76px]">
+          {/* scrollbar-gutter keeps the gutter reserved whether or not the page overflows,
+              so content does not shift sideways when moving between a scrolling and a
+              non-scrolling screen. It is the only scroll container in the app. */}
+          <main className="flex-1 overflow-y-auto [scrollbar-gutter:stable] bg-transparent pt-[76px]">
             {children}
           </main>
         </div>
