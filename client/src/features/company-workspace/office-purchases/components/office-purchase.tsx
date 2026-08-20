@@ -66,7 +66,8 @@ function FormSection({ n, title, hint, children }: { n: number; title: string; h
 }
 
 // ============================ Progressive "New Request" dialog ============================
-// Page 1: pick the nature (Office Purchase — functional; Equipment & Assets — not yet wired).
+// Page 1: pick the nature — Office Purchase (POSTs /api/office-purchases) or Equipment & Assets
+// (POSTs /api/procurement). Both are live; each has its own approval queue and My Requests tab.
 // Page 2: the Office Purchase form. A 2-step progress bar runs across the top.
 export function NewRequestDialog({ open, onClose, initialKind, onSaveDraft, initialData, onSubmitted }: { open: boolean; onClose: () => void; initialKind?: "office" | "procurement"; onSaveDraft?: (data: any) => void; initialData?: any; onSubmitted?: () => void }) {
   const { toast } = useToast();
@@ -105,8 +106,9 @@ export function NewRequestDialog({ open, onClose, initialKind, onSaveDraft, init
   const valid = items.length > 0 && (kind === "procurement"
     ? items.every((it) => it.description.trim() && Number(it.quantity) > 0 && Number(it.unitPrice) > 0 && (it.finalLink || "").trim())
     : items.every((it) => it.description.trim() && Number(it.quantity) > 0));
+  // No validity guard here: Submit is disabled while `valid` is false, so this only ever runs on a
+  // complete form. A toast naming the missing fields used to sit here and could never fire.
   const doSubmit = () => {
-    if (!valid) return toast({ title: kind === "procurement" ? "Each item needs a description, quantity, link and cost" : "Add at least one item with a description and quantity", variant: "destructive" });
     if (kind === "procurement") {
       submit.mutate({
         category: "amazon", justification: justification.trim() || null,

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,21 +15,29 @@ import { StatCard, NavCard } from "../components/approval-ui";
 import { ActivityDetailModal } from "../components/activity-detail-modal";
 import { TicketForm } from "../tickets/components/ticket-form";
 import { useWorkspaceData } from "../api/workspace.api";
+import { appendDraft } from "../shared/drafts";
 
 // /company-workspace — the office-operations hub. Four overview figures, the service catalog
 // that raises a request, navigation into My Requests / Team Requests / My Approvals, and the
 // last seven days of activity. Each service card opens its own form.
 export default function CompanyWorkspacePage() {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const {
     canTeam, canApprove, canReimbApprove,
     summary, sumLoading, travels,
-    myOpenOp, myOpen, teamOpen, apprTotal, pendingReimbAmount, recent,
+    myOpenOp, myOpen, teamOpen, apprTotal, pendingReimbAmount, pendingReimbCount, recent,
   } = useWorkspaceData("main");
 
   const [openForm, setOpenForm] = useState<null | "purchase" | "travel" | "ticket" | "reimbursement">(null);
   const [newReqOpen, setNewReqOpen] = useState(false);
   const [detail, setDetail] = useState<any>(null);
+
+  // Drafts raised here go to the same store My Requests → Drafts reads from.
+  const saveDraft = (type: string, data: any) => {
+    if (appendDraft(type, data)) toast({ title: "Saved to Drafts" });
+    else toast({ title: "Could not save draft", description: "Local storage is full.", variant: "destructive" });
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
@@ -46,7 +55,8 @@ export default function CompanyWorkspacePage() {
           <StatCard title="Pending Purchases" value={myOpenOp} subtitle="in progress" icon={ShoppingCart} color="bg-[#206295]/15 text-[#206295]" />
           <StatCard title="Pending Travels" value={(travels as any[]).filter((t: any) => ["pending_hr", "pending_approval", "under_review", "approved"].includes(t.status)).length} subtitle="in progress" icon={Car} color="bg-[#4BDCD9]/25 text-[#206295]" />
           <StatCard title="Open Tickets" value={summary?.tickets?.open || 0} subtitle="in progress" icon={TicketIcon} color="bg-[#206295]/15 text-[#206295]" />
-          <StatCard title="Pending Reimbursements" value={money(pendingReimbAmount)} subtitle={canReimbApprove ? "awaiting your approval" : "your pending claims"} icon={Receipt} color="bg-[#FF6F62]/20 text-[#FF6F62]" />
+          {/* Money, not a count — the subtitle names the claims so it can't be read as a fourth count. */}
+          <StatCard title="Pending Reimbursements" value={money(pendingReimbAmount)} subtitle={`${pendingReimbCount} ${pendingReimbCount === 1 ? "claim" : "claims"} ${canReimbApprove ? "awaiting your approval" : "pending"}`} icon={Receipt} color="bg-[#FF6F62]/20 text-[#FF6F62]" />
         </div>
       )}
 
@@ -105,11 +115,13 @@ export default function CompanyWorkspacePage() {
         </CardContent></Card>
       </div>
 
-      {/* Service forms (open directly) */}
-      <NewTravelDialog open={openForm === "travel"} onClose={() => setOpenForm(null)} />
-      <TicketForm open={openForm === "ticket"} onClose={() => setOpenForm(null)} />
-      <ReimbursementFormDialog open={openForm === "reimbursement"} onClose={() => setOpenForm(null)} />
-      <NewRequestDialog open={newReqOpen} onClose={() => setNewReqOpen(false)} />
+      {/* Service forms (open directly). Each takes onSaveDraft so a half-finished request can be
+          kept here too — drafts land in the one drafts store and are finished from
+          My Requests → Drafts. Without it these dialogs hide their "Save as Draft" button. */}
+      <NewTravelDialog open={openForm === "travel"} onClose={() => setOpenForm(null)} onSaveDraft={(data) => saveDraft("trip", data)} />
+      <TicketForm open={openForm === "ticket"} onClose={() => setOpenForm(null)} onSaveDraft={(data: any) => saveDraft("ticket", data)} />
+      <ReimbursementFormDialog open={openForm === "reimbursement"} onClose={() => setOpenForm(null)} onSaveDraft={(data) => saveDraft("reimbursement", data)} />
+      <NewRequestDialog open={newReqOpen} onClose={() => setNewReqOpen(false)} onSaveDraft={(data) => saveDraft(data.kind === "procurement" ? "procurement" : "office", data)} />
 
       {detail && <ActivityDetailModal row={detail} onClose={() => setDetail(null)} />}
     </div>

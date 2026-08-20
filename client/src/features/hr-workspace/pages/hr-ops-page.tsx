@@ -17,6 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm, Controller } from "react-hook-form";
 import { DateInput } from "@/components/shared/datetime-field";
 import { Plus, CheckSquare, Trash2, ClipboardList, TicketIcon, CheckCircle2, ArrowRight } from "lucide-react";
+import { TICKET_CATEGORIES } from "@/features/company-workspace/tickets/lib/ticket-categories";
+import { cap } from "@/features/company-workspace/shared/approval-format";
 import { Link } from "wouter";
 import { format } from "date-fns";
 
@@ -471,13 +473,7 @@ export default function HRopsPage() {
                 <Select value={ticketForm.watch("category")} onValueChange={v => ticketForm.setValue("category", v)}>
                   <SelectTrigger data-testid="select-ticket-category"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="hr_query">HR Query</SelectItem>
-                    <SelectItem value="payroll">Payroll</SelectItem>
-                    <SelectItem value="leave">Leave</SelectItem>
-                    <SelectItem value="attendance">Attendance</SelectItem>
-                    <SelectItem value="it_support">IT Support</SelectItem>
-                    <SelectItem value="office_admin">Office Admin</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {TICKET_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{cap(c)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

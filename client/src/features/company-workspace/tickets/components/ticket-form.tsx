@@ -1,7 +1,5 @@
-import { cap } from "../../shared/approval-format";
-import { TICKET_CATEGORIES } from "../lib/ticket-categories";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,34 +7,52 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { X } from "lucide-react";
+import { Save } from "lucide-react";
+import { cap } from "../../shared/approval-format";
+import { ERR_BORDER, FieldError } from "../../components/request-ui";
+import { TICKET_CATEGORIES } from "../lib/ticket-categories";
+import { useCreateTicket } from "../api/tickets.api";
 
-// ===================== Forms =====================
-export function useInvalidate() {
-  const qc = useQueryClient();
-  return () => {
-    qc.invalidateQueries({ queryKey: ["/api/my-requests/summary"] });
-    qc.invalidateQueries({ queryKey: ["/api/my-requests/purchases"] });
-    qc.invalidateQueries({ queryKey: ["/api/my-requests/travels"] });
-    qc.invalidateQueries({ queryKey: ["/api/my-requests/tickets"] });
-    qc.invalidateQueries({ queryKey: ["/api/reimbursements"] });
-  };
-}
+const BLANK = { category: "hr_query", subject: "", description: "", priority: "medium" };
 
-export function TicketForm({ open, onClose }: { open: boolean; onClose: () => void }) {
+// The one Support Ticket form, used by both Company Workspace and My Requests. It used to be
+// two hand-written copies, which is how they drifted: only one showed the "Subject is required"
+// error, only one offered "Save as Draft", and each carried its own category list.
+//
+// `onSaveDraft` follows the same convention as the purchase / travel / reimbursement dialogs —
+// the button appears only when a caller passes it, so a screen with nowhere to keep drafts
+// does not offer one.
+export function TicketForm({ open, onClose, onSaveDraft, initialData, onSubmitted, autoValidate }: {
+  open: boolean;
+  onClose: () => void;
+  onSaveDraft?: (data: any) => void;
+  initialData?: any;
+  onSubmitted?: () => void;
+  /** Show the required-field errors as soon as the form opens — used when submitting an
+   *  incomplete draft, so the reason it could not be submitted is visible immediately. */
+  autoValidate?: boolean;
+}) {
   const { toast } = useToast();
-  const invalidate = useInvalidate();
-  const form = useForm({ defaultValues: { category: "hr_query", subject: "", description: "", priority: "medium" } });
-  const mutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/my-requests/tickets", data),
-    onSuccess: () => { invalidate(); toast({ title: "Ticket submitted successfully" }); form.reset(); onClose(); },
+  const form = useForm({ defaultValues: BLANK });
+  const errors = form.formState.errors as any;
+
+  // Opening from a saved draft prefills; opening fresh clears whatever the last visit left.
+  useEffect(() => {
+    if (!open) return;
+    form.reset({ ...BLANK, ...(initialData || {}) });
+    if (autoValidate) setTimeout(() => form.trigger(), 0);
+  }, [open]);
+
+  const mutation = useCreateTicket({
+    onSuccess: () => { toast({ title: "Ticket submitted successfully" }); onSubmitted?.(); close(); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
+
   // Cancel / X discards input (fresh form next open).
-  const handleClose = () => { form.reset(); onClose(); };
+  function close() { form.reset(BLANK); onClose(); }
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+    <Dialog open={open} onOpenChange={(v) => !v && close()}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Raise Support Ticket</DialogTitle></DialogHeader>
         <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
@@ -54,11 +70,25 @@ export function TicketForm({ open, onClose }: { open: boolean; onClose: () => vo
               </Select>
             </div>
           </div>
-          <div className="space-y-1.5"><Label>Subject *</Label><Input {...form.register("subject", { required: true })} placeholder="Brief subject…" /></div>
-          <div className="space-y-1.5"><Label>Description</Label><Textarea rows={3} {...form.register("description")} placeholder="Describe your issue in detail…" /></div>
+          <div className="space-y-1.5">
+            <Label>Subject *</Label>
+            <Input {...form.register("subject", { required: true })} placeholder="Brief subject…" className={errors.subject ? ERR_BORDER : ""} data-testid="input-ticket-subject" />
+            <FieldError show={errors.subject} msg="Subject is required" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Textarea rows={3} {...form.register("description")} placeholder="Describe your issue in detail…" data-testid="textarea-ticket-desc" />
+          </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-            <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-ticket">{mutation.isPending ? "Submitting…" : "Submit Ticket"}</Button>
+            <Button type="button" variant="outline" onClick={close}>Cancel</Button>
+            {onSaveDraft && (
+              <Button type="button" variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft(form.getValues()); close(); }} data-testid="button-draft-ticket">
+                <Save className="h-4 w-4 mr-1.5" /> Save as Draft
+              </Button>
+            )}
+            <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-ticket">
+              {mutation.isPending ? "Submitting…" : "Submit Ticket"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

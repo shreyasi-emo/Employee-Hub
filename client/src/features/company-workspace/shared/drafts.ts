@@ -13,6 +13,13 @@ export function writeDrafts(d: Draft[]): boolean { try { localStorage.setItem(DR
 
 export const newDraftId = () => `dft_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
 
+/** Add one new draft to the front of the store. Returns false if localStorage is full.
+ *  For screens that only ever create drafts (Company Workspace); My Requests has its own
+ *  version that can also overwrite the draft currently being edited. */
+export function appendDraft(type: string, data: any): boolean {
+  return writeDrafts([{ id: newDraftId(), type, data, savedAt: Date.now() }, ...readDrafts()]);
+}
+
 export const DRAFT_META: Record<string, { label: string; icon: any }> = {
   office: { label: "Office Purchase", icon: ShoppingCart },
   procurement: { label: "Procurement", icon: Package },

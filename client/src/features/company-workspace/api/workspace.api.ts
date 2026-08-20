@@ -87,21 +87,25 @@ export function useWorkspaceData(view: "main" | "approvals") {
     ? ceoReimbQueue.length + pendingProc + officeCeoCount + travelCeoPending
     : (canReimbApprove ? financeReimbQueue.length : 0) + (canOpTriage ? officeTriageCount : 0) + (canTravelApprove ? travelPending : 0);
   // Approver → total awaiting THEIR approval (both stages they can act on). Employee → their own pending claims.
-  const pendingReimbAmount = useMemo(() => {
-    const rows = canReimbApprove
-      ? [...financeReimbQueue, ...ceoReimbQueue]
-      : reimb.filter((r: any) => r.requesterId === user?.id && ["submitted", "finance_approved", "changes_requested"].includes(r.status));
-    return rows.reduce((s: number, r: any) => s + Number(r.totalAmount || 0), 0);
-  }, [canReimbApprove, financeReimbQueue, ceoReimbQueue, reimb, user?.id]);
+  // Amount and count come from the same rows, so the card can show the total and still say
+  // how many claims it is made of.
+  const pendingReimb = useMemo(() => (canReimbApprove
+    ? [...financeReimbQueue, ...ceoReimbQueue]
+    : reimb.filter((r: any) => r.requesterId === user?.id && ["submitted", "finance_approved", "changes_requested"].includes(r.status))
+  ), [canReimbApprove, financeReimbQueue, ceoReimbQueue, reimb, user?.id]);
+  const pendingReimbAmount = useMemo(() => pendingReimb.reduce((s: number, r: any) => s + Number(r.totalAmount || 0), 0), [pendingReimb]);
+  const pendingReimbCount = pendingReimb.length;
 
   // The user's own in-flight purchases — office purchases + procurement (both count toward "Pending Purchases").
   const myOpenOp = useMemo(() =>
     (officePurchases as any[]).filter((o) => ["pending_hr", "priced", "pending_approval", "under_review", "approved", "ordered"].includes(o.status)).length +
     (myProcurement as any[]).filter((o) => ["pending_approval", "under_review"].includes(o.status)).length
   , [officePurchases, myProcurement]);
+  // Deliberately excludes the retired /api/my-requests/purchases table: My Requests has no tab
+  // that can render those rows, so counting them here would send you to a page that cannot show
+  // them. They stay visible — and openable — in Recent Activities below.
   const myOpen =
     myOpenOp +
-    purchases.filter((p: any) => ["draft", "submitted", "pending_ceo", "changes_requested"].includes(p.status)).length +
     travels.filter((t: any) => ["pending_hr", "pending_approval", "under_review", "approved"].includes(t.status)).length +
     tickets.filter((t: any) => ["open", "in_progress", "need_info"].includes(t.status)).length +
     // Only the current user's OWN reimbursements (approvers receive the full list here).
@@ -191,6 +195,7 @@ export function useWorkspaceData(view: "main" | "approvals") {
     travelCeoPending,
     apprTotal,
     pendingReimbAmount,
+    pendingReimbCount,
     myOpenOp,
     myOpen,
     teamOpen,

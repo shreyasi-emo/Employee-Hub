@@ -1,4 +1,3 @@
-import { ERR_BORDER, FieldError } from "../components/request-ui";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -10,7 +9,7 @@ import { DataTable } from "@/components/shared/data-table";
 import { usePaged, PaginationBar } from "@/components/shared/pagination";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +19,6 @@ import { NewRequestDialog, OfficePurchaseDetailDialog } from "@/features/company
 import { NewTravelDialog, TravelDetailDialog, TRAVEL_CATS } from "@/features/company-workspace/travel/components/travel";
 import { ProcurementDetailDialog } from "@/features/company-workspace/procurement/components/procurement";
 import { useToast } from "@/hooks/use-toast";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { DateInput } from "@/components/shared/datetime-field";
 import { Plus, ShoppingCart, Car, TicketIcon, Receipt, ChevronLeft, Package, Trash2, Search, LayoutGrid, Table2, ArrowDownUp, Save, FileEdit } from "lucide-react";
 import { format } from "date-fns";
@@ -28,8 +26,7 @@ import { ReimbursementFormDialog, reimbDraftComplete } from "@/features/company-
 import { statusClass, statusLabel } from "@/lib/status";
 import { formatDate, money, matchesFilter, amountOf, searchText, itemsHeadline, DONE_STATUS } from "../shared/request-format";
 import { readDrafts, writeDrafts, newDraftId, type Draft } from "../shared/drafts";
-import { TICKET_CATEGORIES } from "../tickets/lib/ticket-categories";
-import { cap } from "../shared/approval-format";
+import { TicketForm } from "../tickets/components/ticket-form";
 import { RequestTable } from "../components/request-table";
 import { RequestDetailModal } from "../components/request-detail-modal";
 import { RequestCard } from "../components/request-card";
@@ -59,9 +56,9 @@ export default function MyRequestsPage() {
   const [phase, setPhase] = useState<"active" | "completed">("active"); // In Progress / Completed — mirrors the approval screens' phase toggle
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ type: string; item: any } | null>(null);
-  const [showPRForm, setShowPRForm] = useState(false);
-  const [showTRForm, setShowTRForm] = useState(false);
   const [showTicketForm, setShowTicketForm] = useState(false);
+  const [ticketInitial, setTicketInitial] = useState<any>(null);
+  const [ticketForceValidate, setTicketForceValidate] = useState(false);
   const [showReimbForm, setShowReimbForm] = useState(false);
 
   // ---- Drafts ----
@@ -77,14 +74,11 @@ export default function MyRequestsPage() {
   // Auto-open form if navigated from service catalog
   useEffect(() => {
     if (autoNew) {
-      if (initTab === "purchases") setShowPRForm(true);
-      else if (initTab === "travels") { setEditingDraftId(null); setTripInitial(null); setShowNewTravel(true); }
+      if (initTab === "travels") { setEditingDraftId(null); setTripInitial(null); setShowNewTravel(true); }
       else if (initTab === "tickets") setShowTicketForm(true);
     }
   }, [autoNew, initTab]);
 
-  const { data: purchases = [], isLoading: loadPR } = useQuery<any[]>({ queryKey: ["/api/my-requests/purchases"] });
-  const { data: travels = [], isLoading: loadTR } = useQuery<any[]>({ queryKey: ["/api/my-requests/travels"] });
   const { data: myTrips = [], isLoading: loadTrips } = useQuery<any[]>({ queryKey: ["/api/travel?mine=true"] });
   const [showNewTravel, setShowNewTravel] = useState(false);
   const [travelDetailId, setTravelDetailId] = useState<string | null>(null);
@@ -99,37 +93,15 @@ export default function MyRequestsPage() {
   const { data: procurement = [], isLoading: loadProc } = useQuery<any[]>({ queryKey: ["/api/procurement?mine=true"] });
   const [procDetailId, setProcDetailId] = useState<string | null>(null);
 
-  // PR form with items
-  const prForm = useForm({
-    defaultValues: {
-      category: "office_supplies",
-      items: [{ description: "", qty: 1, estimatedCost: "", link: "" }],
-      notes: "",
-      neededByDate: "",
-    },
-  });
-  const { fields, append, remove } = useFieldArray({ control: prForm.control, name: "items" });
 
-  // Travel form
-  const trForm = useForm({
-    defaultValues: { purpose: "", fromCity: "", toCity: "", travelDate: "", returnDate: "", preferences: "", estimatedBudget: "" }
-  });
 
   // Ticket form
-  const ticketForm = useForm({
-    defaultValues: { category: "hr_query", subject: "", description: "", priority: "medium" }
-  });
 
   // Subscribe to each form's validation errors so required-field styling re-renders.
-  const prErrors = prForm.formState.errors as any;
-  const trErrors = trForm.formState.errors as any;
-  const tkErrors = ticketForm.formState.errors as any;
 
   // Closing a form without saving (Cancel / X / click-away) discards all input — a fresh form opens next time.
   // (Submitting or "Save as Draft" already persist + reset separately.)
-  const closePR = () => { setShowPRForm(false); setEditingDraftId(null); prForm.reset(); };
-  const closeTR = () => { setShowTRForm(false); setEditingDraftId(null); trForm.reset(); };
-  const closeTicket = () => { setShowTicketForm(false); setEditingDraftId(null); ticketForm.reset(); };
+  const closeTicket = () => { setShowTicketForm(false); setEditingDraftId(null); setTicketInitial(null); setTicketForceValidate(false); };
 
   // Open a "changes requested" reimbursement in the form to edit & resubmit; everything else opens the read-only detail.
   const openReimb = (it: any) => {
@@ -148,8 +120,7 @@ export default function MyRequestsPage() {
     const id = editingDraftId || newDraftId();
     persistDrafts([{ id, type, data, savedAt: Date.now() }, ...base]);
     setEditingDraftId(null);
-    setShowPRForm(false); setShowTRForm(false); setShowTicketForm(false); setShowReimbForm(false); setReimbInitial(null);
-    prForm.reset(); trForm.reset(); ticketForm.reset();
+    setShowTicketForm(false); setTicketInitial(null); setTicketForceValidate(false); setShowReimbForm(false); setReimbInitial(null);
     toast({ title: "Saved to Drafts" });
   };
   const editDraft = (d: Draft) => {
@@ -157,9 +128,9 @@ export default function MyRequestsPage() {
     setReimbForceValidate(false);
     if (d.type === "trip") { setTripInitial(d.data); setShowNewTravel(true); }
     else if (d.type === "office" || d.type === "procurement") { setNewKind(d.type); setNewInitialData(d.data); setOpNewOpen(true); }
-    else if (d.type === "purchase") { prForm.reset({ category: "office_supplies", items: [{ description: "", qty: 1, estimatedCost: "", link: "" }], notes: "", neededByDate: "", ...d.data }); setShowPRForm(true); }
+    else if (d.type === "purchase") { setNewKind("office"); setNewInitialData(null); setOpNewOpen(true); } // legacy purchase drafts → current Office Purchase dialog
     else if (d.type === "travel") { setTripInitial(null); setShowNewTravel(true); } // legacy travel drafts → new travel dialog
-    else if (d.type === "ticket") { ticketForm.reset({ category: "hr_query", subject: "", description: "", priority: "medium", ...d.data }); setShowTicketForm(true); }
+    else if (d.type === "ticket") { setTicketInitial(d.data); setShowTicketForm(true); }
     else { setReimbInitial(d.data); setShowReimbForm(true); }
   };
   // Mandatory-field check per draft type — mirrors each form's own required fields.
@@ -173,8 +144,9 @@ export default function MyRequestsPage() {
         ? items.every((i: any) => (i.description || "").trim() && Number(i.quantity) > 0 && Number(i.unitPrice) > 0 && (i.finalLink || "").trim())
         : items.every((i: any) => (i.description || "").trim() && Number(i.quantity) > 0);
     }
-    if (d.type === "purchase") { const items = Array.isArray(x.items) ? x.items : []; return items.length > 0 && items.every((i: any) => (i.description || "").trim()); }
-    if (d.type === "travel") return !!((x.purpose || "").trim() && (x.fromCity || "").trim() && (x.toCity || "").trim() && x.travelDate);
+    // "purchase" / "travel" are retired draft types from the old flow. Never submit them straight
+    // through — reopen the current dialog so the data is re-entered against today's fields.
+    if (d.type === "purchase" || d.type === "travel") return false;
     if (d.type === "ticket") return !!((x.subject || "").trim());
     return reimbDraftComplete(x);
   };
@@ -183,24 +155,15 @@ export default function MyRequestsPage() {
     // Missing mandatory fields → don't submit; open the pre-filled form with validation shown.
     if (!draftComplete(d)) {
       editDraft(d);
-      if (d.type === "purchase") setTimeout(() => prForm.trigger(), 0);
-      else if (d.type === "travel") setTimeout(() => trForm.trigger(), 0);
-      else if (d.type === "ticket") setTimeout(() => ticketForm.trigger(), 0);
-      else if (!["office", "procurement", "trip"].includes(d.type)) setReimbForceValidate(true); // office/procurement/trip: the dialog's own Submit stays disabled until valid
+      if (d.type === "ticket") setTicketForceValidate(true);
+      else if (!["office", "procurement", "trip", "purchase", "travel"].includes(d.type)) setReimbForceValidate(true); // these dialogs keep their own Submit disabled until valid
       toast({ title: "Please complete the required fields", variant: "destructive" });
       return;
     }
     setSubmittingDraftId(d.id);
     try {
       const x = d.data || {};
-      if (d.type === "purchase") {
-        const total = (x.items || []).reduce((s: number, i: any) => s + (Number(i.estimatedCost) || 0), 0);
-        const pr = await apiRequest("POST", "/api/my-requests/purchases", { category: x.category, items: (x.items || []).filter((i: any) => i.description), estimatedCost: total || null, neededByDate: x.neededByDate || null, notes: x.notes || null });
-        await apiRequest("POST", `/api/my-requests/purchases/${pr.id}/submit`, {});
-      } else if (d.type === "travel") {
-        const tr = await apiRequest("POST", "/api/my-requests/travels", { ...x, travelDate: x.travelDate || null, returnDate: x.returnDate || null, estimatedBudget: x.estimatedBudget ? Number(x.estimatedBudget) : null });
-        await apiRequest("POST", `/api/my-requests/travels/${tr.id}/submit`, {});
-      } else if (d.type === "ticket") {
+      if (d.type === "ticket") {
         await apiRequest("POST", "/api/my-requests/tickets", x);
       } else if (d.type === "office") {
         const items = (x.items || []).filter((it: any) => (it.description || "").trim());
@@ -223,86 +186,10 @@ export default function MyRequestsPage() {
     }
   };
 
-  const createPRMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const totalEstimated = data.items.reduce((sum: number, i: any) => sum + (Number(i.estimatedCost) || 0), 0);
-      const pr = await apiRequest("POST", "/api/my-requests/purchases", {
-        category: data.category,
-        items: data.items.filter((i: any) => i.description),
-        estimatedCost: totalEstimated || null,
-        neededByDate: data.neededByDate || null,
-        notes: data.notes || null,
-      });
-      await apiRequest("POST", `/api/my-requests/purchases/${pr.id}/submit`, {});
-      return pr;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/purchases"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/summary"] });
-      setShowPRForm(false); prForm.reset();
-      if (editingDraftId) { removeDraft(editingDraftId); setEditingDraftId(null); }
-      toast({ title: "Purchase request submitted for approval" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
 
-  const createTRMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const tr = await apiRequest("POST", "/api/my-requests/travels", {
-        ...data,
-        travelDate: data.travelDate || null,
-        returnDate: data.returnDate || null,
-        estimatedBudget: data.estimatedBudget ? Number(data.estimatedBudget) : null,
-      });
-      await apiRequest("POST", `/api/my-requests/travels/${tr.id}/submit`, {});
-      return tr;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/travels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/summary"] });
-      setShowTRForm(false); trForm.reset();
-      if (editingDraftId) { removeDraft(editingDraftId); setEditingDraftId(null); }
-      toast({ title: "Travel request submitted for approval" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
 
-  const createTicketMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/my-requests/tickets", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/tickets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/summary"] });
-      setShowTicketForm(false); ticketForm.reset();
-      if (editingDraftId) { removeDraft(editingDraftId); setEditingDraftId(null); }
-      toast({ title: "Ticket submitted successfully" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
 
-  const submitPRMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/my-requests/purchases/${id}/submit`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/purchases"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/summary"] });
-      toast({ title: "Submitted for CEO approval" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
 
-  const submitTRMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/my-requests/travels/${id}/submit`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/travels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/my-requests/summary"] });
-      toast({ title: "Submitted for CEO approval" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const handleSubmit = (id: string, type: "purchase" | "travel" | "ticket") => {
-    if (type === "purchase") submitPRMutation.mutate(id);
-    else if (type === "travel") submitTRMutation.mutate(id);
-  };
 
   const renderEmpty = (msg: string) => (
     <Card className="py-12"><CardContent className="text-center text-sm text-muted-foreground">{msg}</CardContent></Card>
@@ -378,8 +265,6 @@ export default function MyRequestsPage() {
     </div>
   );
 
-  const fPurchases = refine(purchases as any[], "purchase");
-  const fTravels = refine(travels as any[], "travel");
   const fTickets = refine(tickets as any[], "ticket");
   const fReimb = refine(reimbursements as any[], "reimbursement");
   const opQuery = search.trim().toLowerCase();
@@ -392,7 +277,6 @@ export default function MyRequestsPage() {
     (opQuery === "" || `${o.reference || ""} ${(o.items || []).map((i: any) => i.description).join(" ")}`.toLowerCase().includes(opQuery))
   );
   // 15-per-page pagination for the card views (table views paginate via DataTable).
-  const tvPaged = usePaged(fTravels);
   const tkPaged = usePaged(fTickets);
   const rbPaged = usePaged(fReimb);
   const opPaged = usePaged(fOP);
@@ -472,7 +356,7 @@ export default function MyRequestsPage() {
 
         <TabsContent value="tickets" className="mt-4 space-y-5">
           {controls(
-            <Button size="sm" onClick={() => { setEditingDraftId(null); ticketForm.reset(); setShowTicketForm(true); }} data-testid="button-new-ticket">
+            <Button size="sm" onClick={() => { setEditingDraftId(null); setTicketInitial(null); setTicketForceValidate(false); setShowTicketForm(true); }} data-testid="button-new-ticket">
               <Plus className="h-4 w-4 mr-1.5" /> Raise Ticket
             </Button>
           )}
@@ -603,132 +487,14 @@ export default function MyRequestsPage() {
         onSubmitted={() => { if (editingDraftId) { removeDraft(editingDraftId); setEditingDraftId(null); } }} />
       <TravelDetailDialog id={travelDetailId} open={!!travelDetailId} onClose={() => setTravelDetailId(null)} context="owner" />
 
-      {/* Purchase Request Form */}
-      <Dialog open={showPRForm} onOpenChange={(v) => { if (!v) closePR(); }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>New Purchase Request</DialogTitle></DialogHeader>
-          <form onSubmit={prForm.handleSubmit(data => createPRMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Category *</Label>
-              <Select value={prForm.watch("category")} onValueChange={v => prForm.setValue("category", v)}>
-                <SelectTrigger data-testid="select-pr-category"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="office_supplies">Office Supplies</SelectItem>
-                  <SelectItem value="equipment">Equipment / Hardware</SelectItem>
-                  <SelectItem value="software">Software / Subscription</SelectItem>
-                  <SelectItem value="furniture">Furniture</SelectItem>
-                  <SelectItem value="marketing">Marketing Materials</SelectItem>
-                  <SelectItem value="training">Training / Books</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Items *</Label>
-              {fields.map((field, index) => (
-                <div key={field.id} className="grid grid-cols-12 gap-1.5 items-start bg-muted/40 rounded-lg p-2.5">
-                  <div className="col-span-5 space-y-1">
-                    <p className="text-xs text-muted-foreground">Description</p>
-                    <Input {...prForm.register(`items.${index}.description`, { required: true })} placeholder="Item name..." className={`h-8 text-xs ${prErrors.items?.[index]?.description ? ERR_BORDER : ""}`} data-testid={`input-item-desc-${index}`} />
-                    <FieldError show={prErrors.items?.[index]?.description} msg="Required" />
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    <p className="text-xs text-muted-foreground">Qty</p>
-                    <Input type="number" min="1" {...prForm.register(`items.${index}.qty`)} className="h-8 text-xs" data-testid={`input-item-qty-${index}`} />
-                  </div>
-                  <div className="col-span-3 space-y-1">
-                    <p className="text-xs text-muted-foreground">Est. Cost (₹)</p>
-                    <Input type="number" min="0" {...prForm.register(`items.${index}.estimatedCost`)} placeholder="0" className="h-8 text-xs" data-testid={`input-item-cost-${index}`} />
-                  </div>
-                  <div className="col-span-2 flex items-end justify-center pb-0.5">
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => fields.length > 1 && remove(index)} data-testid={`button-remove-item-${index}`}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </div>
-                  <div className="col-span-12">
-                    <Input {...prForm.register(`items.${index}.link`)} placeholder="Product link (optional)" className="h-8 text-xs" data-testid={`input-item-link-${index}`} />
-                  </div>
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => append({ description: "", qty: 1, estimatedCost: "", link: "" })} data-testid="button-add-item">
-                <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item
-              </Button>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Needed By Date</Label>
-              <Controller control={prForm.control} name="neededByDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-pr-needed-by" />} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Notes / Justification</Label>
-              <Textarea rows={2} {...prForm.register("notes")} placeholder="Why is this needed?" data-testid="textarea-pr-notes" />
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closePR}>Cancel</Button>
-              <Button type="button" variant="secondary" className="btn-glass text-[#206295]" onClick={() => saveDraft("purchase", prForm.getValues())} data-testid="button-draft-pr">
-                <Save className="h-4 w-4 mr-1.5" /> Save as Draft
-              </Button>
-              <Button type="submit" disabled={createPRMutation.isPending} data-testid="button-save-pr">
-                {createPRMutation.isPending ? "Submitting..." : "Submit"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Legacy travel form removed — travel now uses NewTravelDialog (chooser: Flights / Stays / Transport). */}
-
-      {/* Ticket Form */}
-      <Dialog open={showTicketForm} onOpenChange={(v) => { if (!v) closeTicket(); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Raise Support Ticket</DialogTitle></DialogHeader>
-          <form onSubmit={ticketForm.handleSubmit(data => createTicketMutation.mutate(data))} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Category</Label>
-                <Select value={ticketForm.watch("category")} onValueChange={v => ticketForm.setValue("category", v)}>
-                  <SelectTrigger data-testid="select-ticket-cat"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TICKET_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{cap(c)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Priority</Label>
-                <Select value={ticketForm.watch("priority")} onValueChange={v => ticketForm.setValue("priority", v)}>
-                  <SelectTrigger data-testid="select-ticket-pri"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Subject *</Label>
-              <Input {...ticketForm.register("subject", { required: true })} placeholder="Brief subject..." className={tkErrors.subject ? ERR_BORDER : ""} data-testid="input-ticket-subject" />
-              <FieldError show={tkErrors.subject} msg="Subject is required" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea rows={3} {...ticketForm.register("description")} placeholder="Describe your issue in detail..." data-testid="textarea-ticket-desc" />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeTicket}>Cancel</Button>
-              <Button type="button" variant="secondary" className="btn-glass text-[#206295]" onClick={() => saveDraft("ticket", ticketForm.getValues())} data-testid="button-draft-ticket">
-                <Save className="h-4 w-4 mr-1.5" /> Save as Draft
-              </Button>
-              <Button type="submit" disabled={createTicketMutation.isPending} data-testid="button-submit-ticket">
-                {createTicketMutation.isPending ? "Submitting..." : "Submit Ticket"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <TicketForm
+        open={showTicketForm}
+        onClose={closeTicket}
+        onSaveDraft={(data: any) => saveDraft("ticket", data)}
+        initialData={ticketInitial}
+        autoValidate={ticketForceValidate}
+        onSubmitted={() => { if (editingDraftId) { removeDraft(editingDraftId); setEditingDraftId(null); } }} />
 
       <ReimbursementFormDialog
         open={showReimbForm}
