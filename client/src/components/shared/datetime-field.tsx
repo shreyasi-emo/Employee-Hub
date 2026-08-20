@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as RangeCalendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CalCaption } from "@/components/shared/date-range-picker";
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns";
 import { CalendarDays, Clock } from "lucide-react";
 
 // ============================ Date & Time form fields ============================
@@ -20,10 +20,17 @@ import { CalendarDays, Clock } from "lucide-react";
 
 // Calendar-style single-date field — full-width form trigger + popover. `disabled` is a
 // react-day-picker Matcher (e.g. `{ before: startOfDay(new Date()) }`).
+//
+// For the END field of a date range pass `minDate={start}` — it greys out every day
+// before the start, so an end-before-start range can't be picked. Pair it with
+// `clampEnd` (lib/date-range) in the START field's onChange so moving the start
+// forward never leaves the end stranded behind it.
 export function DateField({
   value,
   onChange,
   disabled,
+  minDate,
+  maxDate,
   placeholder = "Select date",
   testId = "date-field",
   className = "",
@@ -31,11 +38,22 @@ export function DateField({
   value?: Date;
   onChange: (d: Date) => void;
   disabled?: any;
+  /** Earliest selectable day (inclusive) — typically a range's start date. */
+  minDate?: Date;
+  /** Latest selectable day (inclusive). */
+  maxDate?: Date;
   placeholder?: string;
   testId?: string;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  // Merge min/max into whatever matcher the caller already passed.
+  const matchers = [
+    ...(Array.isArray(disabled) ? disabled : disabled ? [disabled] : []),
+    ...(minDate ? [{ before: startOfDay(minDate) }] : []),
+    ...(maxDate ? [{ after: startOfDay(maxDate) }] : []),
+  ];
+  const dayDisabled = matchers.length ? matchers : undefined;
   return (
     <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
@@ -44,7 +62,7 @@ export function DateField({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-3">
-        <RangeCalendar mode="single" selected={value} onSelect={(d: any) => { if (d) { onChange(d); setOpen(false); } }} defaultMonth={value} disabled={disabled} components={{ Caption: CalCaption }} />
+        <RangeCalendar mode="single" selected={value} onSelect={(d: any) => { if (d) { onChange(d); setOpen(false); } }} defaultMonth={value ?? minDate} disabled={dayDisabled} components={{ Caption: CalCaption }} />
       </PopoverContent>
     </Popover>
   );
@@ -53,17 +71,22 @@ export function DateField({
 // String-valued wrapper around <DateField> for forms that store dates as "yyyy-MM-dd" strings.
 // Drop-in replacement for `<Input type="date" value={s} onChange={e => setS(e.target.value)} />`
 // so every date field in the app uses the same styled calendar. `disabled` is an RDP matcher.
-export function DateInput({ value, onChange, disabled, placeholder, testId, className }: {
+export function DateInput({ value, onChange, disabled, minDate, maxDate, placeholder, testId, className }: {
   value?: string;
   onChange: (v: string) => void;
   disabled?: any;
+  /** Earliest selectable day — accepts a Date or a "yyyy-MM-dd" string. */
+  minDate?: Date | string;
+  /** Latest selectable day — accepts a Date or a "yyyy-MM-dd" string. */
+  maxDate?: Date | string;
   placeholder?: string;
   testId?: string;
   className?: string;
 }) {
   const parse = (s?: string): Date | undefined => { if (!s) return undefined; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
   const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  return <DateField value={parse(value)} onChange={(d) => onChange(fmt(d))} disabled={disabled} placeholder={placeholder} testId={testId} className={className} />;
+  const asDate = (v?: Date | string) => (typeof v === "string" ? parse(v) : v);
+  return <DateField value={parse(value)} onChange={(d) => onChange(fmt(d))} disabled={disabled} minDate={asDate(minDate)} maxDate={asDate(maxDate)} placeholder={placeholder} testId={testId} className={className} />;
 }
 
 // "HH:mm" → "h:mm a" label (works for any time, not just preset slots).

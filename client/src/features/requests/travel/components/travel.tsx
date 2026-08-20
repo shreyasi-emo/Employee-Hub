@@ -20,6 +20,7 @@ import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { EmployeePicker } from "@/components/shared/employee-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { DateInput } from "@/components/shared/datetime-field";
+import { clampEnd } from "@/lib/date-range";
 
 const invalidateTravel = (qc: ReturnType<typeof useQueryClient>) => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/travel") });
 // A trip is "resubmitted" when the latest query/resubmit marker in its thread is a resubmit (HR answered the CEO's query).
@@ -64,17 +65,18 @@ export const TRAVEL_CATS: Record<string, { label: string; icon: any; tint: strin
 };
 
 // Field configs drive both the employee form and the read-only summary.
-type F = { key: string; label: string; type?: "text" | "date" | "datetime-local" | "number" | "select"; options?: string[]; when?: (d: any) => boolean };
+type F = { key: string; label: string; type?: "text" | "date" | "datetime-local" | "number" | "select"; options?: string[]; when?: (d: any) => boolean; min?: (d: any) => string | undefined; clears?: string[] };
 const EMP_FIELDS: Record<string, F[]> = {
   flight: [
     { key: "tripType", label: "Trip type", type: "select", options: ["one-way", "round"] },
     { key: "fromCity", label: "From city" }, { key: "toCity", label: "To city" },
-    { key: "departDate", label: "Departure", type: "date" },
-    { key: "returnDate", label: "Return", type: "date", when: (d) => d.tripType === "round" },
+    { key: "departDate", label: "Departure", type: "date", clears: ["returnDate"] },
+    { key: "returnDate", label: "Return", type: "date", when: (d) => d.tripType === "round", min: (d) => d.departDate || undefined },
   ],
   stay: [
     { key: "city", label: "City" },
-    { key: "checkIn", label: "Check-in", type: "date" }, { key: "checkOut", label: "Check-out", type: "date" },
+    { key: "checkIn", label: "Check-in", type: "date", clears: ["checkOut"] },
+    { key: "checkOut", label: "Check-out", type: "date", min: (d) => d.checkIn || undefined },
     { key: "guests", label: "Guests", type: "number" }, { key: "rooms", label: "Rooms", type: "number" },
   ],
   transport: [
@@ -89,13 +91,13 @@ const HR_FIELDS: Record<string, F[]> = {
   transport: [{ key: "operator", label: "Operator" }, { key: "pnr", label: "PNR / ticket" }, { key: "timing", label: "Timing" }],
 };
 
-function FieldRow({ f, value, onChange }: { f: F; value: any; onChange: (v: any) => void }) {
+function FieldRow({ f, value, min, onChange }: { f: F; value: any; min?: string; onChange: (v: any) => void }) {
   return (
     <div className="space-y-1 min-w-0">
       <Label className="text-[11px]">{f.label}</Label>
       {f.type === "select"
         ? <Select value={value || ""} onValueChange={onChange}><SelectTrigger className="h-9 capitalize"><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{(f.options || []).map((o) => <SelectItem key={o} value={o} className="capitalize">{o}</SelectItem>)}</SelectContent></Select>
-        : <Input type={f.type === "number" ? "number" : f.type === "date" ? "date" : f.type === "datetime-local" ? "datetime-local" : "text"} value={value ?? ""} onChange={(e) => onChange(e.target.value)} className="h-9" />}
+        : <Input type={f.type === "number" ? "number" : f.type === "date" ? "date" : f.type === "datetime-local" ? "datetime-local" : "text"} value={value ?? ""} min={min} onChange={(e) => onChange(e.target.value)} className="h-9" />}
     </div>
   );
 }
@@ -204,8 +206,8 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
                   </div>
                 </div>
                 <div className={`grid gap-3 ${details.tripType === "round" ? "grid-cols-2" : "grid-cols-1"}`}>
-                  <div className="space-y-1"><Label className="text-[11px]">Departure date</Label><DateInput value={details.departDate || ""} onChange={(v) => setDetails((d: any) => ({ ...d, departDate: v }))} testId="flight-depart" /></div>
-                  {details.tripType === "round" && <div className="space-y-1"><Label className="text-[11px]">Return date</Label><DateInput value={details.returnDate || ""} onChange={(v) => setDetails((d: any) => ({ ...d, returnDate: v }))} testId="flight-return" /></div>}
+                  <div className="space-y-1"><Label className="text-[11px]">Departure date</Label><DateInput value={details.departDate || ""} onChange={(v) => setDetails((d: any) => ({ ...d, departDate: v, returnDate: clampEnd(v, d.returnDate) }))} testId="flight-depart" /></div>
+                  {details.tripType === "round" && <div className="space-y-1"><Label className="text-[11px]">Return date</Label><DateInput value={details.returnDate || ""} onChange={(v) => setDetails((d: any) => ({ ...d, returnDate: v }))} minDate={details.departDate || undefined} testId="flight-return" /></div>}
                 </div>
               </TravelSection>
               <Separator />
@@ -225,7 +227,7 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
                 <span className="text-sm font-semibold text-foreground">{TRAVEL_CATS[category].label}</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {fields.filter((f) => !f.when || f.when(details)).map((f) => <FieldRow key={f.key} f={f} value={details[f.key]} onChange={(v) => setDetails((d: any) => ({ ...d, [f.key]: v }))} />)}
+                {fields.filter((f) => !f.when || f.when(details)).map((f) => <FieldRow key={f.key} f={f} value={details[f.key]} min={f.min?.(details)} onChange={(v) => setDetails((d: any) => { const next = { ...d, [f.key]: v }; for (const c of f.clears ?? []) next[c] = clampEnd(v, d[c]); return next; })} />)}
               </div>
               <div className="space-y-1"><Label className="text-[11px]">Purpose</Label><Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for travel" className="h-9" /></div>
               <div className="space-y-1">

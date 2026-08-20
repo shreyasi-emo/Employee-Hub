@@ -1,4 +1,5 @@
 import { DAYS, SHORT_DAYS } from "../lib/days";
+import { clampEnd } from "@/lib/date-range";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -116,11 +117,11 @@ export function AssignShiftDialog({ open, onOpenChange, employees, shifts }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium">Effective From *</label>
-              <DateInput value={form.effectiveFrom} onChange={v => setForm(f => ({ ...f, effectiveFrom: v }))} className="mt-1" testId="input-effective-from" />
+              <DateInput value={form.effectiveFrom} onChange={v => setForm(f => ({ ...f, effectiveFrom: v, effectiveTo: clampEnd(v, f.effectiveTo) }))} className="mt-1" testId="input-effective-from" />
             </div>
             <div>
               <label className="text-sm font-medium">Effective To</label>
-              <DateInput value={form.effectiveTo} onChange={v => setForm(f => ({ ...f, effectiveTo: v }))} className="mt-1" />
+              <DateInput value={form.effectiveTo} onChange={v => setForm(f => ({ ...f, effectiveTo: v }))} minDate={form.effectiveFrom || undefined} className="mt-1" />
             </div>
           </div>
 

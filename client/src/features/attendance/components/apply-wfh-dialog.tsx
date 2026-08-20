@@ -12,6 +12,7 @@ import { DateField } from "@/components/shared/datetime-field";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useApplyWfh } from "../api/attendance.api";
+import { clampEndDate } from "@/lib/date-range";
 
 // Work-From-Home request modal — date (today .. 5 working days) + duration + optional reason.
 // Warns and blocks submission on a holiday / approved-leave conflict. Needs manager approval,
@@ -81,11 +82,11 @@ export function ApplyWfhDialog({ open, onClose }: { open: boolean; onClose: () =
         <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5"><Label>{rangeMode ? "Start date" : "Date"}</Label>
-              <DateField value={date} onChange={setDate} disabled={[{ before: startOfDay(new Date()) }, { after: allowedMax }, { dayOfWeek: [0, 6] }]} placeholder="Select a date" testId="wfh-date" />
+              <DateField value={date} onChange={(d) => { setDate(d); setEndDate((e) => clampEndDate(d, e)); }} disabled={[{ before: startOfDay(new Date()) }, { after: allowedMax }, { dayOfWeek: [0, 6] }]} placeholder="Select a date" testId="wfh-date" />
             </div>
             {rangeMode ? (
               <div className="space-y-1.5"><Label>End date</Label>
-                <DateField value={endDate} onChange={setEndDate} disabled={[{ before: date ? startOfDay(date) : startOfDay(new Date()) }, { after: allowedMax }, { dayOfWeek: [0, 6] }]} placeholder="End date" testId="wfh-end-date" />
+                <DateField value={endDate} onChange={setEndDate} disabled={[{ before: startOfDay(new Date()) }, { after: allowedMax }, { dayOfWeek: [0, 6] }]} minDate={date} placeholder="End date" testId="wfh-end-date" />
               </div>
             ) : (
               <div className="space-y-1.5"><Label>Duration</Label>

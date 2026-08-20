@@ -16,6 +16,7 @@ import { Plus, Calendar, Lock, Archive, Play, Pencil, CheckCircle2, RefreshCw, S
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { CYCLE_STATUS_COLORS } from "../lib/performance-constants";
+import { clampEnd } from "@/lib/date-range";
 import { statusBadge } from "./status-badge";
 
 // ---- Cycles Tab (HR) ----
@@ -119,11 +120,11 @@ export function CyclesTab({ onSelectCycle }: { onSelectCycle: (id: string) => vo
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Start Date *</Label>
-                <DateInput testId="input-cycle-start" value={form.startDate} onChange={v => setForm(f => ({ ...f, startDate: v }))} />
+                <DateInput testId="input-cycle-start" value={form.startDate} onChange={v => setForm(f => ({ ...f, startDate: v, endDate: clampEnd(v, f.endDate) }))} />
               </div>
               <div>
                 <Label>End Date *</Label>
-                <DateInput testId="input-cycle-end" value={form.endDate} onChange={v => setForm(f => ({ ...f, endDate: v }))} />
+                <DateInput testId="input-cycle-end" value={form.endDate} onChange={v => setForm(f => ({ ...f, endDate: v }))} minDate={form.startDate || undefined} />
               </div>
             </div>
             <div className="space-y-2">

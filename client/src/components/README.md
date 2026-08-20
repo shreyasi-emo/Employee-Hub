@@ -16,11 +16,37 @@ The one place to look before building UI. Living doc — we grow it as we standa
 | `GlassBackButton` | `@/components/shared/glass-back-button` | The app-wide **back** control — square glass button + chevron. Use for every "go back" affordance. | `onClick`, `ariaLabel`, `className` |
 | `EmployeePicker` | `@/components/shared/employee-picker` | Standard **people selector** ("Add attendees" style). | `employees`, `selectedIds`, `onChange`, `multiple`, `lockedIds` (can't be removed), `modal` (set `true` inside a Dialog so the list wheel-scrolls) |
 | `DateRangePicker` | `@/components/shared/date-range-picker` | Standard **date / date-range _filter_** — secondary/sm trigger, single date, flip the "End date" switch for a range. Also exports `CalCaption` (the `‹ Month ›` header for any `<RangeCalendar>`). | `value` `{from,to}`, `onChange`, `align`, `triggerClassName`, `testId`, `disabled` (RDP matcher, e.g. `{ before: startOfDay(new Date()) }`) |
-| `DateField` / `TimeField` | `@/components/shared/datetime-field` | Standard **single date + time _form fields_** (full-width outline trigger; calendar popover + editable time combobox that also accepts free-typed times). Use inside forms — Book-a-Car and Mark-On-Duty share these. | `DateField`: `value` `Date`, `onChange`, `disabled` (RDP matcher), `placeholder`, `testId`. `TimeField`: `value` `"HH:mm"`, `onChange`, `min`/`max`, `slots` (custom window; defaults to full day), `placeholder`, `testId` |
+| `DateField` / `TimeField` | `@/components/shared/datetime-field` | Standard **single date + time _form fields_** (full-width outline trigger; calendar popover + editable time combobox that also accepts free-typed times). Use inside forms — Book-a-Car and Mark-On-Duty share these. | `DateField`: `value` `Date`, `onChange`, `disabled` (RDP matcher), **`minDate`** / **`maxDate`** (see the start/end rule below), `placeholder`, `testId`. `DateInput` is the same field for forms that hold `"yyyy-MM-dd"` strings — its `minDate`/`maxDate` also accept a string. `TimeField`: `value` `"HH:mm"`, `onChange`, `min`/`max`, `slots` (custom window; defaults to full day), `placeholder`, `testId` |
 
 > Rule: the moment a component is needed by **2+ pages**, extract it here and add a row above. Page-only components stay in their page. Every shared component gets a header comment documenting its props.
 
 ---
+
+## Rule: start date + end date
+
+Every form with a start and an end date obeys one rule, and it lives in one place:
+[`@/lib/date-range`](../lib/date-range.ts).
+
+1. **The end can never be picked before the start** — pass `minDate` to the end field.
+2. **Moving the start past the end never leaves an invalid range** — call `clampEnd` in the
+   start field onChange; it pulls the end forward to the new start.
+
+```tsx
+import { clampEnd } from "@/lib/date-range";
+
+<DateInput value={form.startDate}
+  onChange={v => setForm(f => ({ ...f, startDate: v, endDate: clampEnd(v, f.endDate) }))} />
+<DateInput value={form.endDate}
+  onChange={v => setForm(f => ({ ...f, endDate: v }))}
+  minDate={form.startDate || undefined} />
+```
+
+`clampEndDate` is the same rule for state held as `Date` objects; `ymd` / `parseYmd` convert
+between the two forms. A native `<input type="date">` end field takes `min={start}` instead.
+A `<Calendar mode="range">` — and `DateRangePicker`, which wraps it — needs neither:
+react-day-picker enforces from ≤ to itself.
+
+`verify.sh` check 9 fails if a new end-side date field shows up without a bound.
 
 ## Pattern: the "record card"
 

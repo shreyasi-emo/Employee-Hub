@@ -8,6 +8,7 @@ import { Calendar, Info } from "lucide-react";
 import { format, startOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { parseYmd, requestedDays } from "../lib/leave-model";
+import { clampEnd, ymd } from "@/lib/date-range";
 import { useApplyLeave } from "../api/leave.api";
 
 export function ApplyLeaveDialog({ open, onOpenChange, employeeId, leaveTypes, leaveBalances }: {
@@ -65,7 +66,7 @@ export function ApplyLeaveDialog({ open, onOpenChange, employeeId, leaveTypes, l
             <div>
               <label className="text-sm font-medium">Start Date *</label>
               <div className="mt-1">
-                <DateField value={parseYmd(form.startDate)} onChange={(d) => setForm((f) => ({ ...f, startDate: format(d, "yyyy-MM-dd"), endDate: f.endDate && f.endDate < format(d, "yyyy-MM-dd") ? format(d, "yyyy-MM-dd") : f.endDate }))} disabled={{ before: startOfDay(new Date()) }} testId="input-start-date" />
+                <DateField value={parseYmd(form.startDate)} onChange={(d) => setForm((f) => { const startDate = ymd(d); return { ...f, startDate, endDate: clampEnd(startDate, f.endDate) }; })} disabled={{ before: startOfDay(new Date()) }} testId="input-start-date" />
               </div>
             </div>
             <div>
@@ -76,7 +77,7 @@ export function ApplyLeaveDialog({ open, onOpenChange, employeeId, leaveTypes, l
                     <Calendar className="h-4 w-4 mr-2 text-muted-foreground" /> {form.startDate ? format(parseYmd(form.startDate)!, "EEE, d MMM yyyy") : "Same day"}
                   </Button>
                 ) : (
-                  <DateField value={parseYmd(form.endDate)} onChange={(d) => setForm((f) => ({ ...f, endDate: format(d, "yyyy-MM-dd") }))} disabled={{ before: startOfDay(parseYmd(form.startDate) || new Date()) }} testId="input-end-date" />
+                  <DateField value={parseYmd(form.endDate)} onChange={(d) => setForm((f) => ({ ...f, endDate: ymd(d) }))} disabled={{ before: startOfDay(new Date()) }} minDate={parseYmd(form.startDate)} testId="input-end-date" />
                 )}
               </div>
             </div>
