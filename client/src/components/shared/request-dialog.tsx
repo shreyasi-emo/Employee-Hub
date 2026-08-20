@@ -71,7 +71,9 @@ export function RequestDialog({
         style={minHeight ? { minHeight } : undefined}
         data-testid={testId}
       >
-        <DialogHeader className={`px-6 pt-6 ${showSteps || subtitle ? "pb-3" : "pb-5"} flex-shrink-0`}>
+        {/* The header is closed by a rule, mirroring the footer's border-t. When a step bar
+            follows, it carries the rule instead, so the region is closed once, not twice. */}
+        <DialogHeader className={`px-6 pt-6 flex-shrink-0 ${showSteps ? "pb-3" : "pb-5 border-b border-border"}`}>
           <DialogTitle>{title}</DialogTitle>
           {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
         </DialogHeader>
