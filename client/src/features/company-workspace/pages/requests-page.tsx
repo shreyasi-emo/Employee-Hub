@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Inbox, Plus, ExternalLink, ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 
-const HANDLER_ROLES = ["super_admin", "hr_admin", "hr_executive", "hr_ops", "office_admin", "logistics", "finance"];
+const HANDLER_ROLES = ["super_admin", "hr_admin", "hr_executive", "hr_ops", "logistics", "finance"];
 
 const statusColors: Record<string, string> = {
   submitted: "bg-blue-500/10 text-blue-700",

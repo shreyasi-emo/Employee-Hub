@@ -92,7 +92,7 @@ export default function HRopsPage() {
 
   const userRole = (auth as any)?.role;
   const showHiringItems = ["super_admin", "hr_admin", "recruiter"].includes(userRole);
-  const showOpsItems = ["super_admin", "hr_admin", "office_admin", "hr_ops"].includes(userRole);
+  const showOpsItems = ["super_admin", "hr_admin", "hr_executive", "hr_ops"].includes(userRole);
 
   const ceoApprovedCount =
     (showHiringItems ? (approvedRequisitions as any[]).length + (approvedOffers as any[]).length : 0) +

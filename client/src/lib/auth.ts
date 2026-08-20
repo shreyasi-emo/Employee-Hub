@@ -34,10 +34,15 @@ export interface AuthState {
   devRole?: UserRole | null; // role currently being impersonated, if any
 }
 
-// Roles that exist in the DB enum (note: "logistics" is UI-only, not a valid DB role)
+// Roles that can be ASSIGNED. Not the same as the DB enum:
+//  - "logistics" is UI-only and was never a DB role.
+//  - "office_admin" is retired. It stays in the DB enum (Postgres cannot drop an enum value)
+//    and keeps its label + colour below so historical rows still render — it simply cannot be
+//    handed out any more. Its module now belongs to super_admin / hr_admin / hr_executive.
+//    To bring it back: add it here and to ROLE_OPTIONS in features/employees/lib/employee-constants.
 export const ALL_ROLES: UserRole[] = [
   "super_admin", "hr_admin", "hr_executive", "finance", "manager", "employee",
-  "recruiter", "hr_ops", "office_admin", "ceo_approver", "interviewer",
+  "recruiter", "hr_ops", "ceo_approver", "interviewer",
 ];
 
 export function useAuth() {
@@ -91,7 +96,7 @@ export function isManager(user: CurrentUser | null): boolean {
 }
 
 export function hasWorkspaceAccess(user: CurrentUser | null): boolean {
-  return hasRole(user, "super_admin", "hr_admin", "hr_executive", "recruiter", "hr_ops", "office_admin", "ceo_approver");
+  return hasRole(user, "super_admin", "hr_admin", "hr_executive", "recruiter", "hr_ops", "ceo_approver");
 }
 
 export function isCEOApprover(user: CurrentUser | null): boolean {

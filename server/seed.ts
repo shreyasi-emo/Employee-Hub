@@ -386,7 +386,6 @@ export async function seed() {
   const extraRoleProfiles = [
     { code: "EMO0R1", role: "recruiter", first: "Riya", last: "Kapoor", username: "recruiter@emoenergy.in", dept: "Human Resources" },
     { code: "EMO0O1", role: "hr_ops", first: "Sameer", last: "Joshi", username: "hrops@emoenergy.in", dept: "Human Resources" },
-    { code: "EMO0A1", role: "office_admin", first: "Pooja", last: "Iyer", username: "officeadmin@emoenergy.in", dept: "Operations" },
     { code: "EMO0I1", role: "interviewer", first: "Karan", last: "Malhotra", username: "interviewer@emoenergy.in", dept: "Engineering" },
   ];
   const extraEmps: any[] = [];

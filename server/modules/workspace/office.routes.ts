@@ -31,7 +31,7 @@ export function registerWorkspaceOfficeRoutes(app: Express) {
     res.json(await storage.createVendor(req.body));
   });
   app.put("/api/workspace/vendors/:id", requireAuth, requireWorkspace, async (req, res) => {
-    const roles = ["super_admin", "hr_admin", "office_admin", "finance"];
+    const roles = ["super_admin", "hr_admin", "hr_executive", "finance"];
     if (!roles.includes(req.currentUser!.role)) return res.status(403).json({ error: "Access denied" });
     res.json(await storage.updateVendor(req.params.id, req.body));
   });

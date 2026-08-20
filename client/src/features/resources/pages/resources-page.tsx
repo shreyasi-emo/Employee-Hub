@@ -10,7 +10,7 @@ import { UploadDocumentDialog } from "../components/upload-document-dialog";
 export default function ResourcesPage() {
   const { data: auth } = useAuth();
   const { toast } = useToast();
-  const canManage = isHR(auth?.user ?? null) || ["super_admin", "office_admin"].includes(auth?.user?.role || "");
+  const canManage = isHR(auth?.user ?? null) || ["super_admin"].includes(auth?.user?.role || "");
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("policy");
 
