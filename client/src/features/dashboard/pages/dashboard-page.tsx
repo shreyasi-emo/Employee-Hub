@@ -311,15 +311,17 @@ export default function DashboardPage() {
 
               {/* Bottom row — the employment facts, each separated by a rule. Built from a list so a
                   missing value takes its divider with it instead of leaving a stray one. */}
-              <div className="flex items-center flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
+              <div className="flex items-center text-xs text-muted-foreground">
                 {([
                   [Hash, emp.employeeCode || "—"],
                   empEmploymentType ? [Briefcase, empEmploymentType.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())] : null,
                   empJoinDate ? [CalendarDays, `Joined ${format(new Date(empJoinDate), "MMM yyyy")}${tenure ? ` · ${tenure}` : ""}`] : null,
                 ].filter(Boolean) as [any, string][]).map(([Icon, text], i) => (
-                  <span key={text} className="inline-flex items-center gap-4">
-                    {i > 0 && <span className="h-3.5 w-px bg-border/70" />}
-                    <span className="inline-flex items-center gap-1.5"><Icon className="h-3.5 w-3.5 text-[#206295]" /> {text}</span>
+                  // flex-1 so the facts share the row evenly instead of bunching at the left,
+                  // and the rule rides on the item so a dropped fact takes its divider with it.
+                  <span key={text} className={`flex-1 min-w-0 inline-flex items-center gap-1.5 ${i > 0 ? "border-l border-border/70 pl-4" : ""}`}>
+                    <Icon className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" />
+                    <span className="truncate">{text}</span>
                   </span>
                 ))}
               </div>
