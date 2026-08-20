@@ -20,6 +20,7 @@ import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { EmployeePicker } from "@/components/shared/employee-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { DateInput } from "@/components/shared/datetime-field";
+import { RequestDialog } from "@/components/shared/request-dialog";
 import { clampEnd } from "@/lib/date-range";
 
 const invalidateTravel = (qc: ReturnType<typeof useQueryClient>) => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/travel") });
@@ -162,91 +163,94 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
   });
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="max-w-lg min-h-[520px] max-h-[86vh] p-0 gap-0 flex flex-col overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0"><DialogTitle>New Travel Request</DialogTitle><p className="text-sm text-muted-foreground mt-0.5">Request travel for business purposes.</p></DialogHeader>
-        <div className="flex-1 overflow-y-auto px-6 pb-4">
-          {step === 0 ? (
-            <div className="flex flex-col justify-center h-full min-h-[360px] space-y-4">
-              <p className="text-[15px] font-bold text-foreground text-center animate-in fade-in slide-in-from-top-1 duration-300">What do you need to book?</p>
-              {Object.entries(TRAVEL_CATS).map(([key, c], i) => (
-                <button key={key} type="button" onClick={() => pick(key)} style={{ animationDelay: `${i * 90}ms`, animationFillMode: "both" }} className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4 animate-in fade-in slide-in-from-bottom-3 duration-500" data-testid={`choose-${key}`}>
-                  <div className="tv-choice h-16 w-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm" style={{ backgroundColor: `${c.tint}1f`, color: c.tint }}><c.icon className="h-9 w-9" /></div>
-                  <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">{c.label}</p><p className="text-xs text-muted-foreground mt-1">{c.desc}</p></div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-1" />
-                </button>
-              ))}
-            </div>
-          ) : category === "flight" ? (
-            <div className="space-y-5">
-              <TravelSection icon={Plane} title="Trip Type">
-                <div className="grid grid-cols-2 gap-3">
-                  {[{ v: "one-way", label: "One way", desc: "Single journey", Icon: MoveRight }, { v: "round", label: "Round trip", desc: "Return included", Icon: Repeat }].map(({ v, label, desc, Icon }) => {
-                    const active = (details.tripType || "one-way") === v;
-                    return (
-                      <button key={v} type="button" onClick={() => setDetails((d: any) => ({ ...d, tripType: v }))} className={`rounded-2xl border p-4 flex flex-col items-start gap-2.5 text-left transition ${active ? "border-[#206295] bg-[#206295]/[0.06] ring-1 ring-[#206295]/40" : "border-border hover-elevate"}`} data-testid={`trip-type-${v}`}>
-                        <span className={`h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-[#206295] text-white" : "bg-muted text-muted-foreground"}`}><Icon className="h-4 w-4" /></span>
-                        <div><p className="text-sm font-semibold text-foreground">{label}</p><p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p></div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </TravelSection>
-              <Separator />
-              <TravelSection icon={MapPin} title="Trip Details">
-                <div className="flex items-end gap-2">
-                  <div className="flex-1 space-y-1 min-w-0">
-                    <Label className="text-[11px]">From city</Label>
-                    <div className="relative"><MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" /><Input value={details.fromCity ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, fromCity: e.target.value }))} placeholder="e.g. Bengaluru" className="h-9 pl-8" data-testid="flight-from" /></div>
-                  </div>
-                  <Button type="button" variant="ghost" size="icon" className="h-9 w-9 mb-0.5 flex-shrink-0 text-[#206295]" onClick={() => setDetails((d: any) => ({ ...d, fromCity: d.toCity || "", toCity: d.fromCity || "" }))} aria-label="Swap cities" data-testid="flight-swap"><ArrowLeftRight className="h-4 w-4" /></Button>
-                  <div className="flex-1 space-y-1 min-w-0">
-                    <Label className="text-[11px]">To city</Label>
-                    <div className="relative"><MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" /><Input value={details.toCity ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, toCity: e.target.value }))} placeholder="e.g. Mumbai" className="h-9 pl-8" data-testid="flight-to" /></div>
-                  </div>
-                </div>
-                <div className={`grid gap-3 ${details.tripType === "round" ? "grid-cols-2" : "grid-cols-1"}`}>
-                  <div className="space-y-1"><Label className="text-[11px]">Departure date</Label><DateInput value={details.departDate || ""} onChange={(v) => setDetails((d: any) => ({ ...d, departDate: v, returnDate: clampEnd(v, d.returnDate) }))} testId="flight-depart" /></div>
-                  {details.tripType === "round" && <div className="space-y-1"><Label className="text-[11px]">Return date</Label><DateInput value={details.returnDate || ""} onChange={(v) => setDetails((d: any) => ({ ...d, returnDate: v }))} minDate={details.departDate || undefined} testId="flight-return" /></div>}
-                </div>
-              </TravelSection>
-              <Separator />
-              <TravelSection icon={UsersIcon} title="Purpose & People">
-                <div className="space-y-1"><Label className="text-[11px]">Purpose of travel</Label><Textarea rows={3} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for this trip…" className="resize-none" data-testid="flight-purpose" /></div>
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
-                  <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
-                  <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues travelling with you." : `${coIds.length + 1} passengers (including you)`}</p>
-                </div>
-              </TravelSection>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: `${TRAVEL_CATS[category].tint}0f` }}>
-                <span className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${TRAVEL_CATS[category].tint}1a`, color: TRAVEL_CATS[category].tint }}>{(() => { const I = TRAVEL_CATS[category].icon; return <I className="h-4 w-4" />; })()}</span>
-                <span className="text-sm font-semibold text-foreground">{TRAVEL_CATS[category].label}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {fields.filter((f) => !f.when || f.when(details)).map((f) => <FieldRow key={f.key} f={f} value={details[f.key]} min={f.min?.(details)} onChange={(v) => setDetails((d: any) => { const next = { ...d, [f.key]: v }; for (const c of f.clears ?? []) next[c] = clampEnd(v, d[c]); return next; })} />)}
-              </div>
-              <div className="space-y-1"><Label className="text-[11px]">Purpose</Label><Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for travel" className="h-9" /></div>
-              <div className="space-y-1">
-                <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers (optional)</Label>
-                <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="flex-shrink-0 border-t border-border bg-background px-6 py-4 flex items-center justify-between gap-3">
-          {step === 1 ? <Button variant="ghost" onClick={() => setStep(0)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button> : <span />}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={close}>Cancel</Button>
-            {step === 1 && onSaveDraft && <Button variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft({ category, details, purpose, coIds }); close(); }}>Save as Draft</Button>}
-            {step === 1 && <Button className="btn-primary-gradient" disabled={!valid || submit.isPending} onClick={() => submit.mutate()} data-testid="travel-submit">{submit.isPending ? "Submitting…" : "Submit Request"}</Button>}
+    <RequestDialog
+      open={open}
+      onClose={close}
+      title="New Travel Request"
+      subtitle="Request travel for business purposes."
+      steps={["Choose type", "Details"]}
+      step={step}
+      minHeight="520px"
+      back={step === 1 ? <Button variant="ghost" onClick={() => setStep(0)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button> : undefined}
+      footer={<>
+        <Button variant="outline" onClick={close}>Cancel</Button>
+        {step === 1 && onSaveDraft && <Button variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft({ category, details, purpose, coIds }); close(); }}>Save as Draft</Button>}
+        {step === 1 && <Button className="btn-primary-gradient" disabled={!valid || submit.isPending} onClick={() => submit.mutate()} data-testid="travel-submit">{submit.isPending ? "Submitting…" : "Submit Request"}</Button>}
+      </>}
+    >
+      <div className="px-6 pb-4">
+        {step === 0 ? (
+          <div className="flex flex-col justify-center h-full min-h-[360px] space-y-4">
+            <p className="text-[15px] font-bold text-foreground text-center animate-in fade-in slide-in-from-top-1 duration-300">What do you need to book?</p>
+            {Object.entries(TRAVEL_CATS).map(([key, c], i) => (
+              <button key={key} type="button" onClick={() => pick(key)} style={{ animationDelay: `${i * 90}ms`, animationFillMode: "both" }} className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4 animate-in fade-in slide-in-from-bottom-3 duration-500" data-testid={`choose-${key}`}>
+                <div className="tv-choice h-16 w-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm" style={{ backgroundColor: `${c.tint}1f`, color: c.tint }}><c.icon className="h-9 w-9" /></div>
+                <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">{c.label}</p><p className="text-xs text-muted-foreground mt-1">{c.desc}</p></div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-1" />
+              </button>
+            ))}
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        ) : category === "flight" ? (
+          <div className="space-y-5">
+            <TravelSection icon={Plane} title="Trip Type">
+              <div className="grid grid-cols-2 gap-3">
+                {[{ v: "one-way", label: "One way", desc: "Single journey", Icon: MoveRight }, { v: "round", label: "Round trip", desc: "Return included", Icon: Repeat }].map(({ v, label, desc, Icon }) => {
+                  const active = (details.tripType || "one-way") === v;
+                  return (
+                    <button key={v} type="button" onClick={() => setDetails((d: any) => ({ ...d, tripType: v }))} className={`rounded-2xl border p-4 flex flex-col items-start gap-2.5 text-left transition ${active ? "border-[#206295] bg-[#206295]/[0.06] ring-1 ring-[#206295]/40" : "border-border hover-elevate"}`} data-testid={`trip-type-${v}`}>
+                      <span className={`h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-[#206295] text-white" : "bg-muted text-muted-foreground"}`}><Icon className="h-4 w-4" /></span>
+                      <div><p className="text-sm font-semibold text-foreground">{label}</p><p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p></div>
+                    </button>
+                  );
+                })}
+              </div>
+            </TravelSection>
+            <Separator />
+            <TravelSection icon={MapPin} title="Trip Details">
+              <div className="flex items-end gap-2">
+                <div className="flex-1 space-y-1 min-w-0">
+                  <Label className="text-[11px]">From city</Label>
+                  <div className="relative"><MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" /><Input value={details.fromCity ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, fromCity: e.target.value }))} placeholder="e.g. Bengaluru" className="h-9 pl-8" data-testid="flight-from" /></div>
+                </div>
+                <Button type="button" variant="ghost" size="icon" className="h-9 w-9 mb-0.5 flex-shrink-0 text-[#206295]" onClick={() => setDetails((d: any) => ({ ...d, fromCity: d.toCity || "", toCity: d.fromCity || "" }))} aria-label="Swap cities" data-testid="flight-swap"><ArrowLeftRight className="h-4 w-4" /></Button>
+                <div className="flex-1 space-y-1 min-w-0">
+                  <Label className="text-[11px]">To city</Label>
+                  <div className="relative"><MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" /><Input value={details.toCity ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, toCity: e.target.value }))} placeholder="e.g. Mumbai" className="h-9 pl-8" data-testid="flight-to" /></div>
+                </div>
+              </div>
+              <div className={`grid gap-3 ${details.tripType === "round" ? "grid-cols-2" : "grid-cols-1"}`}>
+                <div className="space-y-1"><Label className="text-[11px]">Departure date</Label><DateInput value={details.departDate || ""} onChange={(v) => setDetails((d: any) => ({ ...d, departDate: v, returnDate: clampEnd(v, d.returnDate) }))} testId="flight-depart" /></div>
+                {details.tripType === "round" && <div className="space-y-1"><Label className="text-[11px]">Return date</Label><DateInput value={details.returnDate || ""} onChange={(v) => setDetails((d: any) => ({ ...d, returnDate: v }))} minDate={details.departDate || undefined} testId="flight-return" /></div>}
+              </div>
+            </TravelSection>
+            <Separator />
+            <TravelSection icon={UsersIcon} title="Purpose & People">
+              <div className="space-y-1"><Label className="text-[11px]">Purpose of travel</Label><Textarea rows={3} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for this trip…" className="resize-none" data-testid="flight-purpose" /></div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
+                <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
+                <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues travelling with you." : `${coIds.length + 1} passengers (including you)`}</p>
+              </div>
+            </TravelSection>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: `${TRAVEL_CATS[category].tint}0f` }}>
+              <span className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${TRAVEL_CATS[category].tint}1a`, color: TRAVEL_CATS[category].tint }}>{(() => { const I = TRAVEL_CATS[category].icon; return <I className="h-4 w-4" />; })()}</span>
+              <span className="text-sm font-semibold text-foreground">{TRAVEL_CATS[category].label}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {fields.filter((f) => !f.when || f.when(details)).map((f) => <FieldRow key={f.key} f={f} value={details[f.key]} min={f.min?.(details)} onChange={(v) => setDetails((d: any) => { const next = { ...d, [f.key]: v }; for (const c of f.clears ?? []) next[c] = clampEnd(v, d[c]); return next; })} />)}
+            </div>
+            <div className="space-y-1"><Label className="text-[11px]">Purpose</Label><Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for travel" className="h-9" /></div>
+            <div className="space-y-1">
+              <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers (optional)</Label>
+              <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
+            </div>
+          </div>
+        )}
+      </div>
+    </RequestDialog>
   );
 }
 

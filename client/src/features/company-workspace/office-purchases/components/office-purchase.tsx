@@ -20,6 +20,7 @@ import {
   CircleCheck, AlertTriangle, ExternalLink, IndianRupee, Copy, MoreVertical,
   User, CalendarClock, Clock, Building2, FileText, MessageSquare,
 } from "lucide-react";
+import { RequestDialog } from "@/components/shared/request-dialog";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -123,148 +124,129 @@ export function NewRequestDialog({ open, onClose, initialKind, onSaveDraft, init
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="max-w-lg min-h-[540px] max-h-[86vh] p-0 overflow-hidden overflow-y-hidden gap-0 flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-5 flex-shrink-0">
-          <DialogTitle>New Purchase Request</DialogTitle>
-        </DialogHeader>
-
-        {/* Progress bar — compact, centered, numbers with labels beneath */}
-        <div className="px-6 pb-5 flex-shrink-0 border-b border-border">
-          <div className="mx-auto flex items-start gap-2 w-60">
-            <div className="flex flex-col items-center gap-1.5 w-20 flex-shrink-0">
-              <span className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold bg-[#206295] text-white">{step > 0 ? <Check className="h-4 w-4" /> : 1}</span>
-              <span className="text-[11px] font-medium text-foreground text-center leading-tight">Choose type</span>
-            </div>
-            <div className={`h-0.5 flex-1 rounded mt-3.5 ${step >= 1 ? "bg-[#206295]" : "bg-muted"}`} />
-            <div className="flex flex-col items-center gap-1.5 w-20 flex-shrink-0">
-              <span className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ${step >= 1 ? "bg-[#206295] text-white" : "bg-muted text-muted-foreground"}`}>2</span>
-              <span className={`text-[11px] font-medium text-center leading-tight ${step >= 1 ? "text-foreground" : "text-muted-foreground"}`}>Details</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="px-6 pt-4 pb-8">
-            {step === 0 ? (
-              <div className="flex flex-col justify-center h-full min-h-[320px] space-y-5">
-                <p className="text-[15px] font-bold text-foreground text-center">Select the type of request you'd like to raise.</p>
-                <button type="button" onClick={() => pickKind("office")} className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4" data-testid="choose-office-purchase">
-                  <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#206295]/15 to-[#4BDCD9]/25 text-[#206295] flex items-center justify-center flex-shrink-0 shadow-sm">
-                    <CartIllustration className="h-8 w-8 origin-center group-hover:animate-[op-cart-roll_0.7s_ease-in-out]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground">Office Purchase</p>
-                    <p className="text-xs text-muted-foreground mt-1">Everyday items — stationery, peripherals, small online buys.</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
-                </button>
-                <button type="button" onClick={() => pickKind("procurement")} className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4" data-testid="choose-procurement">
-                  <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#0E7C7B]/15 to-[#4BDCD9]/30 text-[#0E7C7B] flex items-center justify-center flex-shrink-0 shadow-sm">
-                    <BoxIllustration className="h-8 w-8 origin-center group-hover:animate-[op-box-lift_0.7s_ease-in-out]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground">Equipment & Assets</p>
-                    <p className="text-xs text-muted-foreground mt-1">Request equipment, supplies, or any business purchase.</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
-                </button>
+    <RequestDialog
+      open={open}
+      onClose={close}
+      title="New Purchase Request"
+      steps={["Choose type", "Details"]}
+      step={step}
+      minHeight="540px"
+      back={step === 1 ? <Button variant="ghost" onClick={() => setStep(0)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button> : undefined}
+      footer={<>
+        <Button variant="outline" onClick={close}>Cancel</Button>
+        {step === 1 && onSaveDraft && <Button variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft({ kind, items, justification }); close(); }} data-testid="op-save-draft">Save as Draft</Button>}
+        {step === 1 && <Button className="btn-primary-gradient" disabled={!valid || submit.isPending} onClick={doSubmit} data-testid="op-submit">{submit.isPending ? "Submitting…" : "Submit request"}</Button>}
+      </>}
+    >
+      <div className="px-6 pt-4 pb-8">
+        {step === 0 ? (
+          <div className="flex flex-col justify-center h-full min-h-[320px] space-y-5">
+            <p className="text-[15px] font-bold text-foreground text-center">Select the type of request you'd like to raise.</p>
+            <button type="button" onClick={() => pickKind("office")} className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4" data-testid="choose-office-purchase">
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#206295]/15 to-[#4BDCD9]/25 text-[#206295] flex items-center justify-center flex-shrink-0 shadow-sm">
+                <CartIllustration className="h-8 w-8 origin-center group-hover:animate-[op-cart-roll_0.7s_ease-in-out]" />
               </div>
-            ) : kind === "procurement" ? (
-              <div className="space-y-5">
-                <div className="flex items-center gap-2.5 rounded-xl bg-[#0E7C7B]/[0.06] px-3 py-2.5">
-                  <span className="h-8 w-8 rounded-lg bg-[#0E7C7B]/10 text-[#0E7C7B] flex items-center justify-center flex-shrink-0"><BoxIllustration className="h-4 w-4" /></span>
-                  <p className="text-sm font-semibold text-foreground">Equipment &amp; Assets</p>
-                </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">Office Purchase</p>
+                <p className="text-xs text-muted-foreground mt-1">Everyday items — stationery, peripherals, small online buys.</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
+            </button>
+            <button type="button" onClick={() => pickKind("procurement")} className="group w-full text-left card-surface rounded-2xl p-5 hover-elevate flex items-center gap-4" data-testid="choose-procurement">
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#0E7C7B]/15 to-[#4BDCD9]/30 text-[#0E7C7B] flex items-center justify-center flex-shrink-0 shadow-sm">
+                <BoxIllustration className="h-8 w-8 origin-center group-hover:animate-[op-box-lift_0.7s_ease-in-out]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">Equipment & Assets</p>
+                <p className="text-xs text-muted-foreground mt-1">Request equipment, supplies, or any business purchase.</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </div>
+        ) : kind === "procurement" ? (
+          <div className="space-y-5">
+            <div className="flex items-center gap-2.5 rounded-xl bg-[#0E7C7B]/[0.06] px-3 py-2.5">
+              <span className="h-8 w-8 rounded-lg bg-[#0E7C7B]/10 text-[#0E7C7B] flex items-center justify-center flex-shrink-0"><BoxIllustration className="h-4 w-4" /></span>
+              <p className="text-sm font-semibold text-foreground">Equipment &amp; Assets</p>
+            </div>
 
-                <div className="space-y-1.5">
-                  <Label>Purpose</Label>
-                  <Input value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="e.g. Replacement bearing for the assembly line" data-testid="proc-purpose" />
-                </div>
+            <div className="space-y-1.5">
+              <Label>Purpose</Label>
+              <Input value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="e.g. Replacement bearing for the assembly line" data-testid="proc-purpose" />
+            </div>
 
-                <div className="space-y-3">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Items</Label>
+                <span className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</span>
+              </div>
+              {items.map((it, i) => (
+                <div key={i} className="rounded-[16px] border border-border p-3 space-y-3 bg-muted/30">
                   <div className="flex items-center justify-between">
-                    <Label>Items</Label>
-                    <span className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</span>
+                    <span className="text-xs font-semibold text-muted-foreground">Item {i + 1}</span>
+                    {items.length > 1 && <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setItems((a) => a.filter((_, idx) => idx !== i))} aria-label="Remove item"><X className="h-3.5 w-3.5 text-[#FF6F62]" /></Button>}
                   </div>
-                  {items.map((it, i) => (
-                    <div key={i} className="rounded-[16px] border border-border p-3 space-y-3 bg-muted/30">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-muted-foreground">Item {i + 1}</span>
-                        {items.length > 1 && <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setItems((a) => a.filter((_, idx) => idx !== i))} aria-label="Remove item"><X className="h-3.5 w-3.5 text-[#FF6F62]" /></Button>}
-                      </div>
-                      <div className="space-y-1"><p className="text-xs text-muted-foreground">Item</p><Input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="e.g. SKF 6205 bearing" className="h-9" data-testid={`proc-item-desc-${i}`} /></div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Quantity</p><Input type="number" min={1} value={it.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} className="h-9" /></div>
-                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Unit cost (₹)</p><Input type="number" min={0} value={it.unitPrice ?? ""} onChange={(e) => setItem(i, { unitPrice: Number(e.target.value) })} placeholder="0.00" className="h-9" /></div>
-                      </div>
-                      <div className="space-y-1"><p className="text-xs text-muted-foreground">Amazon link</p><div className="relative"><Link2 className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" /><Input value={it.finalLink || ""} onChange={(e) => setItem(i, { finalLink: e.target.value })} placeholder="https://amazon.in/…" className="h-9 pl-8" /></div></div>
-                    </div>
-                  ))}
-                  <Button type="button" variant="secondaryB" size="sm" className="w-full" style={{ borderRadius: "16px" }} onClick={() => setItems((a) => [...a, emptyItem()])}><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item</Button>
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Item</p><Input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="e.g. SKF 6205 bearing" className="h-9" data-testid={`proc-item-desc-${i}`} /></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1"><p className="text-xs text-muted-foreground">Quantity</p><Input type="number" min={1} value={it.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} className="h-9" /></div>
+                    <div className="space-y-1"><p className="text-xs text-muted-foreground">Unit cost (₹)</p><Input type="number" min={0} value={it.unitPrice ?? ""} onChange={(e) => setItem(i, { unitPrice: Number(e.target.value) })} placeholder="0.00" className="h-9" /></div>
+                  </div>
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Amazon link</p><div className="relative"><Link2 className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" /><Input value={it.finalLink || ""} onChange={(e) => setItem(i, { finalLink: e.target.value })} placeholder="https://amazon.in/…" className="h-9 pl-8" /></div></div>
                 </div>
+              ))}
+              <Button type="button" variant="secondaryB" size="sm" className="w-full" style={{ borderRadius: "16px" }} onClick={() => setItems((a) => [...a, emptyItem()])}><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item</Button>
+            </div>
 
-                <div className="rounded-[16px] border border-border p-4 bg-muted/30 flex items-center justify-between ml-auto sm:w-64">
-                  <span className="text-sm text-muted-foreground">Total</span>
-                  <span className={`text-base font-bold tabular-nums ${procTotal > 0 ? "text-[#206295]" : "text-muted-foreground/50"}`}>{money(procTotal)}</span>
-                </div>
+            <div className="rounded-[16px] border border-border p-4 bg-muted/30 flex items-center justify-between ml-auto sm:w-64">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className={`text-base font-bold tabular-nums ${procTotal > 0 ? "text-[#206295]" : "text-muted-foreground/50"}`}>{money(procTotal)}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2.5 rounded-xl bg-[#206295]/[0.06] px-3 py-2.5">
+              <span className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><ShoppingCart className="h-4 w-4" /></span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Office Purchase</p>
+                <p className="text-[11px] text-muted-foreground">Stationery, peripherals & everyday supplies.</p>
               </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="flex items-center gap-2.5 rounded-xl bg-[#206295]/[0.06] px-3 py-2.5">
-                  <span className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><ShoppingCart className="h-4 w-4" /></span>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Office Purchase</p>
-                    <p className="text-[11px] text-muted-foreground">Stationery, peripherals & everyday supplies.</p>
+            </div>
+
+            <FormSection n={1} title="What do you need?">
+              {items.map((it, i) => (
+                <div key={i} className="rounded-xl border border-border/70 p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Item {i + 1}</span>
+                    {items.length > 1 && <button type="button" onClick={() => setItems((a) => a.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-[#FF6F62]" aria-label="Remove item"><X className="h-4 w-4" /></button>}
+                  </div>
+                  <div className="grid grid-cols-[1fr_6rem] gap-3">
+                    <div className="space-y-1.5"><Label className="text-xs">Item</Label><Input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="e.g. Logitech wireless mouse" data-testid={`op-item-desc-${i}`} /></div>
+                    <div className="space-y-1.5"><Label className="text-xs">Quantity</Label><Input type="number" min={1} value={it.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} data-testid={`op-item-qty-${i}`} /></div>
+                  </div>
+                  <div className="space-y-1.5 pt-0.5 border-t border-border/50">
+                    <Label className="text-[11px] text-muted-foreground font-normal pt-2 block">Suggested links <span className="opacity-70">(optional)</span></Label>
+                    {(it.suggestedLinks || []).map((lnk, li) => (
+                      <div key={li} className="flex items-center gap-1.5">
+                        <div className="relative flex-1"><Link2 className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" /><Input value={lnk} onChange={(e) => setItem(i, { suggestedLinks: it.suggestedLinks.map((v, x) => (x === li ? e.target.value : v)) })} placeholder="https://amazon.in/…" className="pl-8" /></div>
+                        <button type="button" onClick={() => setItem(i, { suggestedLinks: it.suggestedLinks.filter((_, x) => x !== li) })} className="text-muted-foreground hover:text-[#FF6F62]" aria-label="Remove link"><X className="h-3.5 w-3.5" /></button>
+                      </div>
+                    ))}
+                    <Button type="button" variant="secondaryB" size="sm" className="h-8 text-xs" onClick={() => setItem(i, { suggestedLinks: [...(it.suggestedLinks || []), ""] })}><Plus className="h-3.5 w-3.5 mr-1" /> Add a link</Button>
                   </div>
                 </div>
+              ))}
+              <Button type="button" variant="secondaryB" size="sm" className="w-full" onClick={() => setItems((a) => [...a, emptyItem()])}><Plus className="h-4 w-4 mr-1.5" /> Add another item</Button>
+            </FormSection>
 
-                <FormSection n={1} title="What do you need?">
-                  {items.map((it, i) => (
-                    <div key={i} className="rounded-xl border border-border/70 p-3.5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Item {i + 1}</span>
-                        {items.length > 1 && <button type="button" onClick={() => setItems((a) => a.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-[#FF6F62]" aria-label="Remove item"><X className="h-4 w-4" /></button>}
-                      </div>
-                      <div className="grid grid-cols-[1fr_6rem] gap-3">
-                        <div className="space-y-1.5"><Label className="text-xs">Item</Label><Input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="e.g. Logitech wireless mouse" data-testid={`op-item-desc-${i}`} /></div>
-                        <div className="space-y-1.5"><Label className="text-xs">Quantity</Label><Input type="number" min={1} value={it.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} data-testid={`op-item-qty-${i}`} /></div>
-                      </div>
-                      <div className="space-y-1.5 pt-0.5 border-t border-border/50">
-                        <Label className="text-[11px] text-muted-foreground font-normal pt-2 block">Suggested links <span className="opacity-70">(optional)</span></Label>
-                        {(it.suggestedLinks || []).map((lnk, li) => (
-                          <div key={li} className="flex items-center gap-1.5">
-                            <div className="relative flex-1"><Link2 className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" /><Input value={lnk} onChange={(e) => setItem(i, { suggestedLinks: it.suggestedLinks.map((v, x) => (x === li ? e.target.value : v)) })} placeholder="https://amazon.in/…" className="pl-8" /></div>
-                            <button type="button" onClick={() => setItem(i, { suggestedLinks: it.suggestedLinks.filter((_, x) => x !== li) })} className="text-muted-foreground hover:text-[#FF6F62]" aria-label="Remove link"><X className="h-3.5 w-3.5" /></button>
-                          </div>
-                        ))}
-                        <Button type="button" variant="secondaryB" size="sm" className="h-8 text-xs" onClick={() => setItem(i, { suggestedLinks: [...(it.suggestedLinks || []), ""] })}><Plus className="h-3.5 w-3.5 mr-1" /> Add a link</Button>
-                      </div>
-                    </div>
-                  ))}
-                  <Button type="button" variant="secondaryB" size="sm" className="w-full" onClick={() => setItems((a) => [...a, emptyItem()])}><Plus className="h-4 w-4 mr-1.5" /> Add another item</Button>
-                </FormSection>
+            <Separator />
 
-                <Separator />
-
-                <FormSection n={2} title="Justification" hint="(optional)">
-                  <Textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="e.g. Replacing my faulty keyboard for daily work" />
-                </FormSection>
-              </div>
-            )}
+            <FormSection n={2} title="Justification" hint="(optional)">
+              <Textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="e.g. Replacing my faulty keyboard for daily work" />
+            </FormSection>
           </div>
-        </div>
-
-        <div className="flex-shrink-0 border-t border-border bg-background px-6 py-5 flex items-center justify-between gap-3">
-          {step === 1 ? <Button variant="ghost" onClick={() => setStep(0)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button> : <span />}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={close}>Cancel</Button>
-            {step === 1 && onSaveDraft && <Button variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft({ kind, items, justification }); close(); }} data-testid="op-save-draft">Save as Draft</Button>}
-            {step === 1 && <Button className="btn-primary-gradient" disabled={!valid || submit.isPending} onClick={doSubmit} data-testid="op-submit">{submit.isPending ? "Submitting…" : "Submit request"}</Button>}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        )}
+      </div>
+    </RequestDialog>
   );
 }
 

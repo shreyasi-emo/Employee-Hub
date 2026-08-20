@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigation } from "react-day-picker";
 import { format } from "date-fns";
 import { CalCaption } from "@/components/shared/date-range-picker";
+import { RequestDialog } from "@/components/shared/request-dialog";
 import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, Upload, FileText, X, Save } from "lucide-react";
 
 const NATURE_OPTIONS = [
@@ -206,116 +207,118 @@ export function ReimbursementFormDialog({ open, onClose, onSuccess, initialData,
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>{isResubmit ? "Edit & Resubmit Claim" : "New Reimbursement Claim"}</DialogTitle></DialogHeader>
-        <form onSubmit={submit} className="space-y-6">
-          {/* Decision note banner (resubmit) */}
-          {isResubmit && decisionNote && (
-            <div className="rounded-[16px] border border-[#FF6F62]/40 bg-[#FF6F62]/[0.06] p-3.5">
-              <p className="text-xs font-semibold text-[#FF6F62] uppercase tracking-wide mb-1">Changes requested</p>
-              <p className="text-sm text-foreground">{decisionNote}</p>
-              {hasScope && <p className="text-[11px] text-muted-foreground mt-1.5">The items to update are highlighted below.</p>}
-            </div>
-          )}
-          {/* Business purpose + period */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Business Purpose</Label>
-              <Input value={businessPurpose} onChange={(e) => setBusinessPurpose(e.target.value)} disabled={!canEditField("businessPurpose")} placeholder="e.g. Client visit — Mumbai" className={errCls(!businessPurpose.trim())} data-testid="input-business-purpose" />
-              {fieldErr(!businessPurpose.trim(), "This field is mandatory")}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Expense Period</Label>
-              <div className={`rounded-[16px] ${!canEditField("period") ? "opacity-60 pointer-events-none" : ""} ${tried && !period.from ? "ring-1 ring-[#FF6F62]" : ""}`}><ExpensePeriodPicker value={period} onChange={setPeriod} /></div>
-              {fieldErr(!period.from, "Please select the From date")}
-            </div>
+    <RequestDialog
+      open={open}
+      onClose={handleClose}
+      title={isResubmit ? "Edit & Resubmit Claim" : "New Reimbursement Claim"}
+      size="xl"
+      footer={<>
+        <Button type="button" variant="outline" onClick={handleClose} data-testid="button-cancel-reimbursement">Cancel</Button>
+        {onSaveDraft && !isResubmit && (
+          <Button type="button" variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft(serialize()); handleClose(); }} data-testid="button-draft-reimbursement">
+            <Save className="h-4 w-4 mr-1.5" /> Save as Draft
+          </Button>
+        )}
+        {isResubmit
+          ? <Button type="submit" form="reimbursement-claim-form" disabled={resubmitMutation.isPending} data-testid="button-resubmit-reimbursement">{resubmitMutation.isPending ? "Resubmitting…" : "Resubmit Claim"}</Button>
+          : <Button type="submit" form="reimbursement-claim-form" disabled={mutation.isPending} data-testid="button-submit-reimbursement">{mutation.isPending ? "Submitting…" : "Submit Claim"}</Button>}
+      </>}
+    >
+      <form id="reimbursement-claim-form" onSubmit={submit} className="space-y-6 px-6 pt-2 pb-6">
+        {/* Decision note banner (resubmit) */}
+        {isResubmit && decisionNote && (
+          <div className="rounded-[16px] border border-[#FF6F62]/40 bg-[#FF6F62]/[0.06] p-3.5">
+            <p className="text-xs font-semibold text-[#FF6F62] uppercase tracking-wide mb-1">Changes requested</p>
+            <p className="text-sm text-foreground">{decisionNote}</p>
+            {hasScope && <p className="text-[11px] text-muted-foreground mt-1.5">The items to update are highlighted below.</p>}
           </div>
+        )}
+        {/* Business purpose + period */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label>Business Purpose</Label>
+            <Input value={businessPurpose} onChange={(e) => setBusinessPurpose(e.target.value)} disabled={!canEditField("businessPurpose")} placeholder="e.g. Client visit — Mumbai" className={errCls(!businessPurpose.trim())} data-testid="input-business-purpose" />
+            {fieldErr(!businessPurpose.trim(), "This field is mandatory")}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Expense Period</Label>
+            <div className={`rounded-[16px] ${!canEditField("period") ? "opacity-60 pointer-events-none" : ""} ${tried && !period.from ? "ring-1 ring-[#FF6F62]" : ""}`}><ExpensePeriodPicker value={period} onChange={setPeriod} /></div>
+            {fieldErr(!period.from, "Please select the From date")}
+          </div>
+        </div>
 
-          {/* Items */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Expense Items</Label>
-              <span className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</span>
-            </div>
-            {items.map((it, i) => (
-              <div key={i} className={`rounded-[16px] border p-3 space-y-3 bg-muted/30 ${isResubmit && !canEditLine(i) ? "opacity-60 pointer-events-none border-border" : hasLineScope && canEditLine(i) ? "border-[#206295]/50 ring-1 ring-[#206295]/30" : "border-border"}`} data-testid={`reimb-item-${i}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">Item {i + 1}</span>
-                  {!isResubmit && (
-                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => items.length > 1 && setItems((p) => p.filter((_, idx) => idx !== i))} aria-label="Remove item">
-                      <Trash2 className="h-3.5 w-3.5 text-[#FF6F62]" />
-                    </Button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Invoice No.</p><Input value={it.invoiceNo} onChange={(e) => setItem(i, { invoiceNo: e.target.value })} placeholder="INV-1234" className={`h-9 ${errCls(!it.invoiceNo.trim())}`} />{fieldErr(!it.invoiceNo.trim(), "Invoice No. is required")}</div>
-                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Invoice Date</p><Input type="date" value={it.invoiceDate} onChange={(e) => setItem(i, { invoiceDate: e.target.value })} className={`h-9 ${errCls(!it.invoiceDate)}`} />{fieldErr(!it.invoiceDate, "Invoice date is required")}</div>
-                </div>
-                <div className="space-y-1"><p className="text-xs text-muted-foreground">Description</p><Input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="What was this expense for?" className={`h-9 ${errCls(!it.description.trim())}`} />{fieldErr(!it.description.trim(), "Description is required")}</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Nature of Expense</p>
-                    <Select value={it.nature} onValueChange={(v) => setItem(i, { nature: v })}>
-                      <SelectTrigger className={`h-9 ${errCls(!it.nature)}`} data-testid={`select-nature-${i}`}><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>{NATURE_OPTIONS.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
-                    </Select>
-                    {fieldErr(!it.nature, "Please select a nature")}
-                  </div>
-                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Amount (₹)</p><Input type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, { amount: e.target.value })} placeholder="0.00" className={`h-9 ${errCls(!(Number(it.amount) > 0))}`} data-testid={`input-amount-${i}`} />{fieldErr(!(Number(it.amount) > 0), "Enter a valid amount")}</div>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Upload Invoice <span className="opacity-70">(JPG, PNG, PDF · max 5 MB)</span></p>
-                  {it.fileData ? (
-                    <div className="flex items-center gap-2 h-10 rounded-[16px] border border-border bg-background px-3">
-                      <FileText className="h-4 w-4 text-[#206295] flex-shrink-0" />
-                      <a href={it.fileData} target="_blank" rel="noreferrer" className="text-sm text-foreground truncate flex-1 hover:underline">{it.fileName}</a>
-                      <button type="button" onClick={() => setItem(i, { fileName: undefined, fileType: undefined, fileData: undefined })} aria-label="Remove file"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
-                    </div>
-                  ) : (
-                    <label className={`flex items-center gap-2 h-10 rounded-[16px] border bg-background px-3 cursor-pointer hover-elevate ${tried && !it.fileData ? "border-[#FF6F62]" : "border-border"}`}>
-                      <Upload className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Choose file…</span>
-                      <input type="file" accept={ACCEPT} className="hidden" onChange={(e) => onFile(i, e.target.files?.[0])} data-testid={`upload-invoice-${i}`} />
-                    </label>
-                  )}
-                  {fieldErr(!it.fileData, "Please upload the invoice")}
-                </div>
+        {/* Items */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label>Expense Items</Label>
+            <span className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</span>
+          </div>
+          {items.map((it, i) => (
+            <div key={i} className={`rounded-[16px] border p-3 space-y-3 bg-muted/30 ${isResubmit && !canEditLine(i) ? "opacity-60 pointer-events-none border-border" : hasLineScope && canEditLine(i) ? "border-[#206295]/50 ring-1 ring-[#206295]/30" : "border-border"}`} data-testid={`reimb-item-${i}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground">Item {i + 1}</span>
+                {!isResubmit && (
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => items.length > 1 && setItems((p) => p.filter((_, idx) => idx !== i))} aria-label="Remove item">
+                    <Trash2 className="h-3.5 w-3.5 text-[#FF6F62]" />
+                  </Button>
+                )}
               </div>
-            ))}
-            {!isResubmit && (
-              <Button type="button" variant="secondaryB" size="sm" className="w-full" style={{ borderRadius: "16px" }} onClick={addItem} data-testid="button-add-item">
-                <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item
-              </Button>
-            )}
-          </div>
-
-          {/* Bill summary */}
-          <div className="rounded-[16px] border border-border p-4 bg-muted/30 space-y-2 ml-auto sm:w-72">
-            <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Sub Total</span><span className="font-semibold text-foreground">{money(subTotal)}</span></div>
-            <div className="flex items-center justify-between text-sm gap-3">
-              <span className="text-muted-foreground whitespace-nowrap">Less: Cash Advance</span>
-              <Input type="number" min="0" step="0.01" value={cashAdvance} onChange={(e) => setCashAdvance(e.target.value)} disabled={!canEditField("cashAdvance")} placeholder="0.00" className="h-8 w-28 text-right" data-testid="input-cash-advance" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Invoice No.</p><Input value={it.invoiceNo} onChange={(e) => setItem(i, { invoiceNo: e.target.value })} placeholder="INV-1234" className={`h-9 ${errCls(!it.invoiceNo.trim())}`} />{fieldErr(!it.invoiceNo.trim(), "Invoice No. is required")}</div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Invoice Date</p><Input type="date" value={it.invoiceDate} onChange={(e) => setItem(i, { invoiceDate: e.target.value })} className={`h-9 ${errCls(!it.invoiceDate)}`} />{fieldErr(!it.invoiceDate, "Invoice date is required")}</div>
+              </div>
+              <div className="space-y-1"><p className="text-xs text-muted-foreground">Description</p><Input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="What was this expense for?" className={`h-9 ${errCls(!it.description.trim())}`} />{fieldErr(!it.description.trim(), "Description is required")}</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Nature of Expense</p>
+                  <Select value={it.nature} onValueChange={(v) => setItem(i, { nature: v })}>
+                    <SelectTrigger className={`h-9 ${errCls(!it.nature)}`} data-testid={`select-nature-${i}`}><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>{NATURE_OPTIONS.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
+                  </Select>
+                  {fieldErr(!it.nature, "Please select a nature")}
+                </div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Amount (₹)</p><Input type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, { amount: e.target.value })} placeholder="0.00" className={`h-9 ${errCls(!(Number(it.amount) > 0))}`} data-testid={`input-amount-${i}`} />{fieldErr(!(Number(it.amount) > 0), "Enter a valid amount")}</div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Upload Invoice <span className="opacity-70">(JPG, PNG, PDF · max 5 MB)</span></p>
+                {it.fileData ? (
+                  <div className="flex items-center gap-2 h-10 rounded-[16px] border border-border bg-background px-3">
+                    <FileText className="h-4 w-4 text-[#206295] flex-shrink-0" />
+                    <a href={it.fileData} target="_blank" rel="noreferrer" className="text-sm text-foreground truncate flex-1 hover:underline">{it.fileName}</a>
+                    <button type="button" onClick={() => setItem(i, { fileName: undefined, fileType: undefined, fileData: undefined })} aria-label="Remove file"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                  </div>
+                ) : (
+                  <label className={`flex items-center gap-2 h-10 rounded-[16px] border bg-background px-3 cursor-pointer hover-elevate ${tried && !it.fileData ? "border-[#FF6F62]" : "border-border"}`}>
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Choose file…</span>
+                    <input type="file" accept={ACCEPT} className="hidden" onChange={(e) => onFile(i, e.target.files?.[0])} data-testid={`upload-invoice-${i}`} />
+                  </label>
+                )}
+                {fieldErr(!it.fileData, "Please upload the invoice")}
+              </div>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              <span className="text-sm font-medium text-foreground">{net >= 0 ? "Payable to Employee" : "Receivable from Employee"}</span>
-              <span className={`text-base font-bold ${net >= 0 ? "text-[#206295]" : "text-[#FF6F62]"}`}>{money(Math.abs(net))}</span>
-            </div>
-          </div>
+          ))}
+          {!isResubmit && (
+            <Button type="button" variant="secondaryB" size="sm" className="w-full" style={{ borderRadius: "16px" }} onClick={addItem} data-testid="button-add-item">
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item
+            </Button>
+          )}
+        </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose} data-testid="button-cancel-reimbursement">Cancel</Button>
-            {onSaveDraft && !isResubmit && (
-              <Button type="button" variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft(serialize()); handleClose(); }} data-testid="button-draft-reimbursement">
-                <Save className="h-4 w-4 mr-1.5" /> Save as Draft
-              </Button>
-            )}
-            {isResubmit
-              ? <Button type="submit" disabled={resubmitMutation.isPending} data-testid="button-resubmit-reimbursement">{resubmitMutation.isPending ? "Resubmitting…" : "Resubmit Claim"}</Button>
-              : <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-reimbursement">{mutation.isPending ? "Submitting…" : "Submit Claim"}</Button>}
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        {/* Bill summary */}
+        <div className="rounded-[16px] border border-border p-4 bg-muted/30 space-y-2 ml-auto sm:w-72">
+          <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Sub Total</span><span className="font-semibold text-foreground">{money(subTotal)}</span></div>
+          <div className="flex items-center justify-between text-sm gap-3">
+            <span className="text-muted-foreground whitespace-nowrap">Less: Cash Advance</span>
+            <Input type="number" min="0" step="0.01" value={cashAdvance} onChange={(e) => setCashAdvance(e.target.value)} disabled={!canEditField("cashAdvance")} placeholder="0.00" className="h-8 w-28 text-right" data-testid="input-cash-advance" />
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-border">
+            <span className="text-sm font-medium text-foreground">{net >= 0 ? "Payable to Employee" : "Receivable from Employee"}</span>
+            <span className={`text-base font-bold ${net >= 0 ? "text-[#206295]" : "text-[#FF6F62]"}`}>{money(Math.abs(net))}</span>
+          </div>
+        </div>
+
+      </form>
+    </RequestDialog>
   );
 }
