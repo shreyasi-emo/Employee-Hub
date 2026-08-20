@@ -1,3 +1,4 @@
+import { canProcureApprove } from "../../shared/permissions";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -14,7 +15,6 @@ import { format } from "date-fns";
 import { Package, ExternalLink, IndianRupee, CircleCheck, X, User, CalendarClock, Copy, MessageSquare } from "lucide-react";
 import { CommentThread } from "@/components/shared/comment-thread";
 
-export const canProcureApprove = (role?: string) => !!role && (role === "super_admin" || role === "ceo_approver");
 const normalizeUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
 function linkLabel(u: string) {
   try { const url = new URL(normalizeUrl(u)); const seg = url.pathname.split("/").filter(Boolean)[0]; const host = url.hostname.replace(/^www\./, ""); return seg ? `${host}/${seg.slice(0, 16)}` : host; } catch { return u; }

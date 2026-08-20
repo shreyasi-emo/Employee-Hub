@@ -82,8 +82,8 @@ rule → `lib/`.
 - **`features/notifications/`** — components, lib
 - **`features/onboarding/`** — pages
 - **`features/payroll/`** — components, lib, pages
-- **`features/performance/`** — api, components, lib, pages
-- **`features/requests/`** — components, office-purchases, pages, procurement, reimbursements, shared, tickets, travel
+- **`features/performance/`** — components, lib, pages
+- **`features/requests/`** — api, components, office-purchases, pages, procurement, reimbursements, shared, tickets, travel
 - **`features/resources/`** — api, components, lib, pages
 - **`features/settings/`** — api, components, lib, pages
 - **`features/shifts/`** — components, lib, pages

@@ -7,9 +7,9 @@ import {
 import { LogOut, Building2 } from "lucide-react";
 import { useAuth, useLogout, hasWorkspaceAccess, getRoleLabel } from "@/lib/auth";
 import BRAND from "@/lib/brand";
+import { useCeoInboxCount } from "@/features/requests/api/ceo-inbox.api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
 import {
   navItems, companyItems, workspaceItems, adminItems, accountItems,
   CEO_INBOX_HREF, type NavItem,
@@ -57,19 +57,9 @@ export function AppSidebar() {
   const user = auth?.user;
   const emp = auth?.employee;
 
-  // CEO Inbox badge = CEO-stage items awaiting action (mirrors the page's count): finance-approved
-  // reimbursements + office/procurement pending_approval or under_review. Super-admin only (they own the tab).
-  // TODO(stage 6): move this queue derivation into features/requests — it is request-domain
-  // logic, not shell logic. Left here for now so this stage stays a pure shell move.
-  const isSuper = user?.role === "super_admin";
-  const { data: ceoReimb = [] } = useQuery<any[]>({ queryKey: ["/api/reimbursements?summary=true"], enabled: isSuper, refetchInterval: 60000 });
-  const { data: ceoOps = [] } = useQuery<any[]>({ queryKey: ["/api/office-purchases"], enabled: isSuper, refetchInterval: 60000 });
-  const { data: ceoProcs = [] } = useQuery<any[]>({ queryKey: ["/api/procurement"], enabled: isSuper, refetchInterval: 60000 });
-  const ceoInboxCount = isSuper
-    ? (ceoReimb as any[]).filter((r) => r.status === "finance_approved").length
-      + (ceoOps as any[]).filter((o) => ["pending_approval", "under_review"].includes(o.status)).length
-      + (ceoProcs as any[]).filter((o) => ["pending_approval", "under_review"].includes(o.status)).length
-    : 0;
+  // CEO Inbox badge — the count itself is request-domain logic, so it lives in
+  // features/requests; the sidebar just renders the number.
+  const ceoInboxCount = useCeoInboxCount(user?.role === "super_admin");
 
   const displayName = emp ? `${emp.firstName} ${emp.lastName}` : user?.username || "";
   const initials = emp ? `${emp.firstName[0]}${emp.lastName[0]}` : user?.username?.slice(0, 2).toUpperCase() || "U";

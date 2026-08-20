@@ -1,3 +1,4 @@
+import { canHrTriage, canCeoApprove } from "../../shared/permissions";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -23,9 +24,6 @@ import { CommentThread } from "@/components/shared/comment-thread";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
-const HR_ROLES = ["hr_admin", "hr_executive"];
-export const canHrTriage = (role?: string) => !!role && (role === "super_admin" || HR_ROLES.includes(role));
-export const canCeoApprove = (role?: string) => !!role && (role === "super_admin" || role === "ceo_approver");
 const invalidate = (qc: ReturnType<typeof useQueryClient>) =>
   qc.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/office-purchases") });
 
