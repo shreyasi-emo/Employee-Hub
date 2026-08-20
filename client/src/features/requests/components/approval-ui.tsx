@@ -8,6 +8,8 @@ import { ChevronRight, CalendarRange, LayoutGrid, Table as TableIcon } from "luc
 import { format } from "date-fns";
 
 // Shared chrome for the approval screens.
+// StatCard: this variant truncates the value, takes a ReactNode caption, and becomes a
+// <button> when `onClick` is given. Not the shared components/shared/stat-card.tsx.
 export function StatCard({ title, value, subtitle, icon: Icon, color, onClick }: { title: string; value: any; subtitle?: React.ReactNode; icon: any; color: string; onClick?: () => void; }) {
   const inner = (
     <CardContent className="p-5">

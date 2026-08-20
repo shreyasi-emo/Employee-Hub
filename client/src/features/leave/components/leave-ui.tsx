@@ -1,8 +1,7 @@
 // Presentational pieces for the leave screen.
-//
-// NOTE: this StatCard is a third variant (plain `subtitle` string, no truncate).
-// Reconciling the app's six StatCards is a separate deliberate pass — merging
-// them here would change markup.
+
+import { StatCard } from "@/components/shared/stat-card";
+export { StatCard };
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,21 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { statusOf, avatarColor } from "../lib/leave-model";
-
-export function StatCard({ title, value, subtitle, icon: Icon, color }: { title: string; value: number | string; subtitle?: string; icon: any; color: string; }) {
-  return (
-    <Card className="border-0 card-hover"><CardContent className="p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="space-y-1 flex-1 min-w-0">
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-[33px] leading-tight font-bold text-foreground">{value}</p>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-        </div>
-        <div className={`p-2.5 rounded-xl flex-shrink-0 ${color}`}><Icon className="h-5 w-5" /></div>
-      </div>
-    </CardContent></Card>
-  );
-}
 
 /** One request row, used by the Team Requests and All Requests lists. */
 export function LeaveRequestRow({ request, leaveTypes, employees, onApprove, onReject, onCancel, canApprove, isMine }: any) {

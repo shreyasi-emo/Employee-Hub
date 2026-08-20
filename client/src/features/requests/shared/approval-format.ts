@@ -1,14 +1,14 @@
 import { ShoppingCart, Car, TicketIcon, Receipt } from "lucide-react";
 import { format } from "date-fns";
+import { money, formatDate as fmtDate } from "@/lib/format";
+export { money, fmtDate };
 
 // Formatting and derivation for the approval surfaces: resubmission detection,
 // priority banding, category tinting, date-range filtering, and the service catalog list.
 // ---- helpers ----
 export const cap = (s?: string) => (s ? s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "");
 
-export const money = (v: any) => `₹${Number(v || 0).toLocaleString("en-IN")}`;
 
-export const fmtDate = (d?: string) => { try { return d ? format(new Date(d), "MMM d, yyyy") : ""; } catch { return ""; } };
 
 // A re-submitted claim relabels "Submitted on" → "Re-submitted On"; the original creation date shows on hover.
 // An office/procurement item is "resubmitted" when the latest query/resubmit marker in its thread is a resubmit (HR answered the CEO's query).

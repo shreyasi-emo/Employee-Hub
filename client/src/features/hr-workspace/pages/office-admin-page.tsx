@@ -17,6 +17,7 @@ import { useForm, Controller } from "react-hook-form";
 import { DateInput } from "@/components/shared/datetime-field";
 import { Plus, Building2, ShoppingCart, CreditCard, Send } from "lucide-react";
 import { format } from "date-fns";
+import { formatDate, formatStatus } from "@/lib/format";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -31,8 +32,6 @@ const STATUS_COLORS: Record<string, string> = {
   closed: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
-function formatStatus(s: string) { return s?.replace(/_/g, " ") || ""; }
-function formatDate(d: string) { try { return format(new Date(d), "MMM d, yyyy"); } catch { return ""; } }
 
 export default function OfficeAdminPage() {
   const { data: auth } = useAuth();

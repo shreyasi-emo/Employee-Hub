@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, ShoppingCart, Car, TicketIcon, ChevronLeft } from "lucide-react";
 import { format } from "date-fns";
+import { formatDate, formatStatus } from "@/lib/format";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -25,11 +26,7 @@ const STATUS_COLORS: Record<string, string> = {
   resolved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
 };
 
-function formatDate(d: string) {
-  try { return format(new Date(d), "MMM d, yyyy"); } catch { return ""; }
-}
 
-function formatStatus(s: string) { return s?.replace(/_/g, " ") || ""; }
 
 export default function TeamRequestsPage() {
   const { data: auth } = useAuth();

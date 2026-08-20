@@ -1,4 +1,6 @@
 import { parseISO } from "date-fns";
+import { avatarColor } from "@/lib/avatar";
+export { avatarColor };
 
 // "yyyy-MM-dd" string → local Date (avoids the UTC shift of new Date("yyyy-MM-dd")).
 export const parseYmd = (s?: string): Date | undefined => { if (!s) return undefined; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -11,14 +13,6 @@ export const statusConfig: Record<string, { label: string; bg: string; text: str
 };
 
 export const statusOf = (status?: string) => statusConfig[status || ""] || statusConfig.pending;
-
-const AVATAR_PALETTE = ["#206295", "#4BDCD9", "#FF6F62"];
-export function avatarColor(seed?: string) {
-  const s = seed || "";
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
 
 /** Requested duration in days: half-day is 0.5, otherwise weekdays inclusive
  *  (weekends don't consume leave). */

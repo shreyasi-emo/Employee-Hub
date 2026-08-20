@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { statusClass, statusLabel } from "@/lib/status";
+import { money } from "@/lib/format";
 import { format } from "date-fns";
 import {
   ShoppingCart, Plus, X, Link2, ChevronRight, ChevronLeft, Check, Truck,
@@ -22,7 +23,6 @@ import { CommentThread } from "@/components/shared/comment-thread";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
-const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const HR_ROLES = ["hr_admin", "hr_executive"];
 export const canHrTriage = (role?: string) => !!role && (role === "super_admin" || HR_ROLES.includes(role));
 export const canCeoApprove = (role?: string) => !!role && (role === "super_admin" || role === "ceo_approver");

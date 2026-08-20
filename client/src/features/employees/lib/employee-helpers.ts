@@ -1,16 +1,8 @@
 import { Cake, Gift, HeartHandshake } from "lucide-react";
-
-// Default-avatar shades — main brand colors only (stable per employee, picked deterministically)
-const AVATAR_PALETTE = ["#206295", "#4BDCD9", "#FF6F62"];
-
-export function avatarColor(seed?: string) {
-  const s = seed || "";
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
-
-export function initials(f?: string, l?: string) { return `${f?.[0] ?? ""}${l?.[0] ?? ""}`.toUpperCase() || "?"; }
+import { initials } from "@/lib/format";
+import { avatarColor } from "@/lib/avatar";
+export { avatarColor };
+export { initials };
 
 /** Days until the next occurrence of a recurring (month/day) date — birthdays, anniversaries. */
 export function daysUntilAnnual(dateStr?: string) {

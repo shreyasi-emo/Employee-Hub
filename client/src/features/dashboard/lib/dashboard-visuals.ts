@@ -1,3 +1,6 @@
+import { nameColor, NAME_PALETTE } from "@/lib/avatar";
+export { nameColor, NAME_PALETTE };
+
 import { Card } from "@/components/ui/card";
 import { DollarSign, Calendar, Building2, Car, Route } from "lucide-react";
 
@@ -37,17 +40,6 @@ export const ATT_COLORS: Record<string, string> = {
 };
 
 // Per-name attendee palette so different people get teal / grey / coral DPs & chips
-export const NAME_PALETTE = [
-  { avatar: "rgba(75, 220, 217, 0.35)", text: "#1F8F8C", chip: "rgba(75, 220, 217, 0.15)" },   // teal (#4BDCD9)
-  { avatar: "rgba(125, 133, 142, 0.32)", text: "#566069", chip: "rgba(125, 133, 142, 0.14)" }, // grey
-  { avatar: "rgba(255, 111, 98, 0.32)", text: "#C24A3E", chip: "rgba(255, 111, 98, 0.14)" },   // coral (#FF6F62)
-];
-
-export function nameColor(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h += name.charCodeAt(i);
-  return NAME_PALETTE[h % NAME_PALETTE.length];
-}
 
 // Brand palette for department chips in the directory (stable per department id).
 export const DEPT_CHIP_COLORS = ["#206295", "#0E7C7B", "#4A90C2", "#6A7366", "#953229", "#425B8D"];

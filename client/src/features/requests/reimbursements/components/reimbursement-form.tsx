@@ -13,6 +13,7 @@ import { Calendar as RangeCalendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigation } from "react-day-picker";
 import { format } from "date-fns";
+import { CalCaption } from "@/components/shared/date-range-picker";
 import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, Upload, FileText, X, Save } from "lucide-react";
 
 const NATURE_OPTIONS = [
@@ -30,18 +31,6 @@ const toISO = (d?: Date) => (d ? d.toISOString().split("T")[0] : null);
 
 type Item = { invoiceNo: string; invoiceDate: string; description: string; nature: string; amount: string; fileName?: string; fileType?: string; fileData?: string };
 const blankItem = (): Item => ({ invoiceNo: "", invoiceDate: "", description: "", nature: "", amount: "", fileName: undefined, fileType: undefined, fileData: undefined });
-
-// "‹ June 2026 ›" caption — matches the Attendance / dashboard calendar
-function CalCaption({ displayMonth }: { displayMonth: Date }) {
-  const { goToMonth, nextMonth, previousMonth } = useNavigation();
-  return (
-    <div className="flex items-center justify-center gap-3 pt-1 pb-2">
-      <button type="button" disabled={!previousMonth} onClick={() => previousMonth && goToMonth(previousMonth)} className="p-1 rounded-md hover-elevate disabled:opacity-30" aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></button>
-      <span className="text-sm font-semibold min-w-[8.5rem] text-center">{format(displayMonth, "MMMM yyyy")}</span>
-      <button type="button" disabled={!nextMonth} onClick={() => nextMonth && goToMonth(nextMonth)} className="p-1 rounded-md hover-elevate disabled:opacity-30" aria-label="Next month"><ChevronRight className="h-4 w-4" /></button>
-    </div>
-  );
-}
 
 // Attendance-style date picker: single "From" date, with an "End date" toggle for a range
 function ExpensePeriodPicker({ value, onChange }: { value: { from?: Date; to?: Date }; onChange: (v: { from?: Date; to?: Date }) => void }) {

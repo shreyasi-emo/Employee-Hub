@@ -9,12 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { statusClass, statusLabel } from "@/lib/status";
+import { money } from "@/lib/format";
 import { format } from "date-fns";
 import { Package, ExternalLink, IndianRupee, CircleCheck, X, User, CalendarClock, Copy, MessageSquare } from "lucide-react";
 import { CommentThread } from "@/components/shared/comment-thread";
 
 export const canProcureApprove = (role?: string) => !!role && (role === "super_admin" || role === "ceo_approver");
-const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const normalizeUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
 function linkLabel(u: string) {
   try { const url = new URL(normalizeUrl(u)); const seg = url.pathname.split("/").filter(Boolean)[0]; const host = url.hostname.replace(/^www\./, ""); return seg ? `${host}/${seg.slice(0, 16)}` : host; } catch { return u; }

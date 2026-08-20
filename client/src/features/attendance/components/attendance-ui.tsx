@@ -4,10 +4,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { STATE_COLOR, statusLabelOf } from "../lib/attendance-states";
-
-export function initials(first?: string, last?: string) {
-  return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
-}
+import { initials } from "@/lib/format";
+export { initials };
 
 export function EmpAvatar({ emp, className = "h-8 w-8" }: { emp: any; className?: string }) {
   return (
@@ -18,6 +16,8 @@ export function EmpAvatar({ emp, className = "h-8 w-8" }: { emp: any; className?
   );
 }
 
+// StatCard: this variant takes a ReactNode `subtitle` and renders it raw (callers pass
+// their own <p>). components/shared/stat-card.tsx wraps a plain string instead.
 export function StatCard({ title, value, subtitle, icon: Icon, color }: {
   title: string; value: number | string; subtitle?: React.ReactNode;
   icon: React.ComponentType<{ className?: string }>; color: string;

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { statusClass, statusLabel } from "@/lib/status";
+import { money } from "@/lib/format";
 import { format } from "date-fns";
 import { Plane, Hotel, Moon, Bus, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon } from "lucide-react";
 import { CommentThread } from "@/components/shared/comment-thread";
@@ -21,7 +22,6 @@ import { DateInput } from "@/components/shared/datetime-field";
 
 export const canTravelHr = (role?: string) => !!role && ["super_admin", "hr_admin", "hr_executive"].includes(role);
 export const canTravelCeo = (role?: string) => !!role && ["super_admin", "ceo_approver"].includes(role);
-const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const invalidateTravel = (qc: ReturnType<typeof useQueryClient>) => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/travel") });
 // A trip is "resubmitted" when the latest query/resubmit marker in its thread is a resubmit (HR answered the CEO's query).
 const isResubmitted = (t: any) => { const m = ((t?.comments || []) as any[]).filter((c) => c.kind === "query" || c.kind === "resubmitted"); return m.length > 0 && m[m.length - 1].kind === "resubmitted"; };

@@ -42,6 +42,8 @@ export function CalCaption({ displayMonth }: { displayMonth: Date }) {
   );
 }
 
+// StatCard: this variant carries the glass CARD_STYLE, a rounded-lg icon box and an
+// optional "View details" href. Not the shared components/shared/stat-card.tsx.
 export function StatCard({ title, value, icon: Icon, subtitle, color, href }: {
   title: string;
   value: number | string;

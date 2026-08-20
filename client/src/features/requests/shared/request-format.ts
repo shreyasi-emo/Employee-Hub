@@ -1,15 +1,13 @@
 import { format } from "date-fns";
+import { money, moneyPrecise as money2, formatDate, formatStatus } from "@/lib/format";
+export { money, money2, formatDate, formatStatus };
 
 // Per-request-type accessors and the status vocabulary shared across the request
 // screens: what a row's title/subtitle/amount/reference is, and which states count
 // as approved, rejected, done or still revocable.
-export function formatStatus(s: string) { return s?.replace(/_/g, " ") || ""; }
 
-export function formatDate(d: string) { try { return format(new Date(d), "MMM d, yyyy"); } catch { return ""; } }
 
-export const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
-export const money2 = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // Status filter buckets for the My Requests dropdown.
 export const APPROVED_STATES = ["approved", "fulfilled", "completed", "booked", "confirmed", "done", "resolved", "delivered"];

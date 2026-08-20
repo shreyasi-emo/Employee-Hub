@@ -1,3 +1,4 @@
+import { nameColor } from "@/lib/avatar";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,16 +10,6 @@ import { UserPlus, X, Check } from "lucide-react";
 // `multiple` toggles the Add All / Clear All header (present for multi, hidden for single-select).
 // Works on employee objects and reports selection as an array of employee ids.
 
-const NAME_PALETTE = [
-  { avatar: "rgba(75, 220, 217, 0.35)", text: "#1F8F8C", chip: "rgba(75, 220, 217, 0.15)" },   // teal
-  { avatar: "rgba(125, 133, 142, 0.32)", text: "#566069", chip: "rgba(125, 133, 142, 0.14)" }, // grey
-  { avatar: "rgba(255, 111, 98, 0.32)", text: "#C24A3E", chip: "rgba(255, 111, 98, 0.14)" },   // coral
-];
-function nameColor(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h += name.charCodeAt(i);
-  return NAME_PALETTE[h % NAME_PALETTE.length];
-}
 const initialsOf = (name: string) => name.split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 const nameOf = (e: any) => `${e.firstName || ""} ${e.lastName || ""}`.trim() || e.username || "Employee";
 

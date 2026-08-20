@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { exportXlsx } from "@/lib/export-xlsx";
 import { statusClass, statusLabel } from "@/lib/status";
+import { money, moneyPrecise as money2 } from "@/lib/format";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,6 @@ import {
   ListChecks, CircleDot, XCircle, Maximize2, Check, X, MessageSquareWarning, CircleDashed, Download,
 } from "lucide-react";
 
-const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-const money2 = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDate = (d?: string | null) => { if (!d) return "—"; try { return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); } catch { return "—"; } };
 
 

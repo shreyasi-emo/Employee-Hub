@@ -1,9 +1,4 @@
 // Presentational pieces for the holidays screen.
-//
-// NOTE: this StatCard is deliberately NOT the one in features/attendance —
-// it truncates the value and wraps `subtitle` in its own <p>, where attendance's
-// takes a ReactNode subtitle. Unifying the app's six StatCard variants is a
-// separate deliberate pass; merging them here would change markup.
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, Pencil, MapPin } from "lucide-react";
 import { format } from "date-fns";
 
+// StatCard: this variant truncates BOTH the value and the caption, which the shared
+// components/shared/stat-card.tsx does not.
 export function StatCard({ title, value, subtitle, icon: Icon, color }: { title: string; value: any; subtitle?: string; icon: any; color: string; }) {
   return (
     <Card className="border-0 card-hover"><CardContent className="p-5">
