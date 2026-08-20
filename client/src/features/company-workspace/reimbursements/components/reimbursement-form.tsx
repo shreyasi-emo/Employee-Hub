@@ -224,7 +224,7 @@ export function ReimbursementFormDialog({ open, onClose, onSuccess, initialData,
           : <Button type="submit" form="reimbursement-claim-form" disabled={mutation.isPending} data-testid="button-submit-reimbursement">{mutation.isPending ? "Submitting…" : "Submit Claim"}</Button>}
       </>}
     >
-      <form id="reimbursement-claim-form" onSubmit={submit} className="space-y-6 px-6 pt-2 pb-6">
+      <form id="reimbursement-claim-form" onSubmit={submit} className="space-y-6 px-6 pb-6">
         {/* Decision note banner (resubmit) */}
         {isResubmit && decisionNote && (
           <div className="rounded-[16px] border border-[#FF6F62]/40 bg-[#FF6F62]/[0.06] p-3.5">

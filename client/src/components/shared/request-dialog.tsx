@@ -104,8 +104,10 @@ export function RequestDialog({
         )}
 
         {/* min-h-0 is load-bearing: without it this flex child refuses to shrink below its
-            content, so long forms push the footer off-screen instead of scrolling. */}
-        <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
+            content, so long forms push the footer off-screen instead of scrolling.
+            pt-5 is the gap below the header rule — it lives here so every form gets the same
+            one. Callers supply their own px/pb, but should not add a top padding. */}
+        <div className="flex-1 min-h-0 overflow-y-auto pt-5">{children}</div>
 
         {footer && (
           <div className="flex-shrink-0 border-t border-border bg-background px-6 py-5 flex items-center justify-between gap-3">

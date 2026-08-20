@@ -138,7 +138,7 @@ export function NewRequestDialog({ open, onClose, initialKind, onSaveDraft, init
         {step === 1 && <Button className="btn-primary-gradient" disabled={!valid || submit.isPending} onClick={doSubmit} data-testid="op-submit">{submit.isPending ? "Submitting…" : "Submit request"}</Button>}
       </>}
     >
-      <div className="px-6 pt-4 pb-8">
+      <div className="px-6 pb-8">
         {step === 0 ? (
           <div className="flex flex-col justify-center h-full min-h-[320px] space-y-5">
             <p className="text-[15px] font-bold text-foreground text-center">Select the type of request you'd like to raise.</p>
