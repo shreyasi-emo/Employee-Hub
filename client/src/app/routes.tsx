@@ -23,16 +23,17 @@ import OnboardingPage from "@/features/onboarding/pages/onboarding-page";
 import ATSPage from "@/features/hr-workspace/pages/ats-page";
 import HROpsPage from "@/features/hr-workspace/pages/hr-ops-page";
 import OfficeAdminPage from "@/features/hr-workspace/pages/office-admin-page";
-import CompanyWorkspacePage from "@/features/requests/pages/service-catalog-page";
-import ReimbursementReviewPage from "@/features/requests/reimbursements/pages/reimbursement-review-page";
-import MyRequestsPage from "@/features/requests/pages/my-requests-page";
-import TeamRequestsPage from "@/features/requests/pages/team-requests-page";
+import CompanyWorkspacePage from "@/features/company-workspace/pages/company-workspace-page";
+import MyApprovalsPage from "@/features/company-workspace/pages/my-approvals-page";
+import ReimbursementReviewPage from "@/features/company-workspace/reimbursements/pages/reimbursement-review-page";
+import MyRequestsPage from "@/features/company-workspace/pages/my-requests-page";
+import TeamRequestsPage from "@/features/company-workspace/pages/team-requests-page";
 import LogisticsPage from "@/features/logistics/pages/logistics-page";
-import RequestsPage from "@/features/requests/pages/service-requests-page";
+import RequestsPage from "@/features/company-workspace/pages/requests-page";
 import ApprovalNotesPage from "@/features/admin/pages/approval-notes-page";
 import VehiclesPage from "@/features/vehicles/pages/vehicles-page";
 import ResourcesPage from "@/features/resources/pages/resources-page";
-import ReimbursementsPage from "@/features/requests/reimbursements/pages/reimbursements-page";
+import ReimbursementsPage from "@/features/company-workspace/reimbursements/pages/reimbursements-page";
 import NotFound from "./not-found";
 
 /** Brand splash shown while the initial /api/auth/me resolves. */
@@ -84,9 +85,9 @@ export function AppRoutes() {
       <Route path="/workspace/ats" component={() => <ProtectedRoute component={ATSPage} />} />
       <Route path="/workspace/hr-ops" component={() => <ProtectedRoute component={HROpsPage} />} />
       <Route path="/workspace/office" component={() => <ProtectedRoute component={OfficeAdminPage} />} />
-      <Route path="/workspace/approvals" component={() => <ProtectedRoute component={CompanyWorkspacePage} />} />
+      <Route path="/workspace/approvals" component={() => <ProtectedRoute component={MyApprovalsPage} />} />
       <Route path="/company-workspace" component={() => <ProtectedRoute component={CompanyWorkspacePage} />} />
-      <Route path="/my-approvals" component={() => <ProtectedRoute component={CompanyWorkspacePage} />} />
+      <Route path="/my-approvals" component={() => <ProtectedRoute component={MyApprovalsPage} />} />
       <Route path="/my-approvals/reimbursement/:id" component={() => <ProtectedRoute component={ReimbursementReviewPage} />} />
       <Route path="/my-requests" component={() => <ProtectedRoute component={MyRequestsPage} />} />
       <Route path="/my-requests/:tab" component={() => <ProtectedRoute component={MyRequestsPage} />} />

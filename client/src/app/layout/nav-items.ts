@@ -34,7 +34,7 @@ export const navItems: NavItem[] = [
 ];
 
 export const companyItems: NavItem[] = [
-  { title: "Service Catalog", href: "/company-workspace", icon: Store },
+  { title: "Company Workspace", href: "/company-workspace", icon: Store },
   { title: "My Requests", href: "/my-requests", icon: ClipboardList },
   { title: "Team Requests", href: "/team-requests", icon: Users, roles: ["super_admin", "hr_admin", "hr_executive", "manager", "hr_ops", "office_admin", "ceo_approver"] },
   { title: "Requests", href: "/requests", icon: Inbox },

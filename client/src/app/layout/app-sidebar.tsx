@@ -7,7 +7,7 @@ import {
 import { LogOut, Building2 } from "lucide-react";
 import { useAuth, useLogout, hasWorkspaceAccess, getRoleLabel } from "@/lib/auth";
 import BRAND from "@/lib/brand";
-import { useCeoInboxCount } from "@/features/requests/api/ceo-inbox.api";
+import { useCeoInboxCount } from "@/features/company-workspace/api/ceo-inbox.api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {

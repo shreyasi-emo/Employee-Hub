@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, Download } from "lucide-react";
-import { ReimbursementDetailView, exportReimbursement } from "@/features/requests/reimbursements/components/reimbursement-approval-detail";
+import { ReimbursementDetailView, exportReimbursement } from "@/features/company-workspace/reimbursements/components/reimbursement-approval-detail";
 
 export default function ReimbursementReviewPage() {
   const { id } = useParams();

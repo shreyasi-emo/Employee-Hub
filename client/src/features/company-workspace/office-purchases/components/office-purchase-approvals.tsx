@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { exportXlsx } from "@/lib/export-xlsx";
-import { OfficePurchaseDetailDialog } from "@/features/requests/office-purchases/components/office-purchase";
+import { OfficePurchaseDetailDialog } from "@/features/company-workspace/office-purchases/components/office-purchase";
 import { ShoppingCart, ArrowRight, ChevronLeft, Check, ChevronRight, MessageSquare, CalendarClock, IndianRupee, Eye, Download, ArrowDownUp, Building2, Clock, CheckSquare, CheckCircle2, Layers } from "lucide-react";
 import { statusClass, statusLabel } from "@/lib/status";
 

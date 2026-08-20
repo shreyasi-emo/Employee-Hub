@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { exportXlsx } from "@/lib/export-xlsx";
-import { ReimbursementApprovalModal, exportReimbursement } from "@/features/requests/reimbursements/components/reimbursement-approval-detail";
+import { ReimbursementApprovalModal, exportReimbursement } from "@/features/company-workspace/reimbursements/components/reimbursement-approval-detail";
 import { ChevronLeft, Check, X, ChevronRight, CalendarClock, FileText, IndianRupee, MoreVertical, Eye, Download, Maximize2, ArrowDownUp, Building2, Clock, MousePointerClick, CheckSquare } from "lucide-react";
 import { format } from "date-fns";
 import { statusClass, statusLabel } from "@/lib/status";

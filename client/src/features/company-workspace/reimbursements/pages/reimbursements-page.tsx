@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Check, X, ExternalLink, ChevronLeft, FileText } from "lucide-react";
 import { format } from "date-fns";
-import { ReimbursementFormDialog } from "@/features/requests/reimbursements/components/reimbursement-form";
+import { ReimbursementFormDialog } from "@/features/company-workspace/reimbursements/components/reimbursement-form";
 import { statusClass, statusLabel } from "@/lib/status";
 import { StatusBadge } from "../components/status-badge";
 
