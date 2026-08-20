@@ -265,66 +265,69 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Profile snapshot — spans the first two card slots */}
           <Card className="border-0 col-span-2" style={CARD_STYLE}>
-            <CardContent className="p-5">
-              {/* Top row — who you are, how to reach you, and the way through to the full profile. */}
-              <div className="flex items-start gap-5">
-                <div className="relative flex-shrink-0">
-                  <Avatar className="h-14 w-14 ring-2 ring-[#206295]/20 ring-offset-2 ring-offset-transparent">
-                    {emp.avatarUrl && <AvatarImage src={emp.avatarUrl} />}
-                    <AvatarFallback className="text-lg font-bold bg-[#206295]/10 text-[#206295]">{empInitials}</AvatarFallback>
-                  </Avatar>
-                  <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ backgroundColor: todayMeta.color }} title={`Today · ${todayMeta.label}`} />
+            <CardContent className="p-5 flex items-start gap-5">
+              {/* Everything but the open-profile button. The rule below belongs to this column,
+                  so it stops short of the button rather than running underneath it. */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start gap-5">
+                  <div className="relative flex-shrink-0">
+                    <Avatar className="h-14 w-14 ring-2 ring-[#206295]/20 ring-offset-2 ring-offset-transparent">
+                      {emp.avatarUrl && <AvatarImage src={emp.avatarUrl} />}
+                      <AvatarFallback className="text-lg font-bold bg-[#206295]/10 text-[#206295]">{empInitials}</AvatarFallback>
+                    </Avatar>
+                    <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ backgroundColor: todayMeta.color }} title={`Today · ${todayMeta.label}`} />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-lg font-bold text-foreground truncate">{emp.firstName} {emp.lastName}</p>
+                      {user?.role && <Badge className={`text-[10px] ${getRoleBadgeColor(user.role as any)}`}>{getRoleLabel(user.role as any)}</Badge>}
+                    </div>
+                    <div className="flex items-center gap-2.5 flex-wrap mt-1.5">
+                      {(designationName || deptName) && (
+                        <span className="text-xs text-muted-foreground truncate">{designationName || ""}{designationName && deptName ? " · " : ""}{deptName || ""}</span>
+                      )}
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: `${todayMeta.color}1F`, color: todayMeta.color }}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: todayMeta.color }} /> Today · {todayMeta.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="hidden sm:flex sm:w-64 flex-shrink-0 flex-col gap-3.5 text-xs text-muted-foreground pt-1">
+                    {empEmail && <p className="inline-flex items-center gap-2 w-full min-w-0"><Mail className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /><span className="truncate">{empEmail}</span></p>}
+                    <p className="inline-flex items-center gap-2"><UserCheck className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /> {managerName ? <>Reports to <span className="font-medium text-foreground">{managerName}</span></> : "No manager assigned"}</p>
+                  </div>
                 </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-lg font-bold text-foreground truncate">{emp.firstName} {emp.lastName}</p>
-                    {user?.role && <Badge className={`text-[10px] ${getRoleBadgeColor(user.role as any)}`}>{getRoleLabel(user.role as any)}</Badge>}
-                  </div>
-                  <div className="flex items-center gap-2.5 flex-wrap mt-1.5">
-                    {(designationName || deptName) && (
-                      <span className="text-xs text-muted-foreground truncate">{designationName || ""}{designationName && deptName ? " · " : ""}{deptName || ""}</span>
-                    )}
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: `${todayMeta.color}1F`, color: todayMeta.color }}>
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: todayMeta.color }} /> Today · {todayMeta.label}
+                <div className="h-px bg-border/70 my-4" />
+
+                {/* Bottom row — the employment facts, each separated by a rule. Built from a list so a
+                    missing value takes its divider with it instead of leaving a stray one. */}
+                <div className="flex items-center text-xs text-muted-foreground">
+                  {([
+                    [Hash, emp.employeeCode || "—"],
+                    empEmploymentType ? [Briefcase, empEmploymentType.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())] : null,
+                    empJoinDate ? [CalendarDays, `Joined ${format(new Date(empJoinDate), "MMM yyyy")}${tenure ? ` · ${tenure}` : ""}`] : null,
+                  ].filter(Boolean) as [any, string][]).map(([Icon, text], i) => (
+                    // flex-1 so the facts share the row evenly instead of bunching at the left,
+                    // and the rule rides on the item so a dropped fact takes its divider with it.
+                    <span key={text} className={`flex-1 min-w-0 inline-flex items-center gap-1.5 ${i > 0 ? "border-l border-border/70 pl-4" : ""}`}>
+                      <Icon className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" />
+                      <span className="truncate">{text}</span>
                     </span>
-                  </div>
+                  ))}
                 </div>
-
-                <div className="hidden sm:flex sm:w-64 flex-shrink-0 flex-col gap-1.5 text-xs text-muted-foreground pt-1">
-                  {empEmail && <p className="inline-flex items-center gap-2 w-full min-w-0"><Mail className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /><span className="truncate">{empEmail}</span></p>}
-                  <p className="inline-flex items-center gap-2"><UserCheck className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /> {managerName ? <>Reports to <span className="font-medium text-foreground">{managerName}</span></> : "No manager assigned"}</p>
-                </div>
-
-                <a
-                  href={`/employees/${emp.id}`}
-                  aria-label="Open full profile"
-                  title="Open full profile"
-                  className="flex-shrink-0 h-8 w-8 rounded-lg border border-border/70 flex items-center justify-center text-[#206295] hover-elevate"
-                  data-testid="link-profile-snapshot"
-                >
-                  <ArrowUpRight className="h-4 w-4" />
-                </a>
               </div>
 
-              <div className="h-px bg-border/70 my-4" />
-
-              {/* Bottom row — the employment facts, each separated by a rule. Built from a list so a
-                  missing value takes its divider with it instead of leaving a stray one. */}
-              <div className="flex items-center text-xs text-muted-foreground">
-                {([
-                  [Hash, emp.employeeCode || "—"],
-                  empEmploymentType ? [Briefcase, empEmploymentType.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())] : null,
-                  empJoinDate ? [CalendarDays, `Joined ${format(new Date(empJoinDate), "MMM yyyy")}${tenure ? ` · ${tenure}` : ""}`] : null,
-                ].filter(Boolean) as [any, string][]).map(([Icon, text], i) => (
-                  // flex-1 so the facts share the row evenly instead of bunching at the left,
-                  // and the rule rides on the item so a dropped fact takes its divider with it.
-                  <span key={text} className={`flex-1 min-w-0 inline-flex items-center gap-1.5 ${i > 0 ? "border-l border-border/70 pl-4" : ""}`}>
-                    <Icon className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" />
-                    <span className="truncate">{text}</span>
-                  </span>
-                ))}
-              </div>
+              <a
+                href={`/employees/${emp.id}`}
+                aria-label="Open full profile"
+                title="Open full profile"
+                className="flex-shrink-0 h-8 w-8 rounded-lg border border-border/70 flex items-center justify-center text-[#206295] hover-elevate"
+                data-testid="link-profile-snapshot"
+              >
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
             </CardContent>
           </Card>
           <StatCard
