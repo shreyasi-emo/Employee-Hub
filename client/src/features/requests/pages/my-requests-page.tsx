@@ -28,6 +28,8 @@ import { ReimbursementFormDialog, reimbDraftComplete } from "@/features/requests
 import { statusClass, statusLabel } from "@/lib/status";
 import { formatDate, money, matchesFilter, amountOf, searchText, itemsHeadline, DONE_STATUS } from "../shared/request-format";
 import { readDrafts, writeDrafts, newDraftId, type Draft } from "../shared/drafts";
+import { TICKET_CATEGORIES } from "../tickets/lib/ticket-categories";
+import { cap } from "../shared/approval-format";
 import { RequestTable } from "../components/request-table";
 import { RequestDetailModal } from "../components/request-detail-modal";
 import { RequestCard } from "../components/request-card";
@@ -689,14 +691,7 @@ export default function MyRequestsPage() {
                 <Select value={ticketForm.watch("category")} onValueChange={v => ticketForm.setValue("category", v)}>
                   <SelectTrigger data-testid="select-ticket-cat"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="hr_query">HR Query</SelectItem>
-                    <SelectItem value="stationery">Stationery</SelectItem>
-                    <SelectItem value="office_repairs">Office Repairs</SelectItem>
-                    <SelectItem value="guest_access">Guest Access</SelectItem>
-                    <SelectItem value="it_support">IT Support</SelectItem>
-                    <SelectItem value="payroll">Payroll</SelectItem>
-                    <SelectItem value="leave">Leave</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {TICKET_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{cap(c)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

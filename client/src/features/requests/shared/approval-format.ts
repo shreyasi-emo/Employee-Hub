@@ -57,6 +57,6 @@ export const REIMB_PAGE_SIZE = 15;
 export const SERVICES = [
   { key: "purchase", title: "Purchase Request", desc: "Request equipment, supplies, or any business purchase", icon: ShoppingCart, color: "bg-[#4BDCD9]/25 text-[#206295]" },
   { key: "travel", title: "Travel Request", desc: "Plan business travel — flights, stays, transport", icon: Car, color: "bg-[#206295]/15 text-[#206295]" },
-  { key: "ticket", title: "Support Ticket", desc: "Get help with IT, repairs, stationery, access & more", icon: TicketIcon, color: "bg-[#4BDCD9]/25 text-[#206295]" },
+  { key: "ticket", title: "Support Ticket", desc: "Get help with IT, repairs, access & more", icon: TicketIcon, color: "bg-[#4BDCD9]/25 text-[#206295]" },
   { key: "reimbursement", title: "Reimbursement", desc: "Claim expenses with invoice details and track approval", icon: Receipt, color: "bg-[#FF6F62]/20 text-[#FF6F62]" },
 ] as const;

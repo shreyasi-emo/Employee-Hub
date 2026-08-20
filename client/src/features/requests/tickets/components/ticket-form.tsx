@@ -1,4 +1,5 @@
 import { cap } from "../../shared/approval-format";
+import { TICKET_CATEGORIES } from "../lib/ticket-categories";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ export function TicketForm({ open, onClose }: { open: boolean; onClose: () => vo
             <div className="space-y-1.5"><Label>Category</Label>
               <Select value={form.watch("category")} onValueChange={(v) => form.setValue("category", v)}>
                 <SelectTrigger data-testid="select-ticket-cat"><SelectValue /></SelectTrigger>
-                <SelectContent>{["hr_query", "stationery", "office_repairs", "guest_access", "it_support", "payroll", "leave", "other"].map((c) => <SelectItem key={c} value={c}>{cap(c)}</SelectItem>)}</SelectContent>
+                <SelectContent>{TICKET_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{cap(c)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5"><Label>Priority</Label>
