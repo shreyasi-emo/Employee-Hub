@@ -5,16 +5,16 @@ import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { Plus, Search, Users, Briefcase, Send } from "lucide-react";
+import { RequisitionFormDialog } from "../ats/components/requisition-form";
+import { CandidateFormDialog } from "../ats/components/candidate-form";
+import { ApplicationFormDialog } from "../ats/components/application-form";
+import { Plus, Search, Briefcase, Send } from "lucide-react";
 import { format } from "date-fns";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -35,6 +35,7 @@ export default function ATSPage() {
   const [showReqForm, setShowReqForm] = useState(false);
   const [showCandForm, setShowCandForm] = useState(false);
   const [showAppForm, setShowAppForm] = useState(false);
+  const [appCandidateId, setAppCandidateId] = useState<string | undefined>(undefined);
   const [selectedReq, setSelectedReq] = useState<any>(null);
 
   const { data: requisitions = [], isLoading: loadingReqs } = useQuery<any[]>({
@@ -54,41 +55,9 @@ export default function ATSPage() {
     queryKey: ["/api/workspace/pipeline-stages"],
   });
 
-  const reqForm = useForm({
-    defaultValues: { title: "", departmentId: "", noOfPositions: "1", jobType: "full_time", workMode: "onsite", description: "", requirements: "", salaryMin: "", salaryMax: "" }
-  });
-
-  const candForm = useForm({
-    defaultValues: { name: "", email: "", phone: "", currentRole: "", currentCompany: "", experienceYears: "", source: "linkedin" }
-  });
-
-  const appForm = useForm({
-    defaultValues: { requisitionId: "", candidateId: "" }
-  });
-
-  const createReqMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/workspace/requisitions", {
-      ...data, noOfPositions: Number(data.noOfPositions), salaryMin: data.salaryMin ? Number(data.salaryMin) : null, salaryMax: data.salaryMax ? Number(data.salaryMax) : null, status: "draft",
-    }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/requisitions"] }); setShowReqForm(false); reqForm.reset(); toast({ title: "Requisition created" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
   const submitReqMutation = useMutation({
     mutationFn: (id: string) => apiRequest("POST", `/api/workspace/requisitions/${id}/submit`, {}),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/requisitions"] }); toast({ title: "Submitted for CEO approval" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const createCandMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/workspace/candidates", { ...data, experienceYears: data.experienceYears ? Number(data.experienceYears) : null }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/candidates"] }); setShowCandForm(false); candForm.reset(); toast({ title: "Candidate added" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const createAppMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/workspace/applications", { ...data, status: "active", pipelineStageId: (stages as any[])[0]?.id }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/applications"] }); setShowAppForm(false); appForm.reset(); toast({ title: "Application created" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -190,7 +159,7 @@ export default function ATSPage() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {c.source && <Badge variant="outline" className="text-xs">{c.source}</Badge>}
                       {c.experienceYears && <span className="text-xs text-muted-foreground">{c.experienceYears} yrs</span>}
-                      <Button variant="outline" size="sm" onClick={() => { setShowAppForm(true); appForm.setValue("candidateId", c.id); }} data-testid={`button-apply-${c.id}`}>
+                      <Button variant="outline" size="sm" onClick={() => { setAppCandidateId(c.id); setShowAppForm(true); }} data-testid={`button-apply-${c.id}`}>
                         Apply
                       </Button>
                     </div>
@@ -258,162 +227,13 @@ export default function ATSPage() {
       </Tabs>
 
       {/* New Requisition Dialog */}
-      <Dialog open={showReqForm} onOpenChange={setShowReqForm}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Create Job Requisition</DialogTitle></DialogHeader>
-          <form onSubmit={reqForm.handleSubmit(data => createReqMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Job Title *</Label>
-              <Input {...reqForm.register("title", { required: true })} placeholder="e.g. Senior Backend Engineer" data-testid="input-req-title" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Positions</Label>
-                <Input type="number" min="1" {...reqForm.register("noOfPositions")} data-testid="input-req-positions" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Job Type</Label>
-                <Select value={reqForm.watch("jobType")} onValueChange={v => reqForm.setValue("jobType", v)}>
-                  <SelectTrigger data-testid="select-req-jobtype"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="full_time">Full Time</SelectItem>
-                    <SelectItem value="part_time">Part Time</SelectItem>
-                    <SelectItem value="contract">Contract</SelectItem>
-                    <SelectItem value="internship">Internship</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Work Mode</Label>
-              <Select value={reqForm.watch("workMode")} onValueChange={v => reqForm.setValue("workMode", v)}>
-                <SelectTrigger data-testid="select-req-workmode"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="onsite">On-site</SelectItem>
-                  <SelectItem value="remote">Remote</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Salary Min</Label>
-                <Input type="number" placeholder="e.g. 600000" {...reqForm.register("salaryMin")} data-testid="input-req-salmin" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Salary Max</Label>
-                <Input type="number" placeholder="e.g. 1200000" {...reqForm.register("salaryMax")} data-testid="input-req-salmax" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea rows={3} {...reqForm.register("description")} placeholder="Role description..." data-testid="textarea-req-description" />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowReqForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={createReqMutation.isPending} data-testid="button-create-req">
-                {createReqMutation.isPending ? "Creating..." : "Create"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* New Candidate Dialog */}
-      <Dialog open={showCandForm} onOpenChange={setShowCandForm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Add Candidate</DialogTitle></DialogHeader>
-          <form onSubmit={candForm.handleSubmit(data => createCandMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Full Name *</Label>
-              <Input {...candForm.register("name", { required: true })} placeholder="e.g. John Doe" data-testid="input-cand-name" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Email *</Label>
-                <Input type="email" {...candForm.register("email", { required: true })} placeholder="john@email.com" data-testid="input-cand-email" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Phone</Label>
-                <Input {...candForm.register("phone")} placeholder="+91 9876543210" data-testid="input-cand-phone" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Current Role</Label>
-                <Input {...candForm.register("currentRole")} data-testid="input-cand-role" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Current Company</Label>
-                <Input {...candForm.register("currentCompany")} data-testid="input-cand-company" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Experience (years)</Label>
-                <Input type="number" min="0" {...candForm.register("experienceYears")} data-testid="input-cand-exp" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Source</Label>
-                <Select value={candForm.watch("source")} onValueChange={v => candForm.setValue("source", v)}>
-                  <SelectTrigger data-testid="select-cand-source"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="linkedin">LinkedIn</SelectItem>
-                    <SelectItem value="naukri">Naukri</SelectItem>
-                    <SelectItem value="referral">Referral</SelectItem>
-                    <SelectItem value="agency">Agency</SelectItem>
-                    <SelectItem value="direct">Direct Apply</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowCandForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={createCandMutation.isPending} data-testid="button-save-candidate">
-                {createCandMutation.isPending ? "Adding..." : "Add Candidate"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
-      {/* New Application Dialog */}
-      <Dialog open={showAppForm} onOpenChange={setShowAppForm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Create Application</DialogTitle></DialogHeader>
-          <form onSubmit={appForm.handleSubmit(data => createAppMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Job Requisition *</Label>
-              <Select value={appForm.watch("requisitionId")} onValueChange={v => appForm.setValue("requisitionId", v)}>
-                <SelectTrigger data-testid="select-app-req"><SelectValue placeholder="Select requisition..." /></SelectTrigger>
-                <SelectContent>
-                  {(requisitions as any[]).filter(r => ["approved", "open"].includes(r.status)).map(r => (
-                    <SelectItem key={r.id} value={r.id}>{r.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Candidate *</Label>
-              <Select value={appForm.watch("candidateId")} onValueChange={v => appForm.setValue("candidateId", v)}>
-                <SelectTrigger data-testid="select-app-candidate"><SelectValue placeholder="Select candidate..." /></SelectTrigger>
-                <SelectContent>
-                  {(candidates as any[]).map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name} — {c.email}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAppForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={createAppMutation.isPending || !appForm.watch("requisitionId") || !appForm.watch("candidateId")} data-testid="button-save-application">
-                {createAppMutation.isPending ? "Creating..." : "Create Application"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <RequisitionFormDialog open={showReqForm} onClose={() => setShowReqForm(false)} />
+      <CandidateFormDialog open={showCandForm} onClose={() => setShowCandForm(false)} />
+      <ApplicationFormDialog open={showAppForm} onClose={() => { setShowAppForm(false); setAppCandidateId(undefined); }} initialCandidateId={appCandidateId}
+        requisitions={requisitions as any[]} candidates={candidates as any[]} firstStageId={(stages as any[])[0]?.id} />
     </div>
   );
 }

@@ -168,8 +168,6 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
       onClose={close}
       title="New Travel Request"
       subtitle="Request travel for business purposes."
-      steps={["Choose type", "Details"]}
-      step={step}
       minHeight="520px"
       back={step === 1 ? <Button variant="ghost" onClick={() => setStep(0)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button> : undefined}
       footer={<>

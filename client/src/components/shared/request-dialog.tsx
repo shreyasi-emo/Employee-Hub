@@ -48,7 +48,8 @@ export function RequestDialog({
   title: React.ReactNode;
   /** Optional line under the title. */
   subtitle?: React.ReactNode;
-  /** Step labels. Two or more renders the progress bar; omit for a single-step form. */
+  /** Step labels. Two or more renders the progress bar. Only the Purchase Request form uses
+   *  this — the other request forms deliberately show no step bar, even when they have steps. */
   steps?: string[];
   /** Index of the current step, 0-based. */
   step?: number;

@@ -5,20 +5,16 @@ import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { useForm, Controller } from "react-hook-form";
-import { DateInput } from "@/components/shared/datetime-field";
+import { HrTaskFormDialog } from "../hr-ops/components/hr-task-form";
+import { HelpdeskTicketFormDialog } from "../hr-ops/components/helpdesk-ticket-form";
 import { Plus, CheckSquare, Trash2, ClipboardList, TicketIcon, CheckCircle2, ArrowRight } from "lucide-react";
-import { TICKET_CATEGORIES } from "@/features/company-workspace/tickets/lib/ticket-categories";
-import { cap } from "@/features/company-workspace/shared/approval-format";
 import { Link } from "wouter";
 import { format } from "date-fns";
 
@@ -98,20 +94,6 @@ export default function HRopsPage() {
     (showHiringItems ? (approvedRequisitions as any[]).length + (approvedOffers as any[]).length : 0) +
     (showOpsItems ? (approvedPurchases as any[]).length + (approvedTravel as any[]).length + (approvedPayments as any[]).length : 0);
 
-  const taskForm = useForm({
-    defaultValues: { title: "", description: "", priority: "medium", dueDate: "", category: "general" }
-  });
-
-  const ticketForm = useForm({
-    defaultValues: { subject: "", description: "", category: "hr_query", priority: "medium" }
-  });
-
-  const createTaskMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/workspace/hr-tasks", { ...data, status: "pending", dueDate: data.dueDate || null }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/hr-tasks"] }); setShowTaskForm(false); taskForm.reset(); toast({ title: "Task created" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => apiRequest("PUT", `/api/workspace/hr-tasks/${id}`, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/workspace/hr-tasks"] }),
@@ -120,12 +102,6 @@ export default function HRopsPage() {
   const deleteTaskMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/workspace/hr-tasks/${id}`),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/hr-tasks"] }); toast({ title: "Task deleted" }); },
-  });
-
-  const createTicketMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/workspace/tickets", { ...data, status: "open" }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/tickets"] }); setShowTicketForm(false); ticketForm.reset(); toast({ title: "Ticket raised" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const updateTicketMutation = useMutation({
@@ -414,93 +390,13 @@ export default function HRopsPage() {
       </Tabs>
 
       {/* New Task Dialog */}
-      <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>New HR Task</DialogTitle></DialogHeader>
-          <form onSubmit={taskForm.handleSubmit(data => createTaskMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Title *</Label>
-              <Input {...taskForm.register("title", { required: true })} placeholder="Task title..." data-testid="input-task-title" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea rows={2} {...taskForm.register("description")} placeholder="Task description..." data-testid="textarea-task-desc" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Priority</Label>
-                <Select value={taskForm.watch("priority")} onValueChange={v => taskForm.setValue("priority", v)}>
-                  <SelectTrigger data-testid="select-task-priority"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Due Date</Label>
-                <Controller control={taskForm.control} name="dueDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-task-due" />} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowTaskForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={createTaskMutation.isPending} data-testid="button-save-task">
-                {createTaskMutation.isPending ? "Creating..." : "Create Task"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* New Ticket Dialog */}
-      <Dialog open={showTicketForm} onOpenChange={setShowTicketForm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Raise Helpdesk Ticket</DialogTitle></DialogHeader>
-          <form onSubmit={ticketForm.handleSubmit(data => createTicketMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Subject *</Label>
-              <Input {...ticketForm.register("subject", { required: true })} placeholder="Brief subject..." data-testid="input-ticket-subject" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea rows={3} {...ticketForm.register("description")} placeholder="Describe your issue..." data-testid="textarea-ticket-desc" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Category</Label>
-                <Select value={ticketForm.watch("category")} onValueChange={v => ticketForm.setValue("category", v)}>
-                  <SelectTrigger data-testid="select-ticket-category"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TICKET_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{cap(c)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Priority</Label>
-                <Select value={ticketForm.watch("priority")} onValueChange={v => ticketForm.setValue("priority", v)}>
-                  <SelectTrigger data-testid="select-ticket-priority"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowTicketForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={createTicketMutation.isPending} data-testid="button-save-ticket">
-                {createTicketMutation.isPending ? "Raising..." : "Raise Ticket"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Ticket Detail Dialog */}
+      <HrTaskFormDialog open={showTaskForm} onClose={() => setShowTaskForm(false)} />
+      <HelpdeskTicketFormDialog open={showTicketForm} onClose={() => setShowTicketForm(false)} />
+
       <Dialog open={!!selectedTicket} onOpenChange={(o) => !o && setSelectedTicket(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{selectedTicket?.subject}</DialogTitle></DialogHeader>

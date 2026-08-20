@@ -1,19 +1,17 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { TemplateFormDialog } from "../components/template-form";
+import { TaskFormDialog } from "../components/task-form";
 import { useAuth, isHR } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { ClipboardList, Plus, CheckCircle2, Circle, SkipForward, ChevronRight, Users, Settings } from "lucide-react";
+import { ClipboardList, Plus, CheckCircle2, Circle, SkipForward, ChevronRight, Settings } from "lucide-react";
 import { format } from "date-fns";
 
 const roleOptions = [
@@ -144,25 +142,11 @@ function TemplateManager() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showAddTemplate, setShowAddTemplate] = useState(false);
-  const [newTemplate, setNewTemplate] = useState({ name: "", description: "", isDefault: false });
-  const [newTask, setNewTask] = useState({ title: "", description: "", ownedByRole: "hr_admin", dueDaysFromJoin: 7 });
 
   const { data: templates = [] } = useQuery<any[]>({ queryKey: ["/api/onboarding/templates"] });
   const { data: tasks = [] } = useQuery<any[]>({
     queryKey: [`/api/onboarding/templates/${selectedTemplate}/tasks`],
     enabled: !!selectedTemplate,
-  });
-
-  const createTemplate = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/onboarding/templates", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/onboarding/templates"] }); toast({ title: "Template created" }); setShowAddTemplate(false); setNewTemplate({ name: "", description: "", isDefault: false }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const createTask = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", `/api/onboarding/templates/${selectedTemplate}/tasks`, data),
-    onSuccess: () => { qc.invalidateQueries({ predicate: q => (q.queryKey[0] as string)?.includes("/tasks") }); toast({ title: "Task added" }); setShowAddTask(false); setNewTask({ title: "", description: "", ownedByRole: "hr_admin", dueDaysFromJoin: 7 }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteTask = useMutation({
@@ -234,70 +218,9 @@ function TemplateManager() {
         </div>
       )}
 
-      <Dialog open={showAddTemplate} onOpenChange={setShowAddTemplate}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>New Onboarding Template</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium">Template Name *</label>
-              <Input value={newTemplate.name} onChange={e => setNewTemplate(t => ({ ...t, name: e.target.value }))} className="mt-1" placeholder="e.g. Standard Onboarding" data-testid="input-template-name" />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <Input value={newTemplate.description} onChange={e => setNewTemplate(t => ({ ...t, description: e.target.value }))} className="mt-1" />
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={newTemplate.isDefault} onChange={e => setNewTemplate(t => ({ ...t, isDefault: e.target.checked }))} />
-              <span className="text-sm">Set as default template</span>
-            </label>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowAddTemplate(false)}>Cancel</Button>
-              <Button onClick={() => createTemplate.mutate(newTemplate)} disabled={createTemplate.isPending || !newTemplate.name} data-testid="button-create-template">
-                {createTemplate.isPending ? "Creating..." : "Create Template"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
-      <Dialog open={showAddTask} onOpenChange={setShowAddTask}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add Onboarding Task</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium">Task Title *</label>
-              <Input value={newTask.title} onChange={e => setNewTask(t => ({ ...t, title: e.target.value }))} className="mt-1" placeholder="e.g. Complete IT asset setup" data-testid="input-task-title" />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <Input value={newTask.description} onChange={e => setNewTask(t => ({ ...t, description: e.target.value }))} className="mt-1" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium">Assigned To</label>
-                <Select value={newTask.ownedByRole} onValueChange={v => setNewTask(t => ({ ...t, ownedByRole: v }))}>
-                  <SelectTrigger className="mt-1" data-testid="select-task-owner">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roleOptions.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Due (days from join)</label>
-                <Input type="number" value={newTask.dueDaysFromJoin} onChange={e => setNewTask(t => ({ ...t, dueDaysFromJoin: parseInt(e.target.value) || 7 }))} className="mt-1" min={1} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowAddTask(false)}>Cancel</Button>
-              <Button onClick={() => createTask.mutate(newTask)} disabled={createTask.isPending || !newTask.title} data-testid="button-submit-task">
-                {createTask.isPending ? "Adding..." : "Add Task"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TemplateFormDialog open={showAddTemplate} onClose={() => setShowAddTemplate(false)} />
+      <TaskFormDialog open={showAddTask} onClose={() => setShowAddTask(false)} templateId={selectedTemplate} roleOptions={roleOptions} />
     </div>
   );
 }

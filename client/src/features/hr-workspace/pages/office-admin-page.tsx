@@ -4,19 +4,15 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useForm, Controller } from "react-hook-form";
-import { DateInput } from "@/components/shared/datetime-field";
+import { VendorFormDialog } from "../office-admin/components/vendor-form";
+import { PurchaseRequestFormDialog } from "../office-admin/components/purchase-request-form";
+import { PaymentRequestFormDialog } from "../office-admin/components/payment-request-form";
 import { Plus, Building2, ShoppingCart, CreditCard, Send } from "lucide-react";
-import { format } from "date-fns";
 import { formatDate, formatStatus } from "@/lib/format";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -53,29 +49,6 @@ export default function OfficeAdminPage() {
   });
 
   // Forms — use correct DB field names
-  const vendorForm = useForm({ defaultValues: { name: "", category: "supplier", contactName: "", email: "", phone: "", gstNumber: "", panNumber: "" } });
-  const prForm = useForm({ defaultValues: { category: "office_supplies", notes: "", estimatedCost: "", neededByDate: "" } });
-  const payForm = useForm({ defaultValues: { vendorId: "", paymentType: "vendor_payment", amount: "", currency: "INR", description: "" } });
-
-  const createVendorMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/workspace/vendors", { ...data, isActive: true }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/vendors"] }); setShowVendorForm(false); vendorForm.reset(); toast({ title: "Vendor added" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const createPRMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/workspace/purchase-requests", {
-      category: data.category,
-      items: [],
-      estimatedCost: data.estimatedCost ? String(data.estimatedCost) : null,
-      neededByDate: data.neededByDate || null,
-      notes: data.notes || null,
-      status: "draft",
-    }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/purchase-requests"] }); setShowPRForm(false); prForm.reset(); toast({ title: "Purchase request created" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
   const submitPRMutation = useMutation({
     mutationFn: (id: string) => apiRequest("POST", `/api/workspace/purchase-requests/${id}/submit`, {}),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/purchase-requests"] }); toast({ title: "Submitted for CEO approval" }); },
@@ -85,12 +58,6 @@ export default function OfficeAdminPage() {
   const updatePRMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => apiRequest("PUT", `/api/workspace/purchase-requests/${id}`, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/workspace/purchase-requests"] }),
-  });
-
-  const createPayMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/workspace/payments", { ...data, amount: Number(data.amount), status: "requested" }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/workspace/payments"] }); setShowPayForm(false); payForm.reset(); toast({ title: "Payment created" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const submitPayMutation = useMutation({
@@ -259,134 +226,14 @@ export default function OfficeAdminPage() {
       </Tabs>
 
       {/* Vendor Dialog */}
-      <Dialog open={showVendorForm} onOpenChange={setShowVendorForm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Add Vendor</DialogTitle></DialogHeader>
-          <form onSubmit={vendorForm.handleSubmit(data => createVendorMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5"><Label>Vendor Name *</Label><Input {...vendorForm.register("name", { required: true })} data-testid="input-vendor-name" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Category</Label>
-                <Select value={vendorForm.watch("category")} onValueChange={v => vendorForm.setValue("category", v)}>
-                  <SelectTrigger data-testid="select-vendor-cat"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="supplier">Supplier</SelectItem>
-                    <SelectItem value="service_provider">Service Provider</SelectItem>
-                    <SelectItem value="contractor">Contractor</SelectItem>
-                    <SelectItem value="consultant">Consultant</SelectItem>
-                    <SelectItem value="travel_agency">Travel Agency</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5"><Label>Contact Name</Label><Input {...vendorForm.register("contactName")} data-testid="input-vendor-contact" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...vendorForm.register("email")} data-testid="input-vendor-email" /></div>
-              <div className="space-y-1.5"><Label>Phone</Label><Input {...vendorForm.register("phone")} data-testid="input-vendor-phone" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>GST Number</Label><Input {...vendorForm.register("gstNumber")} data-testid="input-vendor-gst" /></div>
-              <div className="space-y-1.5"><Label>PAN Number</Label><Input {...vendorForm.register("panNumber")} data-testid="input-vendor-pan" /></div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowVendorForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={createVendorMutation.isPending} data-testid="button-save-vendor">
-                {createVendorMutation.isPending ? "Adding..." : "Add Vendor"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Purchase Request Dialog */}
-      <Dialog open={showPRForm} onOpenChange={setShowPRForm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>New Purchase Request</DialogTitle></DialogHeader>
-          <form onSubmit={prForm.handleSubmit(data => createPRMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Select value={prForm.watch("category")} onValueChange={v => prForm.setValue("category", v)}>
-                <SelectTrigger data-testid="select-pr-cat"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="office_supplies">Office Supplies</SelectItem>
-                  <SelectItem value="equipment">Equipment</SelectItem>
-                  <SelectItem value="software">Software</SelectItem>
-                  <SelectItem value="it_hardware">IT Hardware</SelectItem>
-                  <SelectItem value="furniture">Furniture</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5"><Label>Description / Notes *</Label><Textarea rows={2} {...prForm.register("notes", { required: true })} data-testid="textarea-pr-notes" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Estimated Cost (₹)</Label><Input type="number" min="0" {...prForm.register("estimatedCost")} data-testid="input-pr-cost" /></div>
-              <div className="space-y-1.5"><Label>Needed By</Label><Controller control={prForm.control} name="neededByDate" render={({ field }) => <DateInput value={field.value || ""} onChange={field.onChange} testId="input-pr-needed" />} /></div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowPRForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={createPRMutation.isPending} data-testid="button-save-pr">
-                {createPRMutation.isPending ? "Creating..." : "Create Request"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Payment Dialog */}
-      <Dialog open={showPayForm} onOpenChange={setShowPayForm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>New Payment Request</DialogTitle></DialogHeader>
-          <form onSubmit={payForm.handleSubmit(data => createPayMutation.mutate(data))} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Payment Type</Label>
-              <Select value={payForm.watch("paymentType")} onValueChange={v => payForm.setValue("paymentType", v)}>
-                <SelectTrigger data-testid="select-pay-type"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="vendor_payment">Vendor Payment</SelectItem>
-                  <SelectItem value="reimbursement">Reimbursement</SelectItem>
-                  <SelectItem value="advance">Advance</SelectItem>
-                  <SelectItem value="utility">Utility</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Vendor</Label>
-              <Select value={payForm.watch("vendorId")} onValueChange={v => payForm.setValue("vendorId", v)}>
-                <SelectTrigger data-testid="select-pay-vendor"><SelectValue placeholder="Select vendor..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {(vendors as any[]).map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Amount *</Label><Input type="number" min="0" {...payForm.register("amount", { required: true })} data-testid="input-pay-amount" /></div>
-              <div className="space-y-1.5">
-                <Label>Currency</Label>
-                <Select value={payForm.watch("currency")} onValueChange={v => payForm.setValue("currency", v)}>
-                  <SelectTrigger data-testid="select-pay-currency"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="INR">INR</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5"><Label>Description</Label><Textarea rows={2} {...payForm.register("description")} data-testid="textarea-pay-desc" /></div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowPayForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={createPayMutation.isPending} data-testid="button-save-payment">
-                {createPayMutation.isPending ? "Creating..." : "Create Payment"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
+      <VendorFormDialog open={showVendorForm} onClose={() => setShowVendorForm(false)} />
+      <PurchaseRequestFormDialog open={showPRForm} onClose={() => setShowPRForm(false)} />
+      <PaymentRequestFormDialog open={showPayForm} onClose={() => setShowPayForm(false)} vendors={vendors as any[]} />
     </div>
   );
 }
