@@ -283,7 +283,10 @@ export default function DashboardPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-lg font-bold text-foreground truncate">{emp.firstName} {emp.lastName}</p>
                     <div className="flex items-center gap-2 flex-wrap mt-1.5">
-                      {user?.role && <Badge className={`text-[10px] ${getRoleBadgeColor(user.role as any)}`}>{getRoleLabel(user.role as any)}</Badge>}
+                      {/* Matched to the status pill beside it: same radius, padding, text size and
+                          no border, so the two chips are the same height. Badge's own base is
+                          rounded-[12px] / py-0.5 / border, which rendered it visibly shorter. */}
+                      {user?.role && <Badge className={`rounded-full border-0 px-2.5 py-1 text-xs font-semibold ${getRoleBadgeColor(user.role as any)}`}>{getRoleLabel(user.role as any)}</Badge>}
                       <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: `${todayMeta.color}1F`, color: todayMeta.color }}>
                         <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: todayMeta.color }} /> Today · {todayMeta.label}
                       </span>
