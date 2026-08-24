@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ExpandableApprovalDialog } from "../components/expandable-approval-dialog";
 import { ShoppingCart, Plane, Receipt, Package, ChevronLeft, Check, Eye } from "lucide-react";
 import { TravelApprovals } from "@/features/company-workspace/travel/components/travel";
 import { money } from "../shared/approval-format";
@@ -161,20 +161,14 @@ export default function MyApprovalsPage() {
 
       {batchCat && <CeoReviewModal key={batchCat.title + (batchCat.lane || "")} cfg={batchCat} onClose={() => setBatchCat(null)} />}
       {travelModal && (
-        <Dialog open onOpenChange={(o) => { if (!o) setTravelModal(false); }}>
-          <DialogContent className="max-w-2xl max-h-[86vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="flex items-center gap-2"><Plane className="h-5 w-5 text-[#206295]" /> Travel approvals</DialogTitle></DialogHeader>
-            <TravelApprovals scope="ceo" />
-          </DialogContent>
-        </Dialog>
+        <ExpandableApprovalDialog open onClose={() => setTravelModal(false)} title="Travel approvals" icon={Plane}>
+          <TravelApprovals scope="ceo" />
+        </ExpandableApprovalDialog>
       )}
       {reimbModal && (
-        <Dialog open onOpenChange={(o) => { if (!o) setReimbModal(false); }}>
-          <DialogContent className="max-w-5xl max-h-[88vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-[#206295]" /> Reimbursement approvals</DialogTitle></DialogHeader>
-            <ReimbApprovals items={ceoReimbQueue} allItems={reimb} nameByUser={nameByUser} allowBulk={canCeoReimb} />
-          </DialogContent>
-        </Dialog>
+        <ExpandableApprovalDialog open onClose={() => setReimbModal(false)} title="Reimbursement approvals" icon={Receipt}>
+          <ReimbApprovals items={ceoReimbQueue} allItems={reimb} nameByUser={nameByUser} allowBulk={canCeoReimb} />
+        </ExpandableApprovalDialog>
       )}
     </div>
   );

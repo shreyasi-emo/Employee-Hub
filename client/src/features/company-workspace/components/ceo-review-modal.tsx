@@ -6,12 +6,14 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CommentThread } from "@/components/shared/comment-thread";
-import { Check, X, ChevronDown, MessageSquare, ExternalLink, Layers } from "lucide-react";
+import { ExpandToggle } from "./expandable-approval-dialog";
+import { Check, X, ChevronDown, MessageSquare, ExternalLink, Layers, ShoppingCart, Package, ArrowDownUp, Search } from "lucide-react";
 
 // Inbox bulk-approval modal — every pending item in one category, X to drop, Approve/Reject all on the rest.
 // CEO review — expand-a-row: compact list, open a row for its receipt + discussion thread + per-item
@@ -25,7 +27,11 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
   const base = cfg.basePath as string;
   const { data: all = [] } = useQuery<any[]>({ queryKey: [base] });
   const statuses: string[] = cfg.statuses || ["pending_approval"];
-  const rows = (all as any[]).filter((r) => statuses.includes(r.status));
+  const [search, setSearch] = useState("");
+  const q = search.trim().toLowerCase();
+  const rows = (all as any[])
+    .filter((r) => statuses.includes(r.status))
+    .filter((r) => !q || `${r.reference || ""} ${r.employeeName || ""} ${r.employeeCode || ""} ${r.department || ""} ${(r.items || []).map((i: any) => i.description).join(" ")}`.toLowerCase().includes(q));
   const [sortBy, setSortBy] = useState<"amount" | "age">("amount");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -54,16 +60,34 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
   const bulk = useMutation({ mutationFn: ({ path, ids, body }: any) => apiRequest("POST", `${base}/${path}`, { ids, ...(body || {}) }), onSuccess: (_d, v: any) => { invalidate(); toast({ title: v.msg }); setSel(new Set()); setBulkMode(null); setBulkNote(""); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
   const busy = single.isPending || bulk.isPending;
   const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const [maximized, setMaximized] = useState(false);
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>{cfg.title} | {cfg.lane || "Pending"} ({rows.length})</DialogTitle></DialogHeader>
-        <div className="flex items-center justify-end gap-1.5">
-          <span className="text-[11px] text-muted-foreground">Sort</span>
-          {(["amount", "age"] as const).map((s) => <button key={s} onClick={() => setSortBy(s)} className={`text-[11px] px-2 py-0.5 rounded-full transition-colors ${sortBy === s ? "bg-[#206295] text-white" : "bg-muted text-muted-foreground hover-elevate"}`} data-testid={`ceo-sort-${s}`}>{s === "amount" ? "Amount" : "Oldest"}</button>)}
+    <Dialog open onOpenChange={(o) => { if (!o) { setMaximized(false); onClose(); } }}>
+      <DialogContent className={`${maximized ? "max-w-[98vw] w-[98vw] h-[96vh] max-h-[96vh]" : "max-w-3xl w-[calc(100vw-2rem)] max-h-[92vh]"} p-0 gap-0 overflow-hidden flex flex-col`}>
+        {/* Header — closed by a rule, mirroring the request-form modals */}
+        <div className="flex-shrink-0 border-b border-border px-6 pt-6 pb-4">
+          <DialogHeader className="space-y-0">
+            <DialogTitle className="pr-16">{cfg.title} | {cfg.lane || "Pending"} ({rows.length})</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-2 mt-3">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search requests…" className="h-9 pl-8" data-testid="ceo-search" />
+            </div>
+            <span className="text-xs text-muted-foreground flex-shrink-0">Sort</span>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+              <SelectTrigger className="h-9 w-[170px] text-xs flex-shrink-0" data-testid="ceo-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="amount">Amount: High → Low</SelectItem>
+                <SelectItem value="age">Oldest first</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <ScrollArea className="max-h-[60vh] pr-3 -mr-3">
-          <div className="space-y-2">
+        <ExpandToggle expanded={maximized} onToggle={() => setMaximized((v) => !v)} />
+        {/* Body — only this scrolls; the padding gives the cards room so their shadows aren't clipped */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+          <div className="space-y-3">
             {sortedRows.length === 0 && <p className="text-sm text-muted-foreground py-10 text-center">Nothing pending here.</p>}
             {(() => {
               const renderRow = (r: any) => {
@@ -72,16 +96,17 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
               const items = (r.items || []) as any[];
               const cc = (r.comments || []).length;
               return (
-                <div key={r.id} className="rounded-xl border border-border bg-card overflow-hidden">
-                  <div className="flex items-center gap-3 px-3 py-2.5">
+                <div key={r.id} className="card-surface card-hover rounded-2xl overflow-hidden">
+                  <div className="flex items-center gap-3.5 px-5 py-4">
                     <Checkbox checked={sel.has(r.id)} onCheckedChange={() => toggleSel(r.id)} onClick={(e: any) => e.stopPropagation()} />
+                    <span className="h-10 w-10 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0">{cfg.kind === "procurement" ? <Package className="h-[18px] w-[18px]" /> : <ShoppingCart className="h-[18px] w-[18px]" />}</span>
                     <button type="button" className="min-w-0 flex-1 flex items-center gap-3 text-left" onClick={() => setExpanded(open ? null : r.id)}>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 min-w-0">
                           <p className="text-[13px] font-semibold text-foreground truncate">{items.length ? `${items[0]?.description || "Item"}${Number(items[0]?.quantity) > 1 ? ` ×${items[0].quantity}` : ""}${items.length > 1 ? ` +${items.length - 1} more` : ""}` : (r.reference || "Request")}</p>
                           {isResubmittedThread(r.comments) && <Badge className="text-[9px] flex-shrink-0 bg-[#206295]/15 text-[#206295]">Resubmitted</Badge>}
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">{r.employeeName || "Employee"}{r.department ? ` | ${r.department}` : ""}{items.length ? ` | ${items.length} item${items.length !== 1 ? "s" : ""}` : ""} | {r.reference}</p>
+                        <p className="text-xs text-muted-foreground truncate mt-1"><span className="font-semibold text-foreground/90">{r.employeeName || "Employee"}</span>{r.employeeCode ? ` (${r.employeeCode})` : ""}{r.department ? ` | ${r.department}` : ""}{items.length ? ` | ${items.length} item${items.length !== 1 ? "s" : ""}` : ""} | {r.reference}</p>
                       </div>
                       {waitDays(r.createdAt) >= 1 && <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${waitDays(r.createdAt) >= 3 ? "bg-[#FF6F62]/15 text-[#C4402F]" : "bg-muted text-muted-foreground"}`}>{waitDays(r.createdAt)}d</span>}
                       {cc > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground flex-shrink-0"><MessageSquare className="h-3.5 w-3.5" />{cc}</span>}
@@ -150,33 +175,36 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
                 : sortedRows.map(renderRow);
             })()}
           </div>
-        </ScrollArea>
-        {bulkMode && <Textarea autoFocus rows={2} value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} placeholder={bulkMode === "reject" ? `Reason for rejecting ${actIds.length}` : `Message HR about ${sel.size} selected`} />}
-        {!bulkMode && sel.size > 0 && (
-          <div className="flex items-center justify-between rounded-lg bg-[#FFA962]/10 px-3 py-2">
-            <span className="text-xs font-medium text-[#D98324]">{sel.size} selected</span>
-            <Button size="sm" variant="outline" className={queryBtn} disabled={busy} onClick={() => setBulkMode("query")}><MessageSquare className="h-4 w-4 mr-1.5" /> Raise Query on {sel.size}</Button>
-          </div>
-        )}
-        <DialogFooter className="items-center">
-          <div className="mr-auto flex items-center gap-2.5">
-            <span className="text-xl font-bold text-foreground tabular-nums">{money(total)}</span>
-            <span className="h-4 w-px bg-border" /><span className="text-xs text-muted-foreground">{rows.length} item{rows.length !== 1 ? "s" : ""}</span>
-          </div>
-          {bulkMode ? (
-            <>
-              <Button variant="secondary" size="sm" disabled={busy} onClick={() => { setBulkMode(null); setBulkNote(""); }}>Cancel</Button>
-              {bulkMode === "reject"
-                ? <Button size="sm" variant="outline" className={rejectBtn} disabled={busy || !bulkNote.trim() || !actIds.length} onClick={() => bulk.mutate({ path: "bulk-reject", ids: actIds, body: { note: bulkNote }, msg: sel.size > 0 ? `Rejected ${actIds.length}` : "Rejected all" })}><X className="h-4 w-4 mr-1.5" /> {sel.size > 0 ? `Reject ${actIds.length}` : "Reject all"}</Button>
-                : <Button size="sm" variant="outline" className={queryBtn} disabled={busy || !bulkNote.trim() || !sel.size} onClick={() => bulk.mutate({ path: "bulk-query", ids: [...sel], body: { body: bulkNote }, msg: `Query raised on ${sel.size}` })}><MessageSquare className="h-4 w-4 mr-1.5" /> Send query</Button>}
-            </>
-          ) : (
-            <>
-              <Button variant="outline" size="sm" className={rejectBtn} disabled={busy || !rows.length} onClick={() => setBulkMode("reject")}><X className="h-4 w-4 mr-1.5" /> {sel.size > 0 ? `Reject selected (${sel.size})` : "Reject all"}</Button>
-              <Button size="sm" className="btn-primary-gradient text-white" disabled={busy || !rows.length} onClick={() => bulk.mutate({ path: "bulk-approve", ids: actIds, body: {}, msg: sel.size > 0 ? `Approved ${actIds.length}` : "Approved all" })}><Check className="h-4 w-4 mr-1.5" /> {sel.size > 0 ? `Approve selected (${sel.size})` : "Approve all"}</Button>
-            </>
+        </div>
+        {/* Footer — closed by a rule, mirroring the request-form modals */}
+        <div className="flex-shrink-0 border-t border-border bg-background px-6 py-4 space-y-3">
+          {bulkMode && <Textarea autoFocus rows={2} value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} placeholder={bulkMode === "reject" ? `Reason for rejecting ${actIds.length}` : `Message HR about ${sel.size} selected`} />}
+          {!bulkMode && sel.size > 0 && (
+            <div className="flex items-center justify-between rounded-lg bg-[#FFA962]/10 px-3 py-2">
+              <span className="text-xs font-medium text-[#D98324]">{sel.size} selected</span>
+              <Button size="sm" variant="outline" className={queryBtn} disabled={busy} onClick={() => setBulkMode("query")}><MessageSquare className="h-4 w-4 mr-1.5" /> Raise Query on {sel.size}</Button>
+            </div>
           )}
-        </DialogFooter>
+          <div className="flex items-center gap-3">
+            <div className="mr-auto flex items-center gap-2.5">
+              <span className="text-xl font-bold text-foreground tabular-nums">{money(total)}</span>
+              <span className="h-4 w-px bg-border" /><span className="text-xs text-muted-foreground">{rows.length} item{rows.length !== 1 ? "s" : ""}</span>
+            </div>
+            {bulkMode ? (
+              <>
+                <Button variant="secondary" size="sm" disabled={busy} onClick={() => { setBulkMode(null); setBulkNote(""); }}>Cancel</Button>
+                {bulkMode === "reject"
+                  ? <Button size="sm" variant="outline" className={rejectBtn} disabled={busy || !bulkNote.trim() || !actIds.length} onClick={() => bulk.mutate({ path: "bulk-reject", ids: actIds, body: { note: bulkNote }, msg: sel.size > 0 ? `Rejected ${actIds.length}` : "Rejected all" })}><X className="h-4 w-4 mr-1.5" /> {sel.size > 0 ? `Reject ${actIds.length}` : "Reject all"}</Button>
+                  : <Button size="sm" variant="outline" className={queryBtn} disabled={busy || !bulkNote.trim() || !sel.size} onClick={() => bulk.mutate({ path: "bulk-query", ids: [...sel], body: { body: bulkNote }, msg: `Query raised on ${sel.size}` })}><MessageSquare className="h-4 w-4 mr-1.5" /> Send query</Button>}
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" className={rejectBtn} disabled={busy || !rows.length} onClick={() => setBulkMode("reject")}><X className="h-4 w-4 mr-1.5" /> {sel.size > 0 ? `Reject selected (${sel.size})` : "Reject all"}</Button>
+                <Button size="sm" className="btn-primary-gradient text-white" disabled={busy || !rows.length} onClick={() => bulk.mutate({ path: "bulk-approve", ids: actIds, body: {}, msg: sel.size > 0 ? `Approved ${actIds.length}` : "Approved all" })}><Check className="h-4 w-4 mr-1.5" /> {sel.size > 0 ? `Approve selected (${sel.size})` : "Approve all"}</Button>
+              </>
+            )}
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

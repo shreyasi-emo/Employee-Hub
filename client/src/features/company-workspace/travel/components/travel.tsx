@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { statusClass, statusLabel } from "@/lib/status";
 import { money } from "@/lib/format";
 import { format } from "date-fns";
-import { Plane, Hotel, Moon, Bus, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon } from "lucide-react";
+import { Plane, Hotel, Bus, Train, Car, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon } from "lucide-react";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { EmployeePicker } from "@/components/shared/employee-picker";
@@ -32,10 +32,10 @@ const isResubmitted = (t: any) => { const m = ((t?.comments || []) as any[]).fil
 function FlightIcon({ className }: { className?: string }) {
   return (
     <span className={`relative inline-block ${className ?? ""}`}>
-      <span className="tv-streak absolute left-[3%] top-[46%] h-[2px] w-[34%] rounded-full bg-current" style={{ animationDelay: "0ms" }} />
-      <span className="tv-streak absolute left-[9%] top-[62%] h-[2px] w-[30%] rounded-full bg-current" style={{ animationDelay: "110ms" }} />
-      <span className="tv-streak absolute left-[15%] top-[78%] h-[2px] w-[26%] rounded-full bg-current" style={{ animationDelay: "220ms" }} />
-      <Plane className="absolute right-[2%] top-1/2 -translate-y-1/2 h-[80%] w-[80%]" strokeWidth={2} />
+      <span className="tv-streak absolute left-[1%] top-[52%] h-[1.5px] w-[20%] rounded-full bg-current" style={{ animationDelay: "0ms" }} />
+      <span className="tv-streak absolute left-[4%] top-[68%] h-[1.5px] w-[17%] rounded-full bg-current" style={{ animationDelay: "120ms" }} />
+      <span className="tv-streak absolute left-[7%] top-[84%] h-[1.5px] w-[14%] rounded-full bg-current" style={{ animationDelay: "240ms" }} />
+      <Plane className="absolute right-[0%] top-[47%] -translate-y-1/2 h-[76%] w-[76%]" strokeWidth={2} />
     </span>
   );
 }
@@ -43,8 +43,10 @@ function FlightIcon({ className }: { className?: string }) {
 function StayIcon({ className }: { className?: string }) {
   return (
     <span className={`relative inline-block ${className ?? ""}`}>
-      <Hotel className="absolute inset-0 m-auto h-[78%] w-[78%]" strokeWidth={2} />
-      <Moon className="tv-moonrise absolute right-[1%] top-[3%] h-[34%] w-[34%]" strokeWidth={2} />
+      <Hotel className="absolute left-[4%] bottom-[4%] h-[74%] w-[74%]" strokeWidth={2} />
+      <span className="tv-zzz absolute right-[10%] top-[30%] text-[9px] font-bold leading-none" style={{ animationDelay: "0ms" }}>z</span>
+      <span className="tv-zzz absolute right-[10%] top-[30%] text-[8px] font-bold leading-none" style={{ animationDelay: "650ms" }}>z</span>
+      <span className="tv-zzz absolute right-[10%] top-[30%] text-[7px] font-bold leading-none" style={{ animationDelay: "1300ms" }}>z</span>
     </span>
   );
 }
@@ -52,7 +54,7 @@ function StayIcon({ className }: { className?: string }) {
 function TransportIcon({ className }: { className?: string }) {
   return (
     <span className={`relative inline-block ${className ?? ""}`}>
-      <Bus className="absolute left-1/2 top-[2%] -translate-x-1/2 h-[74%] w-[74%]" strokeWidth={2} />
+      <Bus className="absolute left-1/2 bottom-[8%] -translate-x-1/2 h-[74%] w-[74%]" strokeWidth={2} />
       <span className="absolute bottom-[7%] left-[3%] right-[3%] h-[2px] rounded-full bg-current opacity-25" />
       <span className="tv-road absolute bottom-[7%] left-0 h-[2px] w-full rounded-full" />
     </span>
@@ -231,6 +233,72 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
               </div>
             </TravelSection>
           </div>
+        ) : category === "stay" ? (
+          <div className="space-y-5">
+            <TravelSection icon={Hotel} title="Stay Details">
+              <div className="space-y-1">
+                <Label className="text-[11px]">City</Label>
+                <div className="relative"><MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" /><Input value={details.city ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, city: e.target.value }))} placeholder="e.g. Mumbai" className="h-9 pl-8" data-testid="stay-city" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label className="text-[11px]">Check-in date</Label><DateInput value={details.checkIn || ""} onChange={(v) => setDetails((d: any) => ({ ...d, checkIn: v, checkOut: clampEnd(v, d.checkOut) }))} testId="stay-checkin" /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Check-out date</Label><DateInput value={details.checkOut || ""} onChange={(v) => setDetails((d: any) => ({ ...d, checkOut: v }))} minDate={details.checkIn || undefined} testId="stay-checkout" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label className="text-[11px]">Guests</Label><Input type="number" min="1" value={details.guests ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, guests: e.target.value }))} placeholder="1" className="h-9" data-testid="stay-guests" /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Rooms</Label><Input type="number" min="1" value={details.rooms ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, rooms: e.target.value }))} placeholder="1" className="h-9" data-testid="stay-rooms" /></div>
+              </div>
+            </TravelSection>
+            <Separator />
+            <TravelSection icon={UsersIcon} title="Purpose & People">
+              <div className="space-y-1"><Label className="text-[11px]">Purpose of travel</Label><Textarea rows={3} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for this stay…" className="resize-none" data-testid="stay-purpose" /></div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
+                <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
+                <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues staying with you." : `${coIds.length + 1} guests (including you)`}</p>
+              </div>
+            </TravelSection>
+          </div>
+        ) : category === "transport" ? (
+          <div className="space-y-5">
+            <TravelSection icon={Bus} title="Mode">
+              <div className="grid grid-cols-3 gap-3">
+                {[{ v: "train", label: "Train", Icon: Train }, { v: "bus", label: "Bus", Icon: Bus }, { v: "cab", label: "Cab", Icon: Car }].map(({ v, label, Icon }) => {
+                  const active = details.mode === v;
+                  return (
+                    <button key={v} type="button" onClick={() => setDetails((d: any) => ({ ...d, mode: v }))} className={`rounded-2xl border p-4 flex flex-col items-center gap-2 text-center transition ${active ? "border-[#206295] bg-[#206295]/[0.06] ring-1 ring-[#206295]/40" : "border-border hover-elevate"}`} data-testid={`transport-mode-${v}`}>
+                      <span className={`h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-[#206295] text-white" : "bg-muted text-muted-foreground"}`}><Icon className="h-4 w-4" /></span>
+                      <p className="text-sm font-semibold text-foreground">{label}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </TravelSection>
+            <Separator />
+            <TravelSection icon={MapPin} title="Route & Time">
+              <div className="flex items-end gap-2">
+                <div className="flex-1 space-y-1 min-w-0">
+                  <Label className="text-[11px]">From</Label>
+                  <div className="relative"><MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" /><Input value={details.from ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, from: e.target.value }))} placeholder="e.g. Bengaluru" className="h-9 pl-8" data-testid="transport-from" /></div>
+                </div>
+                <Button type="button" variant="ghost" size="icon" className="h-9 w-9 mb-0.5 flex-shrink-0 text-[#206295]" onClick={() => setDetails((d: any) => ({ ...d, from: d.to || "", to: d.from || "" }))} aria-label="Swap" data-testid="transport-swap"><ArrowLeftRight className="h-4 w-4" /></Button>
+                <div className="flex-1 space-y-1 min-w-0">
+                  <Label className="text-[11px]">To</Label>
+                  <div className="relative"><MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" /><Input value={details.to ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, to: e.target.value }))} placeholder="e.g. Mysuru" className="h-9 pl-8" data-testid="transport-to" /></div>
+                </div>
+              </div>
+              <div className="space-y-1"><Label className="text-[11px]">Date &amp; time</Label><Input type="datetime-local" value={details.dateTime ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, dateTime: e.target.value }))} className="h-9" data-testid="transport-datetime" /></div>
+            </TravelSection>
+            <Separator />
+            <TravelSection icon={UsersIcon} title="Purpose & People">
+              <div className="space-y-1"><Label className="text-[11px]">Purpose of travel</Label><Textarea rows={3} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for this trip…" className="resize-none" data-testid="transport-purpose" /></div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
+                <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
+                <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues travelling with you." : `${coIds.length + 1} travellers (including you)`}</p>
+              </div>
+            </TravelSection>
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: `${TRAVEL_CATS[category].tint}0f` }}>
@@ -401,7 +469,7 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
                 <span className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${cat.tint}1a`, color: cat.tint }}><cat.icon className="h-4 w-4" /></span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-semibold text-foreground truncate">{t.reference}</span><Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge>{isResubmitted(t) && <Badge className="text-[10px] bg-[#206295]/15 text-[#206295]">Resubmitted</Badge>}</div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{cat.label} | {t.employeeName || "Employee"} | {route}{t.startDate ? ` | ${format(new Date(t.startDate), "MMM d")}` : ""}</p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{cat.label} | <span className="font-semibold text-foreground/90">{t.employeeName || "Employee"}</span>{t.employeeCode ? ` (${t.employeeCode})` : ""} | {route}{t.startDate ? ` | ${format(new Date(t.startDate), "MMM d")}` : ""}</p>
                 </div>
                 {amt > 0 && <span className="text-base font-bold text-[#206295] tabular-nums flex-shrink-0">{money(amt)}</span>}
                 <Button size="sm" variant="ghost" className="h-9 btn-glass text-[#206295] hover:text-[#206295] flex-shrink-0" onClick={(e) => { e.stopPropagation(); setDetailId(t.id); }}><CircleCheck className="h-4 w-4 mr-1.5" /> Review</Button>

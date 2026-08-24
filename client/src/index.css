@@ -463,10 +463,10 @@
 .tv-streak { rotate: -45deg; opacity: 0; }
 .group:hover .tv-streak { animation: tv-streak 0.9s ease-in-out infinite; }
 @keyframes tv-streak {
-  0%   { opacity: 0;    translate: 7px -7px; }
-  30%  { opacity: 0.9; }
-  65%  { opacity: 0.35; }
-  100% { opacity: 0;    translate: -11px 11px; }
+  0%   { opacity: 0;    translate: 4px -4px; }
+  35%  { opacity: 0.6; }
+  70%  { opacity: 0.25; }
+  100% { opacity: 0;    translate: -9px 9px; }
 }
 
 /* Transport — dashed road streams beneath the fixed bus (shift of one dash period loops seamlessly) */
@@ -480,10 +480,12 @@
   to   { background-position-x: -13px; }
 }
 
-/* Stay — a moon rises over the hotel on hover (overnight cue) */
-.tv-moonrise { opacity: 0; }
-.group:hover .tv-moonrise { animation: tv-moonrise 0.7s ease-out forwards; }
-@keyframes tv-moonrise {
-  0%        { opacity: 0; transform: translateY(35%) scale(0.8); }
-  60%, 100% { opacity: 1; transform: translateY(0)   scale(1); }
+/* Stay — "Zzz" sleep marks drift up-right from the hotel on hover (overnight cue) */
+.tv-zzz { opacity: 0; }
+.group:hover .tv-zzz { animation: tv-zzz 2s ease-in-out infinite; }
+@keyframes tv-zzz {
+  0%   { opacity: 0; transform: translate(0, 3px)   scale(0.7); }
+  25%  { opacity: 1; }
+  70%  { opacity: 0.7; }
+  100% { opacity: 0; transform: translate(5px, -10px) scale(1.05); }
 }
