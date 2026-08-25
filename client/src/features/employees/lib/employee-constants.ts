@@ -26,6 +26,7 @@ export const SYSTEM_ROLES = [
   { value: "interviewer", label: "Interviewer" },
   { value: "finance", label: "Finance" },
   { value: "ceo_approver", label: "CEO Approver" },
+  { value: "logistics", label: "Logistics" },
   { value: "super_admin", label: "Super Admin" },
 ];
 

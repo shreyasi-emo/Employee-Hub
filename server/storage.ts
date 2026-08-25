@@ -9,7 +9,7 @@ import {
   ratingScales, performanceCycles, goals, goalProgressUpdates, reviews, calibrationSessions,
   notifications, shifts, shiftAssignments, employmentHistory,
   onboardingTemplates, onboardingTasks, onboardingInstances, onboardingTaskItems,
-  movementLocations, logisticsMovements, movementEvents,
+  movementLocations, logisticsMovements, movementEvents, logisticsRequests,
   companyVehicles, vehicleBookings, reimbursements, officePurchases, procurementRequests, tripRequests,
   zohoConfig, zohoSyncJobs, requests as requestsTable, requestComments,
   ceoApprovalNotes, referenceDocs,
@@ -1324,6 +1324,28 @@ export const storage = {
   },
   async addMovementEvent(data: any) {
     const [r] = await db.insert(movementEvents).values(data).returning();
+    return r;
+  },
+  // ----- Logistics Requests (Inboard / Outboard) -----
+  async listLogisticsRequests(filters: { requesterId?: string; status?: string } = {}) {
+    let q = db.select().from(logisticsRequests).$dynamic();
+    const conds: any[] = [];
+    if (filters.requesterId) conds.push(eq(logisticsRequests.requesterId, filters.requesterId));
+    if (filters.status) conds.push(eq(logisticsRequests.status, filters.status));
+    if (conds.length) q = q.where(and(...conds));
+    return q.orderBy(desc(logisticsRequests.createdAt));
+  },
+  async getLogisticsRequest(id: string) {
+    const [r] = await db.select().from(logisticsRequests).where(eq(logisticsRequests.id, id));
+    return r;
+  },
+  async createLogisticsRequest(data: any) {
+    const ref = `LR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const [r] = await db.insert(logisticsRequests).values({ ...data, reference: ref }).returning();
+    return r;
+  },
+  async updateLogisticsRequest(id: string, data: any) {
+    const [r] = await db.update(logisticsRequests).set({ ...data, updatedAt: new Date() }).where(eq(logisticsRequests.id, id)).returning();
     return r;
   },
   async listMovementEvents(movementId: string) {

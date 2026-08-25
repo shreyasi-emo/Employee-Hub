@@ -40,6 +40,7 @@ export const roleEnum = pgEnum("role", [
   "office_admin",
   "ceo_approver",
   "interviewer",
+  "logistics",
 ]);
 
 export const employmentTypeEnum = pgEnum("employment_type", [
@@ -1284,6 +1285,37 @@ export const movementEvents = pgTable("movement_events", {
   note: text("note"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// ----- Logistics Requests (employee Inboard / Outboard requests) -----
+export const logisticsRequests = pgTable("logistics_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reference: text("reference").notNull(),
+  requesterId: varchar("requester_id").notNull(),
+  requestType: text("request_type").notNull(),            // "outboard" | "inboard"
+  fromLocationId: varchar("from_location_id"),
+  fromLocationText: text("from_location_text"),
+  toLocationId: varchar("to_location_id"),
+  toLocationText: text("to_location_text"),
+  pickupDate: date("pickup_date"),                        // preferred pickup
+  deliveryDate: date("delivery_date"),                    // expected delivery
+  pocName: text("poc_name"),
+  pocPhone: text("poc_phone"),
+  quantity: integer("quantity").notNull().default(1),
+  weightKg: numeric("weight_kg", { precision: 12, scale: 3 }),
+  goodsCategory: text("goods_category"),
+  description: text("description"),
+  priority: text("priority").notNull().default("regular"),  // "regular" | "urgent"
+  status: text("status").notNull().default("pending"),      // pending | in_progress | completed | cancelled
+  proof: jsonb("proof"),                                    // {fileName, fileType, fileData} — POD / delivery doc at completion
+  processedById: varchar("processed_by_id"),
+  completedById: varchar("completed_by_id"),
+  completedAt: timestamp("completed_at"),
+  cancelledById: varchar("cancelled_by_id"),
+  decisionNote: text("decision_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertLogisticsRequestSchema = createInsertSchema(logisticsRequests).omit({ id: true, createdAt: true, updatedAt: true });
 
 // ----- Company Vehicles -----
 export const companyVehicles = pgTable("company_vehicles", {

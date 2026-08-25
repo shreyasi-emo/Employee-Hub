@@ -132,6 +132,70 @@ export function registerLogisticsRoutes(app: Express) {
   });
 
   // =========================================================================
+  // LOGISTICS REQUESTS (employee Inboard / Outboard)
+  // =========================================================================
+  const canManageLogistics = (req: Request) => hasRole(req, "super_admin", "logistics");
+
+  app.get("/api/logistics/requests", requireAuth, async (req, res) => {
+    // Employees see only their own; logistics + super_admin see all.
+    const filters: any = {};
+    if (!canManageLogistics(req)) filters.requesterId = req.currentUser!.id;
+    if (req.query.status) filters.status = req.query.status as string;
+    res.json(await storage.listLogisticsRequests(filters));
+  });
+
+  app.get("/api/logistics/requests/:id", requireAuth, async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.requesterId !== req.currentUser!.id && !canManageLogistics(req)) return res.status(403).json({ error: "Forbidden" });
+    res.json(r);
+  });
+
+  app.post("/api/logistics/requests", requireAuth, async (req, res) => {
+    // Any employee can raise. Status/handler/proof fields are server-controlled.
+    const { status, processedById, completedById, completedAt, cancelledById, proof, requesterId, reference, id, createdAt, updatedAt, ...safe } = req.body || {};
+    const created = await storage.createLogisticsRequest({ ...safe, requesterId: req.currentUser!.id, status: "pending" });
+    try {
+      await storage.notifyByRole(["super_admin", "logistics"], {
+        type: "logistics_request", title: "New Logistics Request",
+        body: `${created.reference} — ${created.requestType === "inboard" ? "Inboard" : "Outboard"} movement raised by ${req.currentUser!.username}.`,
+        link: "/logistics",
+      });
+    } catch {}
+    res.json(created);
+  });
+
+  app.post("/api/logistics/requests/:id/cancel", requireAuth, async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    const isOwner = r.requesterId === req.currentUser!.id;
+    // Requester may cancel only while Pending; logistics/super_admin may cancel any open request.
+    if (!canManageLogistics(req) && !(isOwner && r.status === "pending")) return res.status(403).json({ error: "Forbidden" });
+    if (r.status === "completed" || r.status === "cancelled") return res.status(400).json({ error: "Request is already closed." });
+    const updated = await storage.updateLogisticsRequest(req.params.id, { status: "cancelled", cancelledById: req.currentUser!.id, decisionNote: req.body?.note || null });
+    try { await storage.notifyUser(r.requesterId, { type: "logistics_cancelled", title: "Logistics Request Cancelled", body: `${r.reference} was cancelled.`, link: "/logistics" }); } catch {}
+    res.json(updated);
+  });
+
+  app.post("/api/logistics/requests/:id/start", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.status !== "pending") return res.status(400).json({ error: `Cannot start from ${r.status}` });
+    res.json(await storage.updateLogisticsRequest(req.params.id, { status: "in_progress", processedById: req.currentUser!.id }));
+  });
+
+  app.post("/api/logistics/requests/:id/complete", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.status === "completed" || r.status === "cancelled") return res.status(400).json({ error: "Request is already closed." });
+    const proof = req.body?.proof;
+    if (!proof || !proof.fileData) return res.status(400).json({ error: "Proof of delivery / document is required to complete." });
+    const updated = await storage.updateLogisticsRequest(req.params.id, { status: "completed", completedById: req.currentUser!.id, completedAt: new Date(), proof });
+    try { await storage.notifyUser(r.requesterId, { type: "logistics_completed", title: "Logistics Request Completed", body: `${r.reference} has been completed.`, link: "/logistics" }); } catch {}
+    res.json(updated);
+  });
+
+  // =========================================================================
   // COMPANY VEHICLES
   // =========================================================================
 }
