@@ -231,10 +231,10 @@ export function registerWorkspaceOfficeRoutes(app: Express) {
     } catch {}
     res.json(updated);
   });
-  app.get("/api/workspace/tickets/:id/comments", requireAuth, async (req, res) => {
+  app.get("/api/workspace/tickets/:id/comments", requireAuth, requireWorkspace, async (req, res) => {
     res.json(await storage.getAdminTicketComments(req.params.id));
   });
-  app.post("/api/workspace/tickets/:id/comments", requireAuth, async (req, res) => {
+  app.post("/api/workspace/tickets/:id/comments", requireAuth, requireWorkspace, async (req, res) => {
     res.json(await storage.addAdminTicketComment({ ticketId: req.params.id, authorId: req.currentUser!.id, content: req.body.content, isInternal: req.body.isInternal || false }));
   });
 

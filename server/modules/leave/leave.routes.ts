@@ -41,7 +41,9 @@ export function registerLeaveRoutes(app: Express) {
   // ===== LEAVE BALANCES =====
   app.get("/api/leave-balances", requireAuth, async (req, res) => {
     const { employeeId, year } = req.query;
-    const empId = (employeeId as string) || req.currentUser!.employeeId || "";
+    // Only HR/managers may read another employee's balances; everyone else is forced to their own.
+    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive", "manager");
+    const empId = (privileged && employeeId) ? (employeeId as string) : (req.currentUser!.employeeId || "");
     if (!empId) return res.status(400).json({ error: "Employee ID required" });
     const y = parseInt(year as string) || new Date().getFullYear();
     res.json(await storage.getLeaveBalances(empId, y));
@@ -95,7 +97,8 @@ export function registerLeaveRoutes(app: Express) {
   });
 
   app.post("/api/leave-requests", requireAuth, async (req, res) => {
-    const empId = req.body.employeeId || req.currentUser!.employeeId;
+    // Only HR may file on another employee's behalf; everyone else files for themselves.
+    const empId = (hasRole(req, "super_admin", "hr_admin", "hr_executive") && req.body.employeeId) ? req.body.employeeId : req.currentUser!.employeeId;
     if (!empId) return res.status(400).json({ error: "Employee ID required" });
 
     // Check balance
@@ -111,7 +114,8 @@ export function registerLeaveRoutes(app: Express) {
 
     const parsed = insertLeaveRequestSchema.safeParse({ ...req.body, employeeId: empId });
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const request = await storage.createLeaveRequest(parsed.data as any);
+    // Server owns the workflow state — never trust a client-sent status/approver (auto-approve below handles within-24h).
+    const request = await storage.createLeaveRequest({ ...parsed.data, status: "pending" } as any);
 
     // Auto-approve immediately if the leave starts within 24h (mirrors WFH). Balance was just
     // checked above, so sufficiency holds.
@@ -245,7 +249,9 @@ export function registerLeaveRoutes(app: Express) {
   // ===== LEAVE LEDGER =====
   app.get("/api/leave-ledger", requireAuth, async (req, res) => {
     const { employeeId, leaveTypeId } = req.query;
-    const empId = (employeeId as string) || req.currentUser!.employeeId || "";
+    // Only HR/managers may read another employee's ledger; everyone else is forced to their own.
+    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive", "manager");
+    const empId = (privileged && employeeId) ? (employeeId as string) : (req.currentUser!.employeeId || "");
     if (!empId) return res.status(400).json({ error: "Employee ID required" });
     res.json(await storage.getLeaveLedger(empId, leaveTypeId as string));
   });

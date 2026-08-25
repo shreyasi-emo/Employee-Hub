@@ -241,7 +241,9 @@ export function registerAttendanceRoutes(app: Express) {
   // Consecutive-days streak ending today for one employee's *current* status (skips weekends/holidays
   // without breaking the run). Used on hover in the Today's Attendance list.
   app.get("/api/attendance/streak", requireAuth, async (req, res) => {
-    const empId = (req.query.employeeId as string) || req.currentUser!.employeeId;
+    // Others' streaks only for HR/managers; everyone else sees their own.
+    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver");
+    const empId = (privileged && req.query.employeeId) ? (req.query.employeeId as string) : req.currentUser!.employeeId;
     if (!empId) return res.status(400).json({ error: "employeeId required" });
     const pad = (n: number) => String(n).padStart(2, "0");
     const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -597,17 +599,19 @@ export function registerAttendanceRoutes(app: Express) {
       const all = await storage.getRegularizationRequests(undefined, status as string);
       res.json(all.filter(r => directReportIds.has(r.employeeId)));
     } else {
-      res.json(await storage.getRegularizationRequests(empId, status as string));
+      // Non-HR/non-manager: own only — never a query-supplied employeeId.
+      res.json(await storage.getRegularizationRequests(viewer.employeeId || undefined, status as string));
     }
   });
 
   app.post("/api/regularizations", requireAuth, async (req, res) => {
     const parsed = insertRegularizationSchema.safeParse({
       ...req.body,
-      employeeId: req.body.employeeId || req.currentUser!.employeeId,
+      // Only HR may file on another employee's behalf.
+      employeeId: (hasRole(req, "super_admin", "hr_admin", "hr_executive") && req.body.employeeId) ? req.body.employeeId : req.currentUser!.employeeId,
     });
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const req_ = await storage.createRegularizationRequest(parsed.data as any);
+    const req_ = await storage.createRegularizationRequest({ ...parsed.data, status: "pending" } as any);
     try {
       const emp = await storage.getEmployee(req_.employeeId);
       const who = emp ? `${emp.firstName} ${emp.lastName}` : "An employee";

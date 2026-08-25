@@ -38,6 +38,7 @@ export function registerLogisticsRoutes(app: Express) {
   app.get("/api/logistics/movements/:id", requireAuth, async (req, res) => {
     const m = await storage.getLogisticsMovement(req.params.id);
     if (!m) return res.status(404).json({ error: "Not found" });
+    if (m.requesterId !== req.currentUser!.id && !hasRole(req, "super_admin", "logistics", "hr_admin", "ceo_approver")) return res.status(403).json({ error: "Forbidden" });
     res.json(m);
   });
 
@@ -105,8 +106,13 @@ export function registerLogisticsRoutes(app: Express) {
     transition(req, res, "dispatched", ["accepted"], "Dispatched"));
   app.post("/api/logistics/movements/:id/in-transit", requireAuth, requireLogistics, (req, res) =>
     transition(req, res, "in_transit", ["dispatched"], "In transit"));
-  app.post("/api/logistics/movements/:id/deliver", requireAuth, (req, res) =>
-    transition(req, res, "delivered", ["dispatched", "in_transit"], "Delivered / received"));
+  app.post("/api/logistics/movements/:id/deliver", requireAuth, async (req, res) => {
+    const m = await storage.getLogisticsMovement(req.params.id);
+    if (!m) return res.status(404).json({ error: "Not found" });
+    // Only the requester/recipient or logistics may confirm receipt (it stamps receivedById).
+    if (m.requesterId !== req.currentUser!.id && !hasRole(req, "super_admin", "logistics")) return res.status(403).json({ error: "Forbidden" });
+    return transition(req, res, "delivered", ["dispatched", "in_transit"], "Delivered / received");
+  });
   app.post("/api/logistics/movements/:id/cancel", requireAuth, async (req, res) => {
     const m = await storage.getLogisticsMovement(req.params.id);
     if (!m) return res.status(404).json({ error: "Not found" });
@@ -117,6 +123,9 @@ export function registerLogisticsRoutes(app: Express) {
   });
 
   app.get("/api/logistics/movements/:id/events", requireAuth, async (req, res) => {
+    const m = await storage.getLogisticsMovement(req.params.id);
+    if (!m) return res.status(404).json({ error: "Not found" });
+    if (m.requesterId !== req.currentUser!.id && !hasRole(req, "super_admin", "logistics", "hr_admin", "ceo_approver")) return res.status(403).json({ error: "Forbidden" });
     res.json(await storage.listMovementEvents(req.params.id));
   });
 

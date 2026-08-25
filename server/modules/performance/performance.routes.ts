@@ -24,6 +24,17 @@ import {
 } from "@shared/schema";
 
 export function registerPerformanceRoutes(app: Express) {
+  // Object-level access to an employee's review/goals: HR, the subject, or the subject's manager.
+  const empAccess = async (user: any, employeeId: string) => {
+    const isHr = ["super_admin", "hr_admin", "hr_executive"].includes(user.role);
+    const isSelf = !!user.employeeId && user.employeeId === employeeId;
+    let isManager = false;
+    if (!isHr && !isSelf && user.role === "manager" && user.employeeId) {
+      const reports = await storage.getEmployeesByManager(user.employeeId);
+      isManager = reports.some((e: any) => e.id === employeeId);
+    }
+    return { isHr, isSelf, isManager, allowed: isHr || isSelf || isManager };
+  };
   app.get("/api/performance/rating-scales", requireAuth, async (req, res) => {
     res.json(await storage.getRatingScales());
   });
@@ -87,8 +98,10 @@ export function registerPerformanceRoutes(app: Express) {
 
   app.post("/api/performance/goals", requireAuth, async (req, res) => {
     const user = req.currentUser!;
-    const employeeId = req.body.employeeId || user.employeeId;
+    // Goals for another employee only by HR / their manager; otherwise for yourself.
+    const employeeId = (["super_admin", "hr_admin", "hr_executive", "manager"].includes(user.role) && req.body.employeeId) ? req.body.employeeId : user.employeeId;
     if (!employeeId) return res.status(400).json({ error: "Employee ID required" });
+    if (!(await empAccess(user, employeeId)).allowed) return res.status(403).json({ error: "Forbidden" });
 
     const cycle = await storage.getPerformanceCycle(req.body.cycleId);
     if (!cycle) return res.status(404).json({ error: "Cycle not found" });
@@ -107,18 +120,30 @@ export function registerPerformanceRoutes(app: Express) {
     const old = await storage.getGoal(req.params.id);
     if (!old) return res.status(404).json({ error: "Goal not found" });
 
+    const { isHr, isManager, allowed } = await empAccess(user, old.employeeId);
+    if (!allowed) return res.status(403).json({ error: "Forbidden" });
+
     if (old.isLocked && user.role !== "super_admin" && user.role !== "hr_admin") {
       return res.status(403).json({ error: "Goal is locked" });
     }
 
     const updates: any = { ...req.body };
+    // Approval is a manager/HR action — the goal's owner cannot self-approve.
     if (req.body.isApproved === true && !old.isApproved) {
-      updates.approvedBy = user.id;
-      updates.approvedAt = new Date();
-      await log(req, "APPROVE_GOAL", "goal", old.id, { isApproved: false }, { isApproved: true });
+      if (!(isHr || isManager)) {
+        delete updates.isApproved;
+      } else {
+        updates.approvedBy = user.id;
+        updates.approvedAt = new Date();
+        await log(req, "APPROVE_GOAL", "goal", old.id, { isApproved: false }, { isApproved: true });
+      }
     }
     if (req.body.isApproved !== undefined && old.isApproved && !req.body.isApproved) {
-      await log(req, "UNAPPROVE_GOAL", "goal", old.id, null, null, req.body.reason);
+      if (!(isHr || isManager)) {
+        delete updates.isApproved;
+      } else {
+        await log(req, "UNAPPROVE_GOAL", "goal", old.id, null, null, req.body.reason);
+      }
     }
 
     const g = await storage.updateGoal(req.params.id, updates);
@@ -129,6 +154,7 @@ export function registerPerformanceRoutes(app: Express) {
     const user = req.currentUser!;
     const g = await storage.getGoal(req.params.id);
     if (!g) return res.status(404).json({ error: "Goal not found" });
+    if (!(await empAccess(user, g.employeeId)).allowed) return res.status(403).json({ error: "Forbidden" });
     if (g.isLocked || g.isApproved) {
       if (user.role !== "super_admin" && user.role !== "hr_admin") {
         return res.status(403).json({ error: "Cannot delete approved/locked goal" });
@@ -139,6 +165,9 @@ export function registerPerformanceRoutes(app: Express) {
   });
 
   app.get("/api/performance/goals/:id/progress", requireAuth, async (req, res) => {
+    const g = await storage.getGoal(req.params.id);
+    if (!g) return res.status(404).json({ error: "Goal not found" });
+    if (!(await empAccess(req.currentUser!, g.employeeId)).allowed) return res.status(403).json({ error: "Forbidden" });
     res.json(await storage.getGoalProgressUpdates(req.params.id));
   });
 
@@ -146,6 +175,7 @@ export function registerPerformanceRoutes(app: Express) {
     const user = req.currentUser!;
     const g = await storage.getGoal(req.params.id);
     if (!g) return res.status(404).json({ error: "Goal not found" });
+    if (!(await empAccess(user, g.employeeId)).allowed) return res.status(403).json({ error: "Forbidden" });
     const p = await storage.addGoalProgress({
       goalId: req.params.id,
       progressValue: req.body.progressValue,
@@ -168,6 +198,8 @@ export function registerPerformanceRoutes(app: Express) {
   });
 
   app.get("/api/performance/reviews/:cycleId/:employeeId", requireAuth, async (req, res) => {
+    const acc = await empAccess(req.currentUser!, req.params.employeeId);
+    if (!acc.allowed) return res.status(403).json({ error: "Forbidden" });
     const r = await storage.getReview(req.params.cycleId, req.params.employeeId);
     res.json(r || null);
   });
@@ -176,14 +208,16 @@ export function registerPerformanceRoutes(app: Express) {
     const user = req.currentUser!;
     const { cycleId, employeeId } = req.params;
 
+    // Access: HR, the review's subject, or the subject's manager.
+    const { isHr, isSelf, isManager, allowed } = await empAccess(user, employeeId);
+    if (!allowed) return res.status(403).json({ error: "Forbidden" });
+
     const cycle = await storage.getPerformanceCycle(cycleId);
     if (!cycle) return res.status(404).json({ error: "Cycle not found" });
 
     const existing = await storage.getReview(cycleId, employeeId);
     if (existing?.status === "hr_locked" || existing?.status === "finalized") {
-      if (user.role !== "super_admin" && user.role !== "hr_admin") {
-        return res.status(403).json({ error: "Review is locked" });
-      }
+      if (!isHr) return res.status(403).json({ error: "Review is locked" });
       if (req.body.unlock) {
         await log(req, "UNLOCK_REVIEW", "review", existing.id, { status: existing.status }, null, req.body.reason);
       }
@@ -191,18 +225,28 @@ export function registerPerformanceRoutes(app: Express) {
 
     const updates: any = { ...req.body };
     delete updates.unlock;
+    // A self-only reviewer may submit their self-review, never the manager/final fields (no self-rating).
+    if (isSelf && !isHr && !isManager) {
+      delete updates.managerReview;
+      delete updates.finalOutcome;
+      delete updates.status;
+    }
 
-    if (req.body.selfReview && user.employeeId === employeeId) {
+    if (req.body.selfReview && isSelf) {
       updates.status = "self_submitted";
     }
-    if (req.body.managerReview) {
+    if (req.body.managerReview && (isHr || isManager)) {
       await log(req, "SUBMIT_MANAGER_REVIEW", "review", existing?.id, null, { cycleId, employeeId });
       updates.status = "manager_submitted";
     }
-    if (req.body.status === "hr_locked" || req.body.status === "finalized") {
-      await log(req, "LOCK_REVIEW", "review", existing?.id, { status: existing?.status }, { status: req.body.status });
+    if ((req.body.status === "hr_locked" || req.body.status === "finalized")) {
+      if (isHr) {
+        await log(req, "LOCK_REVIEW", "review", existing?.id, { status: existing?.status }, { status: req.body.status });
+      } else {
+        delete updates.status; // only HR may lock/finalize
+      }
     }
-    if (req.body.finalOutcome) {
+    if (req.body.finalOutcome && (isHr || isManager)) {
       await log(req, "SET_FINAL_OUTCOME", "review", existing?.id, null, req.body.finalOutcome, req.body.reason);
     }
 

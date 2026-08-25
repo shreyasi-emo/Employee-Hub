@@ -10,6 +10,8 @@ import { log } from "../../shared/audit";
 import { enqueueZohoPush } from "../../zoho";
 
 export function registerRequestRoutes(app: Express) {
+  // A service request (and its comments) is visible only to its requester or a handling team.
+  const canHandle = (req: Request) => hasRole(req, "super_admin", "hr_admin", "hr_executive", "hr_ops", "office_admin", "logistics", "finance", "ceo_approver");
   app.get("/api/requests", requireAuth, async (req, res) => {
     const isHandler = hasRole(req, "super_admin", "hr_admin", "hr_executive", "hr_ops", "office_admin", "logistics", "finance", "ceo_approver");
     const filters: any = {};
@@ -21,6 +23,7 @@ export function registerRequestRoutes(app: Express) {
   app.get("/api/requests/:id", requireAuth, async (req, res) => {
     const r = await storage.getRequest(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.requesterId !== req.currentUser!.id && !canHandle(req)) return res.status(403).json({ error: "Forbidden" });
     res.json(r);
   });
   app.post("/api/requests", requireAuth, async (req, res) => {
@@ -62,9 +65,15 @@ export function registerRequestRoutes(app: Express) {
   });
 
   app.get("/api/requests/:id/comments", requireAuth, async (req, res) => {
+    const r = await storage.getRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.requesterId !== req.currentUser!.id && !canHandle(req)) return res.status(403).json({ error: "Forbidden" });
     res.json(await storage.listRequestComments(req.params.id));
   });
   app.post("/api/requests/:id/comments", requireAuth, async (req, res) => {
+    const r = await storage.getRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.requesterId !== req.currentUser!.id && !canHandle(req)) return res.status(403).json({ error: "Forbidden" });
     res.json(await storage.addRequestComment({
       requestId: req.params.id, authorId: req.currentUser!.id, body: req.body.body,
     }));
