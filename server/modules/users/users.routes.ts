@@ -38,6 +38,18 @@ export function registerUserRoutes(app: Express) {
   app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
     const { role, isActive } = req.body;
     const old = await storage.getUser(req.params.id);
+    if (!old) return res.status(404).json({ error: "Not found" });
+    // Only a super_admin may grant or alter the super_admin role, and role must be a known value
+    // (mirrors the guard on PUT /api/employees/:id — closes the hr_admin self-promotion path).
+    if (role !== undefined) {
+      if (!(roleEnum.enumValues as readonly string[]).includes(role)) {
+        return res.status(400).json({ error: "Unknown role" });
+      }
+      const touchingSuperAdmin = role === "super_admin" || old.role === "super_admin";
+      if (touchingSuperAdmin && req.currentUser!.role !== "super_admin") {
+        return res.status(403).json({ error: "Only a Super Admin can assign or change the Super Admin role." });
+      }
+    }
     const updated = await storage.updateUser(req.params.id, { role, isActive });
     await log(req, "UPDATE_USER", "user", req.params.id, { role: old?.role }, { role });
     res.json({ ...updated, password: undefined });

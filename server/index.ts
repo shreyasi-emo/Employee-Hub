@@ -1,5 +1,8 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import crypto from "crypto";
 import { registerRoutes } from "./shared/router";
 import { serveStatic } from "./static";
 import { startScheduler } from "./scheduler";
@@ -8,6 +11,41 @@ import { createServer } from "http";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Behind Vercel/Netlify/Replit TLS-terminating proxies: trust the first proxy so
+// req.secure / secure cookies / client IP (for rate limiting) read X-Forwarded-* correctly.
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+// Baseline security headers. CSP is intentionally left off here (a strict CSP has to be
+// tuned against the SPA's assets first — tracked as a follow-up) so the app isn't broken;
+// the cross-origin isolation policies are disabled to avoid blocking fonts/SSO redirects.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false,
+}));
+
+// Throttle credential endpoints only (not /api/auth/me, which the client polls).
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Please try again in a few minutes." },
+});
+const CREDENTIAL_PATHS = new Set([
+  "/api/auth/login",
+  "/api/auth/dev-login",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/auth/accept-invite",
+]);
+app.use((req, res, next) => {
+  if (req.method === "POST" && CREDENTIAL_PATHS.has(req.path)) return authLimiter(req, res, next);
+  next();
+});
 
 declare module "http" {
   interface IncomingMessage {
@@ -83,6 +121,8 @@ process.on("unhandledRejection", (reason) => {
 (async () => {
   try {
     const required = ["DATABASE_URL"];
+    // SESSION_SECRET is mandatory in production — never fall back to a shared/known key.
+    if (process.env.NODE_ENV === "production") required.push("SESSION_SECRET");
     for (const v of required) {
       if (!process.env[v]) {
         console.error(`Fatal: Missing required environment variable: ${v}`);
@@ -90,7 +130,10 @@ process.on("unhandledRejection", (reason) => {
       }
     }
     if (!process.env.SESSION_SECRET) {
-      console.warn("Warning: SESSION_SECRET not set. Using insecure default. Set it in production.");
+      // Development only (production is required above): generate a per-boot ephemeral secret
+      // so we never sign sessions with an in-repo constant. Sessions reset on restart.
+      process.env.SESSION_SECRET = crypto.randomBytes(32).toString("hex");
+      console.warn("SESSION_SECRET not set — generated an ephemeral dev secret (sessions reset on restart). Set SESSION_SECRET for stable sessions.");
     }
 
     log("Starting EMO Employee Hub...");

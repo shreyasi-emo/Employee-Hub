@@ -38,7 +38,9 @@ export function registerAuthRoutes(app: Express) {
   // session (so the rest of the app works normally). Disabled in production.
   // REMOVE this endpoint before deploying.
   app.post("/api/auth/dev-login", async (req, res) => {
-    if (process.env.NODE_ENV === "production") {
+    // Double-locked: off in production AND unless ENABLE_DEV_LOGIN=true is explicitly set,
+    // so a single NODE_ENV slip on a deploy can't expose this backdoor.
+    if (process.env.NODE_ENV === "production" || process.env.ENABLE_DEV_LOGIN !== "true") {
       return res.status(404).json({ error: "Not found" });
     }
     const { email, password } = req.body ?? {};
@@ -130,7 +132,7 @@ export function registerAuthRoutes(app: Express) {
   // any role from the header switcher. Pass { role } to impersonate, or
   // { role: "reset" } to return to the real role. Disabled in production.
   app.post("/api/auth/dev-role", requireAuth, async (req, res) => {
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === "production" || process.env.ENABLE_DEV_LOGIN !== "true") {
       return res.status(404).json({ error: "Not found" });
     }
     if (req.realRole !== "super_admin") {
