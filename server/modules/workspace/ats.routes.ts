@@ -50,11 +50,14 @@ export function registerWorkspaceAtsRoutes(app: Express) {
     res.json(req_);
   });
   app.post("/api/workspace/requisitions", requireAuth, requireWorkspace, async (req, res) => {
-    const req_ = await storage.createJobRequisition({ ...req.body, createdBy: req.currentUser!.id });
+    const { status, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    const req_ = await storage.createJobRequisition({ ...safe, createdBy: req.currentUser!.id });
     res.json(req_);
   });
   app.put("/api/workspace/requisitions/:id", requireAuth, requireWorkspace, async (req, res) => {
-    res.json(await storage.updateJobRequisition(req.params.id, req.body));
+    // Status transitions go through the submit/approve endpoints, not the generic update.
+    const { status, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updateJobRequisition(req.params.id, safe));
   });
   app.post("/api/workspace/requisitions/:id/submit", requireAuth, requireWorkspace, async (req, res) => {
     const req_ = await storage.getJobRequisition(req.params.id);
@@ -143,11 +146,13 @@ export function registerWorkspaceAtsRoutes(app: Express) {
     res.json(await storage.getOffers(req.query.applicationId as string, req.query.status as string));
   });
   app.post("/api/workspace/offers", requireAuth, requireWorkspace, async (req, res) => {
-    const offer = await storage.createOffer({ ...req.body, createdBy: req.currentUser!.id });
+    const { status, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    const offer = await storage.createOffer({ ...safe, createdBy: req.currentUser!.id });
     res.json(offer);
   });
   app.put("/api/workspace/offers/:id", requireAuth, requireWorkspace, async (req, res) => {
-    res.json(await storage.updateOffer(req.params.id, req.body));
+    const { status, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updateOffer(req.params.id, safe));
   });
   app.post("/api/workspace/offers/:id/submit", requireAuth, requireWorkspace, async (req, res) => {
     const offer = await storage.getOffer(req.params.id);

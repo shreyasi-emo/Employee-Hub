@@ -42,10 +42,13 @@ export function registerWorkspaceOfficeRoutes(app: Express) {
     res.json(await storage.getPurchaseRequests(undefined, status as string));
   });
   app.post("/api/workspace/purchase-requests", requireAuth, requireWorkspace, async (req, res) => {
-    res.json(await storage.createPurchaseRequest({ ...req.body, requesterId: req.currentUser!.id }));
+    // Status/approver are server-controlled — a workspace role can't create a pre-approved request.
+    const { status, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.createPurchaseRequest({ ...safe, requesterId: req.currentUser!.id, status: "draft" }));
   });
   app.put("/api/workspace/purchase-requests/:id", requireAuth, requireWorkspace, async (req, res) => {
-    res.json(await storage.updatePurchaseRequest(req.params.id, req.body));
+    const { status, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updatePurchaseRequest(req.params.id, safe));
   });
   app.post("/api/workspace/purchase-requests/:id/submit", requireAuth, requireWorkspace, async (req, res) => {
     const pr = await storage.getPurchaseRequest(req.params.id);
@@ -68,10 +71,12 @@ export function registerWorkspaceOfficeRoutes(app: Express) {
     res.json(await storage.getTravelRequests(undefined, status as string));
   });
   app.post("/api/workspace/travel-requests", requireAuth, requireWorkspace, async (req, res) => {
-    res.json(await storage.createTravelRequest({ ...req.body, requesterId: req.currentUser!.id }));
+    const { status, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.createTravelRequest({ ...safe, requesterId: req.currentUser!.id, status: "draft" }));
   });
   app.put("/api/workspace/travel-requests/:id", requireAuth, requireWorkspace, async (req, res) => {
-    res.json(await storage.updateTravelRequest(req.params.id, req.body));
+    const { status, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updateTravelRequest(req.params.id, safe));
   });
   app.post("/api/workspace/travel-requests/:id/submit", requireAuth, requireWorkspace, async (req, res) => {
     const tr = await storage.getTravelRequest(req.params.id);
@@ -189,10 +194,13 @@ export function registerWorkspaceOfficeRoutes(app: Express) {
     res.json(await storage.getWorkspacePayments(req.query.status as string));
   });
   app.post("/api/workspace/payments", requireAuth, requireWorkspace, async (req, res) => {
-    res.json(await storage.createWorkspacePayment({ ...req.body, requestedBy: req.currentUser!.id }));
+    // status/paid/approval fields are server-controlled (DB default "requested"); never accept them here.
+    const { status, paidById, paidBy, paidAt, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.createWorkspacePayment({ ...safe, requestedBy: req.currentUser!.id }));
   });
   app.put("/api/workspace/payments/:id", requireAuth, requireWorkspace, async (req, res) => {
-    res.json(await storage.updateWorkspacePayment(req.params.id, req.body));
+    const { status, paidById, paidBy, paidAt, approvedById, approvedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updateWorkspacePayment(req.params.id, safe));
   });
   app.post("/api/workspace/payments/:id/submit", requireAuth, requireWorkspace, async (req, res) => {
     const pay = await storage.getWorkspacePayments();

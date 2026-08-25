@@ -52,6 +52,7 @@ export function registerLeaveRoutes(app: Express) {
   app.put("/api/leave-balances/adjust", requireAuth, requireHR, async (req, res) => {
     const { employeeId, leaveTypeId, year, adjustment, reason } = req.body;
     if (!reason) return res.status(400).json({ error: "Reason required for leave balance adjustments" });
+    if (!Number.isFinite(parseFloat(adjustment))) return res.status(400).json({ error: "Adjustment must be a valid number" });
     const bal = await storage.getLeaveBalance(employeeId, leaveTypeId, year);
     const currentBalance = parseFloat(bal?.closingBalance?.toString() || "0");
     const newBalance = currentBalance + parseFloat(adjustment);

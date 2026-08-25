@@ -74,7 +74,9 @@ export function registerMyRequestsRoutes(app: Express) {
     if (!pr) return res.status(404).json({ error: "Not found" });
     if (!await verifyOwner(pr.requesterId, req.currentUser!.id, res)) return;
     if (!["draft", "changes_requested"].includes(pr.status)) return res.status(400).json({ error: "Cannot edit in current status" });
-    res.json(await storage.updatePurchaseRequest(req.params.id, req.body));
+    // The requester must not set workflow-controlling fields via the edit body.
+    const { status, approvedById, approvedAt, requesterId, decidedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updatePurchaseRequest(req.params.id, safe));
   });
 
   app.post("/api/my-requests/purchases/:id/submit", requireAuth, async (req, res) => {
@@ -128,7 +130,9 @@ export function registerMyRequestsRoutes(app: Express) {
     if (!tr) return res.status(404).json({ error: "Not found" });
     if (!await verifyOwner(tr.requesterId, req.currentUser!.id, res)) return;
     if (!["draft", "changes_requested"].includes(tr.status)) return res.status(400).json({ error: "Cannot edit in current status" });
-    res.json(await storage.updateTravelRequest(req.params.id, req.body));
+    // The requester must not set workflow-controlling fields via the edit body.
+    const { status, approvedById, approvedAt, requesterId, decidedAt, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updateTravelRequest(req.params.id, safe));
   });
 
   app.post("/api/my-requests/travels/:id/submit", requireAuth, async (req, res) => {

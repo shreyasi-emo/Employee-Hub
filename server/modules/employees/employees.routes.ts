@@ -189,7 +189,9 @@ export function registerEmployeeRoutes(app: Express) {
       }
     }
 
-    const emp = await storage.updateEmployee(req.params.id, req.body);
+    // userId (the login-account link) and employeeCode are server-managed — never settable via this update.
+    const { userId, employeeCode, id, createdAt, updatedAt, ...safeEmp } = req.body;
+    const emp = await storage.updateEmployee(req.params.id, safeEmp);
 
     // Apply the System Role change to the linked user account.
     if (wantsRoleChange && linkedUser && linkedUser.role !== req.body.systemRole) {

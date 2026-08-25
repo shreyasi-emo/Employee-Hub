@@ -59,7 +59,9 @@ export function registerLogisticsRoutes(app: Express) {
     if (m.requesterId !== req.currentUser!.id && !hasRole(req, "super_admin", "logistics")) {
       return res.status(403).json({ error: "Forbidden" });
     }
-    res.json(await storage.updateLogisticsMovement(req.params.id, req.body));
+    // Status changes go through the transition endpoints, not the generic PATCH.
+    const { status, requesterId, receivedById, receivedAt, assignedToId, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updateLogisticsMovement(req.params.id, safe));
   });
 
   // Transition helpers

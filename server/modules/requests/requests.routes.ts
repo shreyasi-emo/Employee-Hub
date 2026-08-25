@@ -46,7 +46,9 @@ export function registerRequestRoutes(app: Express) {
     res.json(created);
   });
   app.patch("/api/requests/:id", requireAuth, requireTeamHandler, async (req, res) => {
-    res.json(await storage.updateRequest(req.params.id, req.body));
+    // Status/ownership transitions belong to the assign/fulfill/reject endpoints, not the generic update.
+    const { status, requesterId, id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updateRequest(req.params.id, safe));
   });
   app.post("/api/requests/:id/assign", requireAuth, requireTeamHandler, async (req, res) => {
     const r = await storage.updateRequest(req.params.id, { assignedToId: req.currentUser!.id, status: "in_review" });

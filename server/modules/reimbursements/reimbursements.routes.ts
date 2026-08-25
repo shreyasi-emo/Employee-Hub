@@ -82,7 +82,9 @@ export function registerReimbursementRoutes(app: Express) {
     const ctx = await reimbursementContext(req.currentUser!.id, req.currentUser!.username);
     // Total is recomputed from the lines here so it can't be forged via a direct API call.
     const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
-    const created = await storage.createReimbursement({ ...req.body, ...ctx, lines, totalAmount: sumLines(lines), requesterId: req.currentUser!.id, status: "submitted" });
+    // Strip approver/decision fields — a claimant must not pre-fill their own approval trail.
+    const { approvedById, financeApprovedById, financeNote, decisionNote, zohoExpenseId, financeDecisionAt, approvedAt, id, createdAt, updatedAt, ...body } = req.body || {};
+    const created = await storage.createReimbursement({ ...body, ...ctx, lines, totalAmount: sumLines(lines), requesterId: req.currentUser!.id, status: "submitted" });
     try {
       const amt = Number(created.totalAmount || 0).toLocaleString("en-IN");
       await storage.notifyByRole(["finance", "super_admin"], {

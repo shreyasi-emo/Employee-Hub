@@ -236,7 +236,8 @@ export function registerPayrollRoutes(app: Express) {
   app.put("/api/payslips/:id", requireAuth, async (req, res) => {
     const financeRoles = ["super_admin", "hr_admin", "finance"];
     if (!financeRoles.includes(req.currentUser!.role)) return res.status(403).json({ error: "Access denied" });
-    res.json(await storage.updatePayslip(req.params.id, req.body));
+    const { id, createdAt, updatedAt, ...safe } = req.body;
+    res.json(await storage.updatePayslip(req.params.id, safe));
   });
 
   // ===== STATUTORY CONFIG =====
