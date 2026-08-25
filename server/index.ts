@@ -90,18 +90,8 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        let body = JSON.stringify(capturedJsonResponse);
-        // Strip base64 data-URLs (uploaded invoices/proformas/documents) so they don't flood the terminal
-        body = body.replace(/"data:[^"]{40,}"/g, '"data:…"');
-        logLine += ` :: ${body}`;
-      }
-      if (logLine.length > 200) {
-        logLine = logLine.slice(0, 199) + "…";
-      }
-
-      log(logLine);
+      // Log only the request line — never response bodies (they can carry PII / tokens).
+      log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
     }
   });
 
@@ -146,14 +136,12 @@ process.on("unhandledRejection", (reason) => {
 
     app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-
       console.error("Internal Server Error:", err);
-
       if (res.headersSent) {
         return next(err);
       }
-
+      // Don't leak internal error detail on 5xx — only surface validated 4xx business messages.
+      const message = status >= 500 ? "Internal Server Error" : (err.message || "Request failed");
       return res.status(status).json({ message });
     });
 

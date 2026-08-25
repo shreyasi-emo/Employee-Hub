@@ -133,7 +133,7 @@ export function registerWorkspaceAtsRoutes(app: Express) {
     res.json(await storage.updateInterview(req.params.id, req.body));
   });
 
-  app.post("/api/workspace/interviews/:id/feedback", requireAuth, async (req, res) => {
+  app.post("/api/workspace/interviews/:id/feedback", requireAuth, requireWorkspace, async (req, res) => {
     const f = await storage.createInterviewFeedback({ ...req.body, interviewId: req.params.id, interviewerUserId: req.currentUser!.id, submittedAt: new Date() });
     res.json(f);
   });

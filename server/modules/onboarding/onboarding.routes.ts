@@ -67,6 +67,11 @@ export function registerOnboardingRoutes(app: Express) {
   });
 
   app.get("/api/onboarding/instances/:id/tasks", requireAuth, async (req, res) => {
+    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
+    if (!hrRoles.includes(req.currentUser!.role)) {
+      const mine = await storage.getOnboardingInstances(req.currentUser!.employeeId || "");
+      if (!mine.some((i: any) => i.id === req.params.id)) return res.status(403).json({ error: "Forbidden" });
+    }
     res.json(await storage.getOnboardingTaskItems(req.params.id));
   });
 
