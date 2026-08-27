@@ -2,12 +2,11 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Truck, Plus, MapPin } from "lucide-react";
+import { Truck, Plus } from "lucide-react";
 import { useLogisticsRequests, useLogisticsLocations } from "../api/logistics.api";
 import { RaiseLogisticsDialog } from "../components/raise-logistics-dialog";
 import { LogisticsRequestCard } from "../components/logistics-request-card";
 import { LogisticsDetailDialog } from "../components/logistics-detail-dialog";
-import { ManageLocationsDialog } from "../components/manage-locations-dialog";
 
 const HANDLER_ROLES = ["super_admin", "logistics"];
 const ACTIVE = ["pending", "in_progress"];
@@ -18,7 +17,6 @@ export default function LogisticsPage() {
   const isHandler = HANDLER_ROLES.includes(role);
   const [tab, setTab] = useState("active");
   const [raise, setRaise] = useState(false);
-  const [manage, setManage] = useState(false);
   const [detail, setDetail] = useState<any>(null);
 
   const { data: requests = [] } = useLogisticsRequests();
@@ -42,10 +40,7 @@ export default function LogisticsPage() {
             <p className="text-sm text-muted-foreground mt-0.5">{isHandler ? "Process inward & outward movement requests" : "Raise and track your movement requests"}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isHandler && <Button variant="secondary" onClick={() => setManage(true)} data-testid="logistics-manage-locations"><MapPin className="h-4 w-4 mr-1.5" /> Locations</Button>}
-          <Button className="btn-primary-gradient" onClick={() => setRaise(true)} data-testid="logistics-raise"><Plus className="h-4 w-4 mr-1.5" /> Raise Request</Button>
-        </div>
+        <Button className="btn-primary-gradient" onClick={() => setRaise(true)} data-testid="logistics-raise"><Plus className="h-4 w-4 mr-1.5" /> Raise Request</Button>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -58,7 +53,6 @@ export default function LogisticsPage() {
       </Tabs>
 
       <RaiseLogisticsDialog open={raise} onClose={() => setRaise(false)} locations={locations} />
-      <ManageLocationsDialog open={manage} onClose={() => setManage(false)} locations={locations} />
       {detail && <LogisticsDetailDialog request={detail} isHandler={isHandler} isOwner={detail.requesterId === auth?.user?.id} locName={locName} onClose={() => setDetail(null)} />}
     </div>
   );

@@ -8,8 +8,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateInput } from "@/components/shared/datetime-field";
 import { RequestDialog } from "@/components/shared/request-dialog";
-import { ChevronLeft, ChevronRight, PackageOpen, PackageCheck, MapPin } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { ChevronLeft, ChevronRight, PackageOpen, PackageCheck, MapPin, CalendarClock, Package } from "lucide-react";
 import { useCreateLogisticsRequest } from "../api/logistics.api";
+
+// Section header — mirrors the Travel/request forms so fields group cleanly instead of crowding.
+function Section({ icon: Icon, title, children }: { icon: any; title: string; children: any }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="h-6 w-6 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Icon className="h-3.5 w-3.5" /></span>
+        <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 const TYPES = [
   { v: "outboard", label: "Outboard", desc: "Sending something out / outward movement", Icon: PackageOpen },
@@ -76,9 +90,7 @@ export function RaiseLogisticsDialog({ open, onClose, locations = [] }: { open: 
       open={open}
       onClose={onClose}
       title="New Logistics Request"
-      subtitle="Request an inward or outward movement."
-      steps={["Type", "Details"]}
-      step={step}
+      subtitle={step === 0 ? "Request an inward or outward movement." : `${f.requestType === "inboard" ? "Inboard" : "Outboard"} movement details`}
       minHeight="480px"
       back={step === 1 ? <Button variant="ghost" onClick={() => setStep(0)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button> : undefined}
       footer={step === 1 ? (
@@ -103,43 +115,49 @@ export function RaiseLogisticsDialog({ open, onClose, locations = [] }: { open: 
             ))}
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <LocationField label="From" locations={locations} idValue={f.fromLocationId} textValue={f.fromLocationText} onId={(v: string) => set({ fromLocationId: v })} onText={(v: string) => set({ fromLocationText: v })} />
-              <LocationField label="To" locations={locations} idValue={f.toLocationId} textValue={f.toLocationText} onId={(v: string) => set({ toLocationId: v })} onText={(v: string) => set({ toLocationText: v })} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-[11px]">Preferred pickup date</Label><DateInput value={f.pickupDate} onChange={(v) => set({ pickupDate: v })} testId="logistics-pickup" /></div>
-              <div className="space-y-1"><Label className="text-[11px]">Expected delivery date</Label><DateInput value={f.deliveryDate} onChange={(v) => set({ deliveryDate: v })} minDate={f.pickupDate || undefined} testId="logistics-delivery" /></div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-[11px]">Point of contact</Label><Input className="h-9" value={f.pocName} onChange={(e) => set({ pocName: e.target.value })} placeholder="Name" /></div>
-              <div className="space-y-1"><Label className="text-[11px]">Contact phone</Label><Input className="h-9" value={f.pocPhone} onChange={(e) => set({ pocPhone: e.target.value })} placeholder="Phone number" /></div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-[11px]">Quantity <span className="text-[#FF6F62]">*</span></Label><Input className="h-9" type="number" min="1" value={f.quantity} onChange={(e) => set({ quantity: e.target.value })} /></div>
-              <div className="space-y-1"><Label className="text-[11px]">Weight (kg) <span className="text-muted-foreground">optional</span></Label><Input className="h-9" type="number" min="0" step="0.001" value={f.weightKg} onChange={(e) => set({ weightKg: e.target.value })} placeholder="—" /></div>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-[11px]">Type of goods / item category</Label>
-              <Input className="h-9" list="logistics-goods" value={f.goodsCategory} onChange={(e) => set({ goodsCategory: e.target.value })} placeholder="e.g. Battery, Spare parts, Documents, Tools" />
-              <datalist id="logistics-goods"><option value="Battery" /><option value="Spare parts" /><option value="Documents" /><option value="Tools / equipment" /><option value="Customer shipment" /></datalist>
-            </div>
-
-            <div className="space-y-1"><Label className="text-[11px]">Description / special instructions</Label><Textarea rows={2} className="resize-none" value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder="Anything the logistics team should know…" /></div>
-
-            <div className="space-y-1.5">
-              <Label className="text-[11px]">Priority</Label>
-              <div className="segmented-toggle inline-flex p-0.5 h-9">
-                {["regular", "urgent"].map((p) => (
-                  <button key={p} type="button" onClick={() => set({ priority: p })} className={`px-4 h-full rounded-[10px] text-xs font-medium capitalize ${f.priority === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}>{p}</button>
-                ))}
+          <div className="space-y-5">
+            <Section icon={MapPin} title="Route">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <LocationField label="From" locations={locations} idValue={f.fromLocationId} textValue={f.fromLocationText} onId={(v: string) => set({ fromLocationId: v })} onText={(v: string) => set({ fromLocationText: v })} />
+                <LocationField label="To" locations={locations} idValue={f.toLocationId} textValue={f.toLocationText} onId={(v: string) => set({ toLocationId: v })} onText={(v: string) => set({ toLocationText: v })} />
               </div>
-            </div>
+            </Section>
+
+            <Separator />
+
+            <Section icon={CalendarClock} title="Schedule & contact">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label className="text-[11px]">Preferred pickup date</Label><DateInput value={f.pickupDate} onChange={(v) => set({ pickupDate: v })} testId="logistics-pickup" /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Expected delivery date</Label><DateInput value={f.deliveryDate} onChange={(v) => set({ deliveryDate: v })} minDate={f.pickupDate || undefined} testId="logistics-delivery" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label className="text-[11px]">Point of contact</Label><Input className="h-9" value={f.pocName} onChange={(e) => set({ pocName: e.target.value })} placeholder="Name" /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Contact phone</Label><Input className="h-9" value={f.pocPhone} onChange={(e) => set({ pocPhone: e.target.value })} placeholder="Phone number" /></div>
+              </div>
+            </Section>
+
+            <Separator />
+
+            <Section icon={Package} title="Shipment details">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label className="text-[11px]">Quantity <span className="text-[#FF6F62]">*</span></Label><Input className="h-9" type="number" min="1" value={f.quantity} onChange={(e) => set({ quantity: e.target.value })} /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Weight (kg) <span className="text-muted-foreground">optional</span></Label><Input className="h-9" type="number" min="0" step="0.001" value={f.weightKg} onChange={(e) => set({ weightKg: e.target.value })} placeholder="—" /></div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px]">Type of goods / item category</Label>
+                <Input className="h-9" list="logistics-goods" value={f.goodsCategory} onChange={(e) => set({ goodsCategory: e.target.value })} placeholder="e.g. Battery, Spare parts, Documents, Tools" />
+                <datalist id="logistics-goods"><option value="Battery" /><option value="Spare parts" /><option value="Documents" /><option value="Tools / equipment" /><option value="Customer shipment" /></datalist>
+              </div>
+              <div className="space-y-1"><Label className="text-[11px]">Description / special instructions</Label><Textarea rows={2} className="resize-none" value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder="Anything the logistics team should know…" /></div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px]">Priority</Label>
+                <div className="segmented-toggle inline-flex p-0.5 h-9">
+                  {["regular", "urgent"].map((p) => (
+                    <button key={p} type="button" onClick={() => set({ priority: p })} className={`px-4 h-full rounded-[10px] text-xs font-medium capitalize ${f.priority === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}>{p}</button>
+                  ))}
+                </div>
+              </div>
+            </Section>
           </div>
         )}
       </div>
