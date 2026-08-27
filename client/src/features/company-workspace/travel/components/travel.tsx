@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { statusClass, statusLabel } from "@/lib/status";
 import { money } from "@/lib/format";
 import { format } from "date-fns";
-import { Plane, Hotel, Bus, Train, Car, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon } from "lucide-react";
+import { Plane, Hotel, Bus, Train, Car, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon, Clock, Eye } from "lucide-react";
+import { ApprovalCard } from "@/features/company-workspace/components/approval-card";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { EmployeePicker } from "@/components/shared/employee-picker";
@@ -444,6 +445,36 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
     if (phase === "completed") return ["rejected", "cancelled"].includes(t.status);
     return pendingStatuses.includes(t.status);
   }).sort((a, b) => +new Date(b.createdAt || 0) - +new Date(a.createdAt || 0));
+
+  const renderCard = (t: any) => {
+    const cat = TRAVEL_CATS[t.category] || TRAVEL_CATS.flight;
+    const amt = Number(t.amount) || 0;
+    const route = t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "") : `${t.details?.from || "?"} → ${t.details?.to || "?"}`;
+    return (
+      <ApprovalCard
+        key={t.id}
+        testId={`travel-appr-${t.id}`}
+        icon={cat.icon}
+        reference={t.reference}
+        badge={<Badge className="text-[10px] px-2 py-0.5 capitalize" style={{ backgroundColor: `${cat.tint}1a`, color: cat.tint }}>{cat.label}</Badge>}
+        resubmitted={isResubmitted(t)}
+        amount={amt}
+        amountFallback="Not priced yet"
+        requesterName={t.employeeName || "Employee"}
+        requesterCode={t.employeeCode}
+        facts={t.purpose ? [{ label: "Purpose", value: t.purpose, muted: true, truncate: true }] : []}
+        meta={[
+          { icon: CalendarClock, label: "Submitted", value: t.createdAt ? format(new Date(t.createdAt), "dd MMM yyyy") : "—", width: "w-[120px]" },
+          { icon: MapPin, label: t.category === "stay" ? "Location" : "Route", value: route || "—", width: "w-[150px]" },
+          { icon: Clock, label: "Status", badge: <Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge>, width: "w-[130px]" },
+        ]}
+        onView={() => setDetailId(t.id)}
+        viewLabel="Review"
+        menu={[{ label: "View details", icon: Eye, onClick: () => setDetailId(t.id) }]}
+      />
+    );
+  };
+
   return (
     <div className="space-y-3">
       {scope === "hr" && (
@@ -456,27 +487,11 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
           </div>
         </div>
       )}
+
       {list.length === 0 ? (
         <div className="card-surface rounded-2xl py-10 text-center"><Check className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" /><p className="text-sm text-muted-foreground">Nothing here.</p></div>
       ) : (
-        <div className="space-y-2.5">
-          {list.map((t) => {
-            const cat = TRAVEL_CATS[t.category] || TRAVEL_CATS.flight;
-            const amt = Number(t.amount) || 0;
-            const route = t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "") : `${t.details?.from || "?"} → ${t.details?.to || "?"}`;
-            return (
-              <div key={t.id} className="card-surface card-hover p-4 flex items-center gap-4 cursor-pointer" onClick={() => setDetailId(t.id)} data-testid={`travel-appr-${t.id}`}>
-                <span className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${cat.tint}1a`, color: cat.tint }}><cat.icon className="h-4 w-4" /></span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-semibold text-foreground truncate">{t.reference}</span><Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge>{isResubmitted(t) && <Badge className="text-[10px] bg-[#206295]/15 text-[#206295]">Resubmitted</Badge>}</div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{cat.label} | <span className="font-semibold text-foreground/90">{t.employeeName || "Employee"}</span>{t.employeeCode ? ` (${t.employeeCode})` : ""} | {route}{t.startDate ? ` | ${format(new Date(t.startDate), "MMM d")}` : ""}</p>
-                </div>
-                {amt > 0 && <span className="text-base font-bold text-[#206295] tabular-nums flex-shrink-0">{money(amt)}</span>}
-                <Button size="sm" variant="ghost" className="h-9 btn-glass text-[#206295] hover:text-[#206295] flex-shrink-0" onClick={(e) => { e.stopPropagation(); setDetailId(t.id); }}><CircleCheck className="h-4 w-4 mr-1.5" /> Review</Button>
-              </div>
-            );
-          })}
-        </div>
+        <div className="space-y-3">{list.map(renderCard)}</div>
       )}
       <TravelDetailDialog id={detailId} open={!!detailId} onClose={() => setDetailId(null)} context="approver" scope={scope} />
     </div>

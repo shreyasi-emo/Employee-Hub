@@ -161,7 +161,7 @@ export default function MyApprovalsPage() {
 
       {batchCat && <CeoReviewModal key={batchCat.title + (batchCat.lane || "")} cfg={batchCat} onClose={() => setBatchCat(null)} />}
       {travelModal && (
-        <ExpandableApprovalDialog open onClose={() => setTravelModal(false)} title="Travel approvals" icon={Plane}>
+        <ExpandableApprovalDialog open onClose={() => setTravelModal(false)} title="Travel approvals" icon={Plane} count={travelPend.length} size="lg">
           <TravelApprovals scope="ceo" />
         </ExpandableApprovalDialog>
       )}

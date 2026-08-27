@@ -1,4 +1,5 @@
 import { money, isResubmittedThread } from "../shared/approval-format";
+import { formatDate } from "../shared/request-format";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -10,15 +11,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { ExpandToggle } from "./expandable-approval-dialog";
-import { Check, X, ChevronDown, MessageSquare, ExternalLink, Layers, ShoppingCart, Package, ArrowDownUp, Search } from "lucide-react";
+import { ApprovalCard } from "./approval-card";
+import { Check, X, MessageSquare, ExternalLink, Layers, ShoppingCart, Package, ArrowDownUp, Search, CalendarClock, Building2 } from "lucide-react";
 
-// Inbox bulk-approval modal — every pending item in one category, X to drop, Approve/Reject all on the rest.
-// CEO review — expand-a-row: compact list, open a row for its receipt + discussion thread + per-item
-// Approve / Reject / Raise Query. Footer keeps Approve-all / Reject-all; tick rows to query several.
-// Live-fetches its category so the list updates as items are decided or moved to Under Review.
+// Priority chip for office purchases (procurement carries no priority).
+const PRI: Record<string, string> = { high: "bg-[#FF6F62]/20 text-[#C4402F]", medium: "bg-[#FFA962]/25 text-[#D98324]", low: "bg-[#64748B]/15 text-[#64748B]" };
+const priBadge = (p: string) => <Badge className={`text-[10px] px-2 py-0.5 capitalize font-semibold ${PRI[p] || PRI.medium}`}>{p || "medium"}</Badge>;
+
+// CEO Inbox drill modal for office purchases & procurement. Premium approval cards (shared ApprovalCard),
+// each an accordion: open a row in place for its receipt + discussion + per-item Approve / Reject / Raise
+// Query. Footer keeps Approve-all / Reject-all; tick rows to act on several. Live-fetches its category so
+// the list updates as items are decided or moved to Under Review.
 export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void }) {
   const { data: auth } = useAuth();
   const meId = auth?.user?.id;
@@ -39,6 +44,7 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
   const [rowNote, setRowNote] = useState("");
   const [bulkMode, setBulkMode] = useState<null | "reject" | "query">(null);
   const [bulkNote, setBulkNote] = useState("");
+  const [maximized, setMaximized] = useState(false);
   const allIds = rows.map((r) => r.id);
   const actIds = sel.size > 0 ? Array.from(sel) : allIds;  // Approve/Reject act on ticked rows when any are selected, else the whole lane.
   const total = rows.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0);
@@ -50,7 +56,6 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
     return out;
   })();
   const gTotal = (arr: any[]) => arr.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0);
-  const waitDays = (d: any) => Math.max(0, Math.floor((Date.now() - +new Date(d || Date.now())) / 86400000));
   const rejectBtn = "border-[#FF6F62]/40 text-[#FF6F62] hover:bg-[#FF6F62]/10 hover:text-[#FF6F62]";
   const queryBtn = "border-[#D98324]/40 text-[#D98324] hover:bg-[#FFA962]/15 hover:text-[#D98324]";
   const normUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
@@ -60,10 +65,87 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
   const bulk = useMutation({ mutationFn: ({ path, ids, body }: any) => apiRequest("POST", `${base}/${path}`, { ids, ...(body || {}) }), onSuccess: (_d, v: any) => { invalidate(); toast({ title: v.msg }); setSel(new Set()); setBulkMode(null); setBulkNote(""); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
   const busy = single.isPending || bulk.isPending;
   const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const [maximized, setMaximized] = useState(false);
+  const isProc = cfg.kind === "procurement";
+
+  const renderRow = (r: any) => {
+    const open = expanded === r.id;
+    const amount = Number(r.totalAmount) || 0;
+    const items = (r.items || []) as any[];
+    const itemSummary = items.length ? `${items[0]?.description || "Item"}${Number(items[0]?.quantity) > 1 ? ` ×${items[0].quantity}` : ""}${items.length > 1 ? ` +${items.length - 1} more` : ""}` : "—";
+    return (
+      <ApprovalCard
+        key={r.id}
+        testId={`appr-${cfg.kind}-${r.id}`}
+        icon={isProc ? Package : ShoppingCart}
+        reference={r.reference || "Request"}
+        badge={!isProc && r.priority ? priBadge(r.priority) : undefined}
+        resubmitted={isResubmittedThread(r.comments)}
+        amount={amount}
+        amountFallback="Not priced yet"
+        requesterName={r.employeeName || "Employee"}
+        requesterCode={r.employeeCode}
+        facts={[{ value: itemSummary, truncate: true }]}
+        meta={[
+          { icon: CalendarClock, label: "Submitted", value: formatDate(r.createdAt), width: "w-[120px]" },
+          { icon: Building2, label: "Department", value: r.department || "—", width: "w-[150px]" },
+          { icon: Layers, label: "Items", value: String(items.length), width: "w-[64px]" },
+        ]}
+        selectable
+        checkboxAlways
+        selected={sel.has(r.id)}
+        onToggleSelect={() => toggleSel(r.id)}
+        expandable
+        expanded={open}
+        onToggleExpand={() => setExpanded(open ? null : r.id)}
+      >
+        <div className="space-y-3">
+          <div className="rounded-lg border border-border/70 bg-card divide-y divide-border/60">
+            {items.map((it, i) => {
+              const link = it.finalLink || it.link;
+              return (
+                <div key={i} className="flex items-start gap-2 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] text-foreground">{it.description || "Item"} <span className="text-muted-foreground">× {it.quantity || 1}</span></p>
+                    {link && <a href={normUrl(link)} target="_blank" rel="noreferrer" className="text-[11px] text-[#206295] hover:underline inline-flex items-center gap-1 mt-0.5"><ExternalLink className="h-3 w-3" />{shortLink(link)}</a>}
+                  </div>
+                  <span className="text-[13px] font-medium tabular-nums flex-shrink-0">{money((Number(it.unitPrice) || 0) * (Number(it.quantity) || 0))}</span>
+                </div>
+              );
+            })}
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/40">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Total</span>
+              <span className="text-sm font-bold text-[#206295] tabular-nums">{money(amount)}</span>
+            </div>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><MessageSquare className="h-3.5 w-3.5" /> Discussion</p>
+            <CommentThread basePath={base} id={r.id} comments={r.comments || []} invalidateKey={cfg.invalidateKey} meId={meId} />
+          </div>
+          {rowForm && rowForm.id === r.id ? (
+            <div className="space-y-2">
+              <Textarea autoFocus rows={2} value={rowNote} onChange={(e) => setRowNote(e.target.value)} placeholder={rowForm.kind === "reject" ? "Reason for rejection" : "What do you need from HR?"} />
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" size="sm" disabled={busy} onClick={() => { setRowForm(null); setRowNote(""); }}>Cancel</Button>
+                {rowForm.kind === "reject"
+                  ? <Button size="sm" variant="outline" className={rejectBtn} disabled={busy || !rowNote.trim()} onClick={() => single.mutate({ path: "reject", id: r.id, body: { note: rowNote }, msg: "Rejected" })}>Confirm reject</Button>
+                  : <Button size="sm" variant="outline" className={queryBtn} disabled={busy || !rowNote.trim()} onClick={() => single.mutate({ path: "query", id: r.id, body: { body: rowNote }, msg: "Query raised" })}>Send query</Button>}
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" className={queryBtn} disabled={busy} onClick={() => { setRowForm({ id: r.id, kind: "query" }); setRowNote(""); }}><MessageSquare className="h-4 w-4 mr-1.5" /> Raise Query</Button>
+              <Button size="sm" variant="outline" className={rejectBtn} disabled={busy} onClick={() => { setRowForm({ id: r.id, kind: "reject" }); setRowNote(""); }}><X className="h-4 w-4 mr-1.5" /> Reject</Button>
+              <Button size="sm" className="btn-primary-gradient text-white" disabled={busy} onClick={() => single.mutate({ path: "approve", id: r.id, body: {}, msg: "Approved" })}><Check className="h-4 w-4 mr-1.5" /> Approve</Button>
+            </div>
+          )}
+        </div>
+      </ApprovalCard>
+    );
+  };
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) { setMaximized(false); onClose(); } }}>
-      <DialogContent className={`${maximized ? "max-w-[98vw] w-[98vw] h-[96vh] max-h-[96vh]" : "max-w-3xl w-[calc(100vw-2rem)] max-h-[92vh]"} p-0 gap-0 overflow-hidden flex flex-col`}>
+      <DialogContent className={`${maximized ? "max-w-[98vw] w-[98vw] h-[96vh] max-h-[96vh]" : "max-w-6xl w-[calc(100vw-2rem)] max-h-[92vh]"} p-0 gap-0 overflow-hidden flex flex-col`}>
         {/* Header — closed by a rule, mirroring the request-form modals */}
         <div className="flex-shrink-0 border-b border-border px-6 pt-6 pb-4">
           <DialogHeader className="space-y-0">
@@ -85,98 +167,28 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
           </div>
         </div>
         <ExpandToggle expanded={maximized} onToggle={() => setMaximized((v) => !v)} />
+
         {/* Body — only this scrolls; the padding gives the cards room so their shadows aren't clipped */}
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
           <div className="space-y-3">
             {sortedRows.length === 0 && <p className="text-sm text-muted-foreground py-10 text-center">Nothing pending here.</p>}
-            {(() => {
-              const renderRow = (r: any) => {
-              const open = expanded === r.id;
-              const amount = Number(r.totalAmount) || 0;
-              const items = (r.items || []) as any[];
-              const cc = (r.comments || []).length;
-              return (
-                <div key={r.id} className="card-surface card-hover rounded-2xl overflow-hidden">
-                  <div className="flex items-center gap-3.5 px-5 py-4">
-                    <Checkbox checked={sel.has(r.id)} onCheckedChange={() => toggleSel(r.id)} onClick={(e: any) => e.stopPropagation()} />
-                    <span className="h-10 w-10 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0">{cfg.kind === "procurement" ? <Package className="h-[18px] w-[18px]" /> : <ShoppingCart className="h-[18px] w-[18px]" />}</span>
-                    <button type="button" className="min-w-0 flex-1 flex items-center gap-3 text-left" onClick={() => setExpanded(open ? null : r.id)}>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <p className="text-[13px] font-semibold text-foreground truncate">{items.length ? `${items[0]?.description || "Item"}${Number(items[0]?.quantity) > 1 ? ` ×${items[0].quantity}` : ""}${items.length > 1 ? ` +${items.length - 1} more` : ""}` : (r.reference || "Request")}</p>
-                          {isResubmittedThread(r.comments) && <Badge className="text-[9px] flex-shrink-0 bg-[#206295]/15 text-[#206295]">Resubmitted</Badge>}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate mt-1"><span className="font-semibold text-foreground/90">{r.employeeName || "Employee"}</span>{r.employeeCode ? ` (${r.employeeCode})` : ""}{r.department ? ` | ${r.department}` : ""}{items.length ? ` | ${items.length} item${items.length !== 1 ? "s" : ""}` : ""} | {r.reference}</p>
+            {cfg.grouped
+              ? groups.map((g) => g.rows.length > 1
+                  ? (
+                    <div key={g.key} className="rounded-xl border border-[#206295]/25 bg-[#206295]/[0.03] p-2 space-y-2">
+                      <div className="flex items-center justify-between px-1.5 pt-0.5">
+                        <span className="text-[11px] font-semibold text-[#206295] uppercase tracking-wide flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> HR group | {g.rows.length} requests</span>
+                        <span className="text-xs font-bold text-[#206295] tabular-nums">{money(gTotal(g.rows))}</span>
                       </div>
-                      {waitDays(r.createdAt) >= 1 && <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${waitDays(r.createdAt) >= 3 ? "bg-[#FF6F62]/15 text-[#C4402F]" : "bg-muted text-muted-foreground"}`}>{waitDays(r.createdAt)}d</span>}
-                      {cc > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground flex-shrink-0"><MessageSquare className="h-3.5 w-3.5" />{cc}</span>}
-                      <span className="text-base font-bold text-[#206295] tabular-nums flex-shrink-0">{money(amount)}</span>
-                      <ChevronDown className={`h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
-                    </button>
-                  </div>
-                  {open && (
-                    <div className="border-t border-border bg-muted/20 px-3 py-3 space-y-3">
-                      <div className="rounded-lg border border-border/70 bg-card divide-y divide-border/60">
-                        {items.map((it, i) => {
-                          const link = it.finalLink || it.link;
-                          return (
-                            <div key={i} className="flex items-start gap-2 px-3 py-2">
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[13px] text-foreground">{it.description || "Item"} <span className="text-muted-foreground">× {it.quantity || 1}</span></p>
-                                {link && <a href={normUrl(link)} target="_blank" rel="noreferrer" className="text-[11px] text-[#206295] hover:underline inline-flex items-center gap-1 mt-0.5"><ExternalLink className="h-3 w-3" />{shortLink(link)}</a>}
-                              </div>
-                              <span className="text-[13px] font-medium tabular-nums flex-shrink-0">{money((Number(it.unitPrice) || 0) * (Number(it.quantity) || 0))}</span>
-                            </div>
-                          );
-                        })}
-                        <div className="flex items-center justify-between px-3 py-2 bg-muted/40">
-                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Total</span>
-                          <span className="text-sm font-bold text-[#206295] tabular-nums">{money(amount)}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><MessageSquare className="h-3.5 w-3.5" /> Discussion</p>
-                        <CommentThread basePath={base} id={r.id} comments={r.comments || []} invalidateKey={cfg.invalidateKey} meId={meId} />
-                      </div>
-                      {rowForm && rowForm.id === r.id ? (
-                        <div className="space-y-2">
-                          <Textarea autoFocus rows={2} value={rowNote} onChange={(e) => setRowNote(e.target.value)} placeholder={rowForm.kind === "reject" ? "Reason for rejection" : "What do you need from HR?"} />
-                          <div className="flex justify-end gap-2">
-                            <Button variant="secondary" size="sm" disabled={busy} onClick={() => { setRowForm(null); setRowNote(""); }}>Cancel</Button>
-                            {rowForm.kind === "reject"
-                              ? <Button size="sm" variant="outline" className={rejectBtn} disabled={busy || !rowNote.trim()} onClick={() => single.mutate({ path: "reject", id: r.id, body: { note: rowNote }, msg: "Rejected" })}>Confirm reject</Button>
-                              : <Button size="sm" variant="outline" className={queryBtn} disabled={busy || !rowNote.trim()} onClick={() => single.mutate({ path: "query", id: r.id, body: { body: rowNote }, msg: "Query raised" })}>Send query</Button>}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" className={queryBtn} disabled={busy} onClick={() => { setRowForm({ id: r.id, kind: "query" }); setRowNote(""); }}><MessageSquare className="h-4 w-4 mr-1.5" /> Raise Query</Button>
-                          <Button size="sm" variant="outline" className={rejectBtn} disabled={busy} onClick={() => { setRowForm({ id: r.id, kind: "reject" }); setRowNote(""); }}><X className="h-4 w-4 mr-1.5" /> Reject</Button>
-                          <Button size="sm" className="btn-primary-gradient text-white" disabled={busy} onClick={() => single.mutate({ path: "approve", id: r.id, body: {}, msg: "Approved" })}><Check className="h-4 w-4 mr-1.5" /> Approve</Button>
-                        </div>
-                      )}
+                      {g.rows.map(renderRow)}
                     </div>
-                  )}
-                </div>
-              );
-              };
-              return cfg.grouped
-                ? groups.map((g) => g.rows.length > 1
-                    ? (
-                      <div key={g.key} className="rounded-xl border border-[#206295]/25 bg-[#206295]/[0.03] p-2 space-y-2">
-                        <div className="flex items-center justify-between px-1.5 pt-0.5">
-                          <span className="text-[11px] font-semibold text-[#206295] uppercase tracking-wide flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> HR group | {g.rows.length} requests</span>
-                          <span className="text-xs font-bold text-[#206295] tabular-nums">{money(gTotal(g.rows))}</span>
-                        </div>
-                        {g.rows.map(renderRow)}
-                      </div>
-                    )
-                    : renderRow(g.rows[0]))
-                : sortedRows.map(renderRow);
-            })()}
+                  )
+                  : renderRow(g.rows[0]))
+              : sortedRows.map(renderRow)}
           </div>
         </div>
-        {/* Footer — closed by a rule, mirroring the request-form modals */}
+
+        {/* Footer — Approve-all / Reject-all always available; tick rows to act on a subset */}
         <div className="flex-shrink-0 border-t border-border bg-background px-6 py-4 space-y-3">
           {bulkMode && <Textarea autoFocus rows={2} value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} placeholder={bulkMode === "reject" ? `Reason for rejecting ${actIds.length}` : `Message HR about ${sel.size} selected`} />}
           {!bulkMode && sel.size > 0 && (
@@ -195,7 +207,7 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
                 <Button variant="secondary" size="sm" disabled={busy} onClick={() => { setBulkMode(null); setBulkNote(""); }}>Cancel</Button>
                 {bulkMode === "reject"
                   ? <Button size="sm" variant="outline" className={rejectBtn} disabled={busy || !bulkNote.trim() || !actIds.length} onClick={() => bulk.mutate({ path: "bulk-reject", ids: actIds, body: { note: bulkNote }, msg: sel.size > 0 ? `Rejected ${actIds.length}` : "Rejected all" })}><X className="h-4 w-4 mr-1.5" /> {sel.size > 0 ? `Reject ${actIds.length}` : "Reject all"}</Button>
-                  : <Button size="sm" variant="outline" className={queryBtn} disabled={busy || !bulkNote.trim() || !sel.size} onClick={() => bulk.mutate({ path: "bulk-query", ids: [...sel], body: { body: bulkNote }, msg: `Query raised on ${sel.size}` })}><MessageSquare className="h-4 w-4 mr-1.5" /> Send query</Button>}
+                  : <Button size="sm" variant="outline" className={queryBtn} disabled={busy || !bulkNote.trim() || !sel.size} onClick={() => bulk.mutate({ path: "bulk-query", ids: Array.from(sel), body: { body: bulkNote }, msg: `Query raised on ${sel.size}` })}><MessageSquare className="h-4 w-4 mr-1.5" /> Send query</Button>}
               </>
             ) : (
               <>
