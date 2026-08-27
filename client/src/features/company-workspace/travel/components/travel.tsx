@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { statusClass, statusLabel } from "@/lib/status";
 import { money } from "@/lib/format";
 import { format } from "date-fns";
-import { Plane, Hotel, Bus, Train, Car, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon, Clock, Eye } from "lucide-react";
+import { Plane, Hotel, Bus, Train, Car, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon, Clock, Eye, CheckSquare, MousePointerClick, ArrowDownUp } from "lucide-react";
 import { ApprovalCard } from "@/features/company-workspace/components/approval-card";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
@@ -435,16 +435,48 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner", scope
 
 // ============================ Travel approvals (HR price/book + CEO decide) ============================
 export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [phase, setPhase] = useState<"pending" | "booked" | "completed">("pending");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [catFilter, setCatFilter] = useState<"all" | "flight" | "stay" | "transport">("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "amount">("newest");
   const { data: all = [] } = useQuery<any[]>({ queryKey: ["/api/travel"] });
   // CEO surface reviews (approve/reject/query); HR surface prices + books. Scope keeps them separate for super_admin.
   const pendingStatuses = scope === "ceo" ? ["pending_approval", "under_review"] : ["pending_hr", "approved", "under_review"];
-  const list = (all as any[]).filter((t) => {
-    if (phase === "booked") return t.status === "booked";
-    if (phase === "completed") return ["rejected", "cancelled"].includes(t.status);
-    return pendingStatuses.includes(t.status);
-  }).sort((a, b) => +new Date(b.createdAt || 0) - +new Date(a.createdAt || 0));
+  const list = (all as any[])
+    .filter((t) => {
+      if (phase === "booked") return t.status === "booked";
+      if (phase === "completed") return ["rejected", "cancelled"].includes(t.status);
+      return pendingStatuses.includes(t.status);
+    })
+    .filter((t) => catFilter === "all" || t.category === catFilter)
+    .sort((a, b) => {
+      if (sortBy === "amount") return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+      const da = +new Date(a.createdAt || 0), db = +new Date(b.createdAt || 0);
+      return sortBy === "oldest" ? da - db : db - da;
+    });
+
+  // CEO bulk decision — the travel API decides one trip at a time, so bulk loops the per-trip endpoints.
+  const bulkApprove = useMutation({
+    mutationFn: async (ids: string[]) => { for (const id of ids) await apiRequest("POST", `/api/travel/${id}/approve`, {}); },
+    onSuccess: (_d, ids: string[]) => { invalidateTravel(qc); toast({ title: `Approved ${ids.length}` }); setSel(new Set()); setSelectionMode(false); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+  const bulkReject = useMutation({
+    mutationFn: async ({ ids, note }: { ids: string[]; note: string }) => { for (const id of ids) await apiRequest("POST", `/api/travel/${id}/reject`, { note }); },
+    onSuccess: (_d, v: any) => { invalidateTravel(qc); toast({ title: `Rejected ${v.ids.length}` }); setSel(new Set()); setSelectionMode(false); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+  const busy = bulkApprove.isPending || bulkReject.isPending;
+  const allSelected = list.length > 0 && list.every((t) => sel.has(t.id));
+  const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = () => setSel(allSelected ? new Set() : new Set(list.map((t) => t.id)));
+  const exitSelection = () => { setSelectionMode(false); setSel(new Set()); };
+  const approveSelected = () => { if (sel.size && window.confirm(`Approve ${sel.size} trip(s)? This cannot be undone.`)) bulkApprove.mutate(Array.from(sel)); };
+  const rejectSelected = () => { if (!sel.size) return; const note = window.prompt(`Reject ${sel.size} trip(s)? Enter a reason:`); if (note && note.trim()) bulkReject.mutate({ ids: Array.from(sel), note: note.trim() }); };
 
   const renderCard = (t: any) => {
     const cat = TRAVEL_CATS[t.category] || TRAVEL_CATS.flight;
@@ -468,6 +500,10 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
           { icon: MapPin, label: t.category === "stay" ? "Location" : "Route", value: route || "—", width: "w-[150px]" },
           { icon: Clock, label: "Status", badge: <Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge>, width: "w-[130px]" },
         ]}
+        selectable={scope === "ceo"}
+        selectionMode={selectionMode}
+        selected={sel.has(t.id)}
+        onToggleSelect={() => toggleSel(t.id)}
         onView={() => setDetailId(t.id)}
         viewLabel="Review"
         menu={[{ label: "View details", icon: Eye, onClick: () => setDetailId(t.id) }]}
@@ -484,6 +520,41 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
             {(["pending", "booked", "completed"] as const).map((p) => (
               <button key={p} onClick={() => setPhase(p)} className={`px-3 h-full rounded-[9px] text-xs font-medium capitalize ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`travel-phase-${p}`}>{p}</button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {scope === "ceo" && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={catFilter} onValueChange={(v) => setCatFilter(v as any)}>
+            <SelectTrigger className="h-9 w-[150px] text-xs" data-testid="travel-cat"><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="flight">Flight</SelectItem>
+              <SelectItem value="stay">Stay</SelectItem>
+              <SelectItem value="transport">Transport</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+            <SelectTrigger className="h-9 w-[160px] text-xs" data-testid="travel-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest first</SelectItem>
+              <SelectItem value="oldest">Oldest first</SelectItem>
+              <SelectItem value="amount">Amount: High → Low</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="ml-auto flex items-center gap-2">
+            {selectionMode ? (
+              <>
+                <Button variant="outline" size="sm" className="h-9" onClick={toggleAll} data-testid="travel-select-all"><CheckSquare className="h-4 w-4 mr-1.5" /> {allSelected ? "Clear" : "All"}</Button>
+                <span className="text-xs text-muted-foreground">{sel.size} selected</span>
+                <Button size="sm" variant="outline" className="h-9 text-[#FF6F62] border-[#FF6F62]/40 hover:bg-[#FF6F62]/10" disabled={busy || !sel.size} onClick={rejectSelected}><X className="h-4 w-4 mr-1.5" /> Reject</Button>
+                <Button size="sm" className="h-9 btn-primary-gradient" disabled={busy || !sel.size} onClick={approveSelected}><Check className="h-4 w-4 mr-1.5" /> Approve ({sel.size})</Button>
+                <Button variant="secondary" size="sm" className="h-9" onClick={exitSelection} data-testid="travel-select-done">Done</Button>
+              </>
+            ) : (
+              <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelectionMode(true)} data-testid="travel-select"><MousePointerClick className="h-4 w-4 mr-1.5" /> Select</Button>
+            )}
           </div>
         </div>
       )}

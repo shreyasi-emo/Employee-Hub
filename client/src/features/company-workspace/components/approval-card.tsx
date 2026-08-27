@@ -33,8 +33,8 @@ export function ApprovalCard({
   const amt = Number(amount) || 0;
   const showCheckbox = selectable && (selectionMode || checkboxAlways);
   const handleCardClick = () => {
+    if (selectionMode && selectable) return onToggleSelect?.();
     if (expandable) return onToggleExpand?.();
-    if (selectionMode) return onToggleSelect?.();
     return onView?.();
   };
   return (

@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { ExpandToggle } from "./expandable-approval-dialog";
 import { ApprovalCard } from "./approval-card";
-import { Check, X, MessageSquare, ExternalLink, Layers, ShoppingCart, Package, ArrowDownUp, Search, CalendarClock, Building2 } from "lucide-react";
+import { Check, X, MessageSquare, ExternalLink, Layers, ShoppingCart, Package, ArrowDownUp, Search, CalendarClock, Building2, MousePointerClick, CheckSquare } from "lucide-react";
 
 // Priority chip for office purchases (procurement carries no priority).
 const PRI: Record<string, string> = { high: "bg-[#FF6F62]/20 text-[#C4402F]", medium: "bg-[#FFA962]/25 text-[#D98324]", low: "bg-[#64748B]/15 text-[#64748B]" };
@@ -33,9 +33,11 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
   const { data: all = [] } = useQuery<any[]>({ queryKey: [base] });
   const statuses: string[] = cfg.statuses || ["pending_approval"];
   const [search, setSearch] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | "high" | "medium" | "low">("all");
   const q = search.trim().toLowerCase();
   const rows = (all as any[])
     .filter((r) => statuses.includes(r.status))
+    .filter((r) => cfg.kind !== "office" || priorityFilter === "all" || (r.priority || "medium") === priorityFilter)
     .filter((r) => !q || `${r.reference || ""} ${r.employeeName || ""} ${r.employeeCode || ""} ${r.department || ""} ${(r.items || []).map((i: any) => i.description).join(" ")}`.toLowerCase().includes(q));
   const [sortBy, setSortBy] = useState<"amount" | "age">("amount");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
   const [bulkMode, setBulkMode] = useState<null | "reject" | "query">(null);
   const [bulkNote, setBulkNote] = useState("");
   const [maximized, setMaximized] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
   const allIds = rows.map((r) => r.id);
   const actIds = sel.size > 0 ? Array.from(sel) : allIds;  // Approve/Reject act on ticked rows when any are selected, else the whole lane.
   const total = rows.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0);
@@ -65,6 +68,9 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
   const bulk = useMutation({ mutationFn: ({ path, ids, body }: any) => apiRequest("POST", `${base}/${path}`, { ids, ...(body || {}) }), onSuccess: (_d, v: any) => { invalidate(); toast({ title: v.msg }); setSel(new Set()); setBulkMode(null); setBulkNote(""); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
   const busy = single.isPending || bulk.isPending;
   const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const allSelected = allIds.length > 0 && allIds.every((id) => sel.has(id));
+  const toggleAll = () => setSel(allSelected ? new Set() : new Set(allIds));
+  const exitSelection = () => { setSelectionMode(false); setSel(new Set()); };
   const isProc = cfg.kind === "procurement";
 
   const renderRow = (r: any) => {
@@ -91,7 +97,7 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
           { icon: Layers, label: "Items", value: String(items.length), width: "w-[64px]" },
         ]}
         selectable
-        checkboxAlways
+        selectionMode={selectionMode}
         selected={sel.has(r.id)}
         onToggleSelect={() => toggleSel(r.id)}
         expandable
@@ -156,14 +162,32 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search requests…" className="h-9 pl-8" data-testid="ceo-search" />
             </div>
-            <span className="text-xs text-muted-foreground flex-shrink-0">Sort</span>
+            {cfg.kind === "office" && (
+              <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as any)}>
+                <SelectTrigger className="h-9 w-[130px] text-xs flex-shrink-0" data-testid="ceo-priority"><SelectValue placeholder="Priority" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priority</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-              <SelectTrigger className="h-9 w-[170px] text-xs flex-shrink-0" data-testid="ceo-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 w-[160px] text-xs flex-shrink-0" data-testid="ceo-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="amount">Amount: High → Low</SelectItem>
                 <SelectItem value="age">Oldest first</SelectItem>
               </SelectContent>
             </Select>
+            {selectionMode ? (
+              <>
+                <Button variant="outline" size="sm" className="h-9 flex-shrink-0" onClick={toggleAll} data-testid="ceo-select-all"><CheckSquare className="h-4 w-4 mr-1.5" /> {allSelected ? "Clear" : "All"}</Button>
+                <Button variant="secondary" size="sm" className="h-9 flex-shrink-0" onClick={exitSelection} data-testid="ceo-select-done">Done</Button>
+              </>
+            ) : (
+              <Button variant="secondary" size="sm" className="h-9 flex-shrink-0" onClick={() => setSelectionMode(true)} data-testid="ceo-select"><MousePointerClick className="h-4 w-4 mr-1.5" /> Select</Button>
+            )}
           </div>
         </div>
         <ExpandToggle expanded={maximized} onToggle={() => setMaximized((v) => !v)} />
