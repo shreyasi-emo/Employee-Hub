@@ -103,7 +103,7 @@ export function TodayDonutCard({ pieData, pieTotal, todayCounts }: {
   todayCounts: Record<string, number>;
 }) {
   return (
-    <Card className="border-0 flex flex-col">
+    <Card className="border-0 h-full min-h-[20rem] flex flex-col">
       <CardHeader className="pt-4 pb-2">
         <div className="flex items-center h-9">
           <CardTitle className="text-base font-semibold flex items-center gap-2"><UserCheck className="h-4 w-4 text-muted-foreground" /> Today's Attendance</CardTitle>

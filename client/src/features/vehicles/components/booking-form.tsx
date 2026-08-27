@@ -141,7 +141,7 @@ export function BookingForm({ open, onClose, prefillSlot, vehicleId: seedVehicle
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg h-[88vh] p-0 overflow-hidden gap-0 flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <DialogTitle className="flex items-center gap-2.5">
             <span className="h-9 w-9 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center"><Car className="h-5 w-5" /></span>
             {editing ? "Edit Trip" : "Book a Car"}

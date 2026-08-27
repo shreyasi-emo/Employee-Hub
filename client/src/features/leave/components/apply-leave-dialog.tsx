@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DateField } from "@/components/shared/datetime-field";
 import { Calendar, Info } from "lucide-react";
 import { format, startOfDay } from "date-fns";
@@ -35,7 +36,7 @@ export function ApplyLeaveDialog({ open, onOpenChange, employeeId, leaveTypes, l
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Apply for Leave</DialogTitle></DialogHeader>
+        <DialogHeader className="border-b border-border"><DialogTitle>Apply for Leave</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium">Leave Type *</label>
@@ -84,7 +85,7 @@ export function ApplyLeaveDialog({ open, onOpenChange, employeeId, leaveTypes, l
           </div>
 
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="half-day" checked={form.isHalfDay} onChange={(e) => setForm((f) => ({ ...f, isHalfDay: e.target.checked }))} className="rounded" data-testid="checkbox-half-day" />
+            <Checkbox id="half-day" checked={form.isHalfDay} onCheckedChange={(c) => setForm((f) => ({ ...f, isHalfDay: !!c }))} data-testid="checkbox-half-day" />
             <label htmlFor="half-day" className="text-sm">Half Day</label>
           </div>
 
@@ -103,7 +104,7 @@ export function ApplyLeaveDialog({ open, onOpenChange, employeeId, leaveTypes, l
             <Textarea value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Optional: provide reason for leave..." className="mt-1" data-testid="textarea-leave-reason" />
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button
               onClick={() => mutation.mutate({

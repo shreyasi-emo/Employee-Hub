@@ -8,15 +8,23 @@ import { Plus, Package, Shield, User, CreditCard, MapPin, Briefcase, Calendar, A
 import { format } from "date-fns";
 import { InfoRow } from "./employee-ui";
 
-export function PersonalTab({ employee, showBank }: { employee: any; showBank: boolean }) {
+// Card header with an icon-led title and an optional right-aligned Edit link (opens the edit dialog).
+function CardHead({ icon: Icon, title, onEdit }: { icon: any; title: string; onEdit?: () => void }) {
+  return (
+    <CardHeader className="pb-3">
+      <div className="flex items-center justify-between">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2"><Icon className="h-4 w-4 text-[#206295]" /> {title}</CardTitle>
+        {onEdit && <button type="button" onClick={onEdit} className="text-xs font-medium text-[#206295] hover:underline">Edit</button>}
+      </div>
+    </CardHeader>
+  );
+}
+
+export function PersonalTab({ employee, showBank, onEdit }: { employee: any; showBank: boolean; onEdit?: () => void }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <User className="h-4 w-4" /> Personal Details
-          </CardTitle>
-        </CardHeader>
+        <CardHead icon={User} title="Personal Details" onEdit={onEdit} />
         <CardContent className="grid grid-cols-2 gap-4">
           <InfoRow label="Date of Birth" value={employee.dateOfBirth ? format(new Date(employee.dateOfBirth), "MMM d, yyyy") : null} />
           <InfoRow label="Gender" value={employee.gender} />
@@ -27,22 +35,14 @@ export function PersonalTab({ employee, showBank }: { employee: any; showBank: b
         </CardContent>
       </Card>
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <MapPin className="h-4 w-4" /> Address
-          </CardTitle>
-        </CardHeader>
+        <CardHead icon={MapPin} title="Address" onEdit={onEdit} />
         <CardContent className="space-y-4">
           <InfoRow label="Current Address" value={employee.currentAddress} />
           <InfoRow label="Permanent Address" value={employee.permanentAddress} />
         </CardContent>
       </Card>
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" /> Emergency Contact
-          </CardTitle>
-        </CardHeader>
+        <CardHead icon={AlertCircle} title="Emergency Contact" onEdit={onEdit} />
         <CardContent className="grid grid-cols-2 gap-4">
           <InfoRow label="Name" value={employee.emergencyContactName} />
           <InfoRow label="Relation" value={employee.emergencyContactRelation} />
@@ -51,11 +51,7 @@ export function PersonalTab({ employee, showBank }: { employee: any; showBank: b
       </Card>
       {showBank && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <CreditCard className="h-4 w-4" /> Bank Details
-            </CardTitle>
-          </CardHeader>
+          <CardHead icon={CreditCard} title="Bank Details" onEdit={onEdit} />
           <CardContent className="grid grid-cols-2 gap-4">
             <InfoRow label="Bank Name" value={employee.bankName} />
             <InfoRow label="Account (Masked)" value={employee.bankAccountMasked} />

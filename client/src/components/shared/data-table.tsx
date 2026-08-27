@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { PaginationBar } from "./pagination";
 import { cn } from "@/lib/utils";
 
 // House standard: lists show 15 rows per page, then paginate.
@@ -130,13 +130,8 @@ export function DataTable<T>({
       </table>
     </div>
     {showPager && (
-      <div className="flex items-center justify-between px-5 py-3 border-t border-border text-xs text-muted-foreground">
-        <span className="tabular-nums">{firstShown}–{lastShown} of {rows.length}</span>
-        <div className="flex items-center gap-1">
-          <button type="button" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} aria-label="Previous page" data-testid="dt-prev" className="h-7 w-7 inline-flex items-center justify-center rounded-[8px] border border-border disabled:opacity-40 hover-elevate"><ChevronLeft className="h-4 w-4" /></button>
-          <span className="px-2 tabular-nums">{curPage} / {totalPages}</span>
-          <button type="button" disabled={curPage >= totalPages} onClick={() => setPage(curPage + 1)} aria-label="Next page" data-testid="dt-next" className="h-7 w-7 inline-flex items-center justify-center rounded-[8px] border border-border disabled:opacity-40 hover-elevate"><ChevronRight className="h-4 w-4" /></button>
-        </div>
+      <div className="px-5 py-3 border-t border-border">
+        <PaginationBar page={curPage} totalPages={totalPages} count={rows.length} size={pageSize} onPage={setPage} />
       </div>
     )}
     </div>

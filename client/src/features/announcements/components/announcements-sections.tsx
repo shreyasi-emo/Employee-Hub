@@ -30,7 +30,7 @@ export function CategoryFilterPills({ announcements, categories, value, onChange
   return (
     <div className="flex gap-2 flex-wrap">
       <button
-        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${value === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border"}`}
+        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${value === "all" ? "btn-primary-gradient text-white border-transparent" : "bg-muted text-muted-foreground border-border hover-elevate"}`}
         onClick={() => onChange("all")}
         data-testid="filter-all"
       >
@@ -39,7 +39,7 @@ export function CategoryFilterPills({ announcements, categories, value, onChange
       {categories.map((cat: any) => (
         <button
           key={cat}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors capitalize ${value === cat ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border"}`}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors capitalize ${value === cat ? "btn-primary-gradient text-white border-transparent" : "bg-muted text-muted-foreground border-border hover-elevate"}`}
           onClick={() => onChange(cat)}
           data-testid={`filter-${cat}`}
         >

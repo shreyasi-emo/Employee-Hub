@@ -146,25 +146,24 @@ export function OrgAttendanceView() {
 
       <WfhApprovalsCard />
 
-      {/* Main row — the Today's Attendance card hugs its content and drives the row height; the
-          Headcount and Approvals cards are absolutely positioned so they match that height exactly. */}
+      {/* Main row — all three cards stretch to a common height (grid items-stretch). Each card is
+          h-full so it fills its cell; nothing is absolutely positioned, so a short card can never
+          overflow onto the table below. */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:items-stretch">
-        <div className="lg:col-span-2 lg:relative">
-          <div className="lg:absolute lg:inset-0">
-            <HeadcountChartCard
-              chartView={chartView} onChartView={setChartView}
-              stateFilter={stateFilter} onStateFilter={setStateFilter}
-              graphData={graphData} seriesStates={seriesStates} showPct={showPct} renderXTick={renderXTick}
-            />
-          </div>
+        <div className="lg:col-span-2 min-w-0">
+          <HeadcountChartCard
+            chartView={chartView} onChartView={setChartView}
+            stateFilter={stateFilter} onStateFilter={setStateFilter}
+            graphData={graphData} seriesStates={seriesStates} showPct={showPct} renderXTick={renderXTick}
+          />
         </div>
 
-        <TodayDonutCard pieData={pieData} pieTotal={pieTotal} todayCounts={todayCounts} />
+        <div className="min-w-0">
+          <TodayDonutCard pieData={pieData} pieTotal={pieTotal} todayCounts={todayCounts} />
+        </div>
 
-        <div className="lg:relative">
-          <div className="lg:absolute lg:inset-0">
-            <ApprovalsFeedCard />
-          </div>
+        <div className="min-w-0">
+          <ApprovalsFeedCard />
         </div>
       </div>
 

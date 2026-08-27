@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
@@ -68,11 +69,11 @@ export function LeaveTypesSection() {
             </div>
             <div className="flex gap-4 flex-wrap">
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={newLT.isPaid} onChange={e => setNewLT(n => ({ ...n, isPaid: e.target.checked }))} />
+                <Checkbox checked={newLT.isPaid} onCheckedChange={v => setNewLT(n => ({ ...n, isPaid: v === true }))} />
                 Paid
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={newLT.isCarryForward} onChange={e => setNewLT(n => ({ ...n, isCarryForward: e.target.checked }))} />
+                <Checkbox checked={newLT.isCarryForward} onCheckedChange={v => setNewLT(n => ({ ...n, isCarryForward: v === true }))} />
                 Carry Forward
               </label>
             </div>

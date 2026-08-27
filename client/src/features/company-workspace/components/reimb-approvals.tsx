@@ -1,5 +1,7 @@
 import { money, catStyle, dayInRange, rangeSuffix, reimbPriority, reimbSubmittedInfo, REIMB_PAGE_SIZE } from "../shared/approval-format";
 import { ApprovalDateRange, ViewToggle } from "./approval-ui";
+import { ApprovalToolbar } from "./approval-toolbar";
+import { ApprovalModal, ApprovalFooter } from "./approval-modal";
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +23,7 @@ import { format } from "date-fns";
 import { statusClass, statusLabel } from "@/lib/status";
 
 // Premium card-based reimbursement approvals list. Finance = individual; CEO = + bulk.
-export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk }: { items: any[]; allItems?: any[]; nameByUser?: Record<string, string>; allowBulk: boolean }) {
+export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk, showPhaseToggle = false, asModal = false, open = true, onClose }: { items: any[]; allItems?: any[]; nameByUser?: Record<string, string>; allowBulk: boolean; showPhaseToggle?: boolean; asModal?: boolean; open?: boolean; onClose?: () => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [, navigate] = useLocation();
@@ -35,6 +37,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
   const [sortBy, setSortBy] = useState("date_desc");
   const [view, setView] = useState<"card" | "table">("card");
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
   const inRange = (d: any) => dayInRange(d, range);
   const approvedByName = (r: any) => nameByUser[r.approvedById] || nameByUser[r.financeApprovedById] || "—";
 
@@ -81,8 +84,10 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
     if (priorityFilter !== "all" && pr !== priorityFilter) return false;
     if (catFilter !== "all" && r.category !== catFilter) return false;
     if (!inRange(r.createdAt)) return false;
+    const qq = search.trim().toLowerCase();
+    if (qq && !`${r.reference || ""} ${r.employeeName || ""} ${r.employeeCode || ""} ${r.department || ""} ${r.category || ""} ${r.businessPurpose || ""}`.toLowerCase().includes(qq)) return false;
     return true;
-  }), [baseList, priorityFilter, catFilter, range]);
+  }), [baseList, priorityFilter, catFilter, range, search]);
   const sorted = useMemo(() => {
     const s = [...filtered];
     s.sort((a, b) => {
@@ -111,78 +116,72 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
   );
   const dateRange = <ApprovalDateRange value={range} onChange={(v) => { setRange(v); setPage(1); }} />;
 
-  return (
-    <div className="space-y-4">
-      {/* ===== Toolbar: filters · sort · pagination · select ===== */}
-      <div className="flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          {phaseToggle}
-          <div className="h-7 w-px bg-foreground/30 mx-0.5" />
-          <ViewToggle view={view} onChange={setView} />
-          <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[130px] text-xs" data-testid="filter-priority"><SelectValue placeholder="Priority" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priority</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={catFilter} onValueChange={(v) => { setCatFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[150px] text-xs" data-testid="filter-category"><SelectValue placeholder="Category" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="h-9 w-[160px] text-xs" data-testid="sort-reimb"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="date_desc">Newest first</SelectItem>
-              <SelectItem value="date_asc">Oldest first</SelectItem>
-              <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
-              <SelectItem value="amount_asc">Amount: Low → High</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          {dateRange}
-          {phase === "completed" && (
-            <Button variant="secondary" size="sm" className="h-9" onClick={() => doExport(sorted)} data-testid="button-export-reimb"><Download className="h-4 w-4 mr-1" /> Export</Button>
-          )}
-          {allowBulk && phase === "pending" && !selectionMode && (
-            <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelectionMode(true)} data-testid="button-select">
-              <MousePointerClick className="h-4 w-4 mr-1" /> Select
-            </Button>
-          )}
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} data-testid="page-prev"><ChevronLeft className="h-4 w-4" /></Button>
-            <span className="px-1 tabular-nums">{curPage} / {totalPages}</span>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage >= totalPages} onClick={() => setPage(curPage + 1)} data-testid="page-next"><ChevronRight className="h-4 w-4" /></Button>
-          </div>
-        </div>
-      </div>
+  const footerNode = allowBulk && phase === "pending" ? (
+    <ApprovalFooter
+      total={sorted.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0)}
+      itemCount={sorted.length}
+      selectedCount={sel.size}
+      busy={approve.isPending || rejectAll.isPending}
+      onApprove={(sc) => approve.mutate(sc === "selected" ? Array.from(sel) : sorted.map((r) => r.id))}
+      onReject={(sc, note) => rejectAll.mutate({ ids: sc === "selected" ? Array.from(sel) : sorted.map((r) => r.id), note })}
+    />
+  ) : undefined;
 
-      {/* ===== Selection bar (CEO bulk approval) ===== */}
-      {allowBulk && selectionMode && (
-        <Card className="border-0"><CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={toggleAll} data-testid="button-select-all"><CheckSquare className="h-4 w-4 mr-1" /> Select All</Button>
-            <span className="text-sm font-medium">{sel.size} selected</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-end gap-0.5">
-              <IndianRupee className="h-6 w-6 text-[#206295] mb-0.5" />
-              <span className="text-2xl font-bold text-[#206295] tracking-tight tabular-nums">{selectedTotal.toLocaleString("en-IN")}</span>
-            </div>
-            <div className="h-9 w-px bg-foreground/30" />
-            <Button size="sm" variant="outline" className="h-9 text-[#FF6F62] border-[#FF6F62]/40 hover:bg-[#FF6F62]/10" disabled={sel.size === 0 || rejectAll.isPending} onClick={rejectAllConfirm} data-testid="button-reject-all"><X className="h-4 w-4 mr-1.5" /> Reject All</Button>
-            <Button size="sm" className="h-9 btn-primary-gradient" disabled={sel.size === 0 || approve.isPending} onClick={approveAll} data-testid="button-approve-all"><Check className="h-4 w-4 mr-1.5" /> Approve All</Button>
-            <Button variant="outline" size="icon" className="h-9 w-9 flex-shrink-0" onClick={exitSelection} aria-label="Exit selection" data-testid="button-exit-selection"><X className="h-4 w-4" /></Button>
-          </div>
-        </CardContent></Card>
-      )}
+  const toolbarNode = (
+    <ApprovalToolbar
+      search={search}
+      onSearch={(v) => { setSearch(v); setPage(1); }}
+      viewToggle={<ViewToggle view={view} onChange={setView} />}
+      filters={<>
+        {showPhaseToggle && phaseToggle}
+        <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
+          <SelectTrigger className="h-9 w-[130px] text-xs flex-shrink-0" data-testid="filter-priority"><SelectValue placeholder="Priority" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Priority</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={catFilter} onValueChange={(v) => { setCatFilter(v); setPage(1); }}>
+          <SelectTrigger className="h-9 w-[150px] text-xs flex-shrink-0" data-testid="filter-category"><SelectValue placeholder="Category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </>}
+      sort={
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="h-9 w-[160px] text-xs flex-shrink-0" data-testid="sort-reimb"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="date_desc">Newest first</SelectItem>
+            <SelectItem value="date_asc">Oldest first</SelectItem>
+            <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
+            <SelectItem value="amount_asc">Amount: Low → High</SelectItem>
+          </SelectContent>
+        </Select>
+      }
+      extra={<>
+        {dateRange}
+        {phase === "completed" && <Button variant="secondary" size="sm" className="h-9 flex-shrink-0" onClick={() => doExport(sorted)} data-testid="button-export-reimb"><Download className="h-4 w-4 mr-1" /> Export</Button>}
+      </>}
+      selectable={allowBulk && phase === "pending"}
+      selectionMode={selectionMode}
+      onSelect={() => setSelectionMode(true)}
+      onExitSelect={exitSelection}
+      allSelected={allSelected}
+      onToggleAll={toggleAll}
+      page={curPage}
+      totalPages={totalPages}
+      onPage={setPage}
+      total={sorted.length}
+      pageSize={REIMB_PAGE_SIZE}
+    />
+  );
 
+  const bodyNode = (
+    <>
       {/* ===== Table view (either phase) ===== */}
       {view === "table" && (
         sorted.length === 0 ? (
@@ -206,6 +205,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
               getRowKey={(r: any) => r.id}
               onRowClick={(r: any) => (selectionMode ? toggle(r.id) : openDetail(r))}
               testIdPrefix="completed-reimb"
+              paginate={false}
             />
           </div>
         )
@@ -329,16 +329,35 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
       </div>
         )
       )}
+    </>
+  );
 
-      {detail && (
-        <ReimbursementApprovalModal
-          reimb={detail}
-          canAct={detail.status !== "approved" && detail.status !== "rejected"}
-          open={!!detail}
-          onClose={() => setDetail(null)}
-          onExpand={() => { const id = detail.id; setDetail(null); navigate(`/my-approvals/reimbursement/${id}`); }}
-        />
-      )}
+  const detailNode = detail ? (
+    <ReimbursementApprovalModal
+      reimb={detail}
+      canAct={detail.status !== "approved" && detail.status !== "rejected"}
+      open={!!detail}
+      onClose={() => setDetail(null)}
+      onExpand={() => { const id = detail.id; setDetail(null); navigate(`/my-approvals/reimbursement/${id}`); }}
+    />
+  ) : null;
+
+  if (asModal) {
+    return (
+      <>
+        <ApprovalModal open={open} onClose={() => onClose?.()} icon={FileText} title="Reimbursement approvals" count={items.length} toolbar={toolbarNode} footer={footerNode}>
+          {bodyNode}
+        </ApprovalModal>
+        {detailNode}
+      </>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {toolbarNode}
+      {bodyNode}
+      {footerNode && <div className="border-t border-border pt-4">{footerNode}</div>}
+      {detailNode}
     </div>
   );
 }

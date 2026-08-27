@@ -46,7 +46,7 @@ export function VendorFormDialog({ open, onClose }: { open: boolean; onClose: ()
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...form.register("email")} data-testid="input-vendor-email" /></div>
-            <div className="space-y-1.5"><Label>Phone</Label><Input {...form.register("phone")} data-testid="input-vendor-phone" /></div>
+            <div className="space-y-1.5"><Label>Phone</Label><Input type="tel" inputMode="tel" {...form.register("phone")} data-testid="input-vendor-phone" /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5"><Label>GST Number</Label><Input {...form.register("gstNumber")} data-testid="input-vendor-gst" /></div>

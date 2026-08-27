@@ -40,7 +40,7 @@ export function ProgressDialog({ open, onClose, goal }: { open: boolean; onClose
         <div className="space-y-3">
           <div>
             <Label>Current Value</Label>
-            <Input data-testid="input-progress-value" value={form.progressValue} onChange={e => setForm(f => ({ ...f, progressValue: e.target.value }))} placeholder={`Target: ${goal?.targetValue} ${goal?.unit || ""}`} />
+            <Input data-testid="input-progress-value" type="number" inputMode="decimal" value={form.progressValue} onChange={e => setForm(f => ({ ...f, progressValue: e.target.value }))} placeholder={`Target: ${goal?.targetValue} ${goal?.unit || ""}`} />
           </div>
           <div>
             <Label>Note</Label>

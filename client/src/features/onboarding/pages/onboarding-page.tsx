@@ -33,7 +33,7 @@ function TaskItemRow({ item, tasks, canEdit }: { item: any; tasks: any[]; canEdi
   });
 
   const statusIcon = item.status === "done" ? (
-    <CheckCircle2 className="h-4 w-4 text-green-500" />
+    <CheckCircle2 className="h-4 w-4 text-[#0E7C7B]" />
   ) : item.status === "skipped" ? (
     <SkipForward className="h-4 w-4 text-muted-foreground" />
   ) : (
@@ -111,7 +111,7 @@ function InstanceCard({ instance, employees, templates }: { instance: any; emplo
                 <span className="text-xs text-muted-foreground">{done}/{total}</span>
               </div>
             )}
-            <Badge className={pct === 100 ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-xs" : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 text-xs"}>
+            <Badge className={pct === 100 ? "bg-[#4BDCD9]/25 text-[#0E7C7B] text-xs" : "bg-[#FFA962]/25 text-[#D98324] text-xs"}>
               {pct === 100 ? "Completed" : `${pct}%`}
             </Badge>
             <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />

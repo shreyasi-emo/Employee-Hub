@@ -14,15 +14,15 @@ export function usePaged<T>(items: T[], size = PAGE_SIZE) {
   return { pageItems, page: cur, setPage, totalPages, count: items.length, size, hasPages: totalPages > 1 };
 }
 
-export function PaginationBar({ page, totalPages, count, size, onPage, className = "" }: {
-  page: number; totalPages: number; count: number; size: number; onPage: (p: number) => void; className?: string;
+export function PaginationBar({ page, totalPages, count, size, onPage, compact = false, className = "" }: {
+  page: number; totalPages: number; count: number; size: number; onPage: (p: number) => void; compact?: boolean; className?: string;
 }) {
   if (totalPages <= 1) return null;
   const first = (page - 1) * size + 1;
   const last = Math.min(page * size, count);
   return (
-    <div className={`flex items-center justify-between pt-1 text-xs text-muted-foreground ${className}`}>
-      <span className="tabular-nums">{first}–{last} of {count}</span>
+    <div className={`flex items-center text-xs text-muted-foreground ${compact ? "gap-2 flex-shrink-0" : "justify-between pt-1"} ${className}`}>
+      <span className="tabular-nums whitespace-nowrap">{first}–{last} of {count}</span>
       <div className="flex items-center gap-1">
         <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></Button>
         <span className="px-1 tabular-nums">{page} / {totalPages}</span>

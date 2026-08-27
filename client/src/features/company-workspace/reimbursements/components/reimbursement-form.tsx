@@ -7,15 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as RangeCalendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigation } from "react-day-picker";
 import { format } from "date-fns";
-import { CalCaption } from "@/components/shared/date-range-picker";
+import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { RequestDialog } from "@/components/shared/request-dialog";
-import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, Upload, FileText, X, Save } from "lucide-react";
+import { DateInput } from "@/components/shared/datetime-field";
+import { Plus, Trash2, Upload, FileText, X, Save } from "lucide-react";
 
 const NATURE_OPTIONS = [
   "Travel & Conveyance",
@@ -34,36 +31,6 @@ type Item = { invoiceNo: string; invoiceDate: string; description: string; natur
 const blankItem = (): Item => ({ invoiceNo: "", invoiceDate: "", description: "", nature: "", amount: "", fileName: undefined, fileType: undefined, fileData: undefined });
 
 // Attendance-style date picker: single "From" date, with an "End date" toggle for a range
-function ExpensePeriodPicker({ value, onChange }: { value: { from?: Date; to?: Date }; onChange: (v: { from?: Date; to?: Date }) => void }) {
-  const [endDate, setEndDate] = useState(!!(value.from && value.to && +value.from !== +value.to));
-  const hasRange = endDate && value.to && value.from && +value.to !== +value.from;
-  const label = value.from
-    ? hasRange ? `${format(value.from, "MMM d")} – ${format(value.to!, "MMM d, yyyy")}` : format(value.from, "MMM d, yyyy")
-    : "Pick date";
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="secondary" size="sm" className="w-full justify-start" data-testid="button-expense-period"><CalendarDays className="h-4 w-4 mr-1" /> {label}</Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex-1 text-sm font-medium px-3 py-1.5 rounded-[12px] border border-border text-center">{value.from ? format(value.from, "MMM d, yyyy") : "From date"}</div>
-          {endDate && (<><span className="text-muted-foreground text-xs">→</span><div className="flex-1 text-sm font-medium px-3 py-1.5 rounded-[12px] border border-border text-center">{hasRange ? format(value.to!, "MMM d, yyyy") : "End date"}</div></>)}
-        </div>
-        {endDate ? (
-          <RangeCalendar mode="range" selected={value as any} onSelect={(r: any) => onChange(r ?? {})} defaultMonth={value.from} components={{ Caption: CalCaption }} />
-        ) : (
-          <RangeCalendar mode="single" selected={value.from} onSelect={(d: any) => d && onChange({ from: d, to: d })} defaultMonth={value.from} components={{ Caption: CalCaption }} />
-        )}
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
-          <span className="text-sm font-medium">End date</span>
-          <Switch checked={endDate} onCheckedChange={(c) => { setEndDate(c); if (!c && value.from) onChange({ from: value.from, to: value.from }); else if (c && value.from) onChange({ from: value.from, to: undefined }); }} data-testid="switch-expense-end-date" />
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 // All item fields are mandatory, including the uploaded invoice
 export function itemComplete(it: any) {
   return !!(it.invoiceNo?.trim() && it.invoiceDate && it.description?.trim() && it.nature && Number(it.amount) > 0 && it.fileData);
@@ -242,7 +209,7 @@ export function ReimbursementFormDialog({ open, onClose, onSuccess, initialData,
           </div>
           <div className="space-y-1.5">
             <Label>Expense Period</Label>
-            <div className={`rounded-[16px] ${!canEditField("period") ? "opacity-60 pointer-events-none" : ""} ${tried && !period.from ? "ring-1 ring-[#FF6F62]" : ""}`}><ExpensePeriodPicker value={period} onChange={setPeriod} /></div>
+            <div className={`rounded-[16px] ${!canEditField("period") ? "opacity-60 pointer-events-none" : ""} ${tried && !period.from ? "ring-1 ring-[#FF6F62]" : ""}`}><DateRangePicker value={period} onChange={setPeriod} triggerClassName="w-full justify-start" testId="button-expense-period" /></div>
             {fieldErr(!period.from, "Please select the From date")}
           </div>
         </div>
@@ -265,7 +232,7 @@ export function ReimbursementFormDialog({ open, onClose, onSuccess, initialData,
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">Invoice No.</p><Input value={it.invoiceNo} onChange={(e) => setItem(i, { invoiceNo: e.target.value })} placeholder="INV-1234" className={`h-9 ${errCls(!it.invoiceNo.trim())}`} />{fieldErr(!it.invoiceNo.trim(), "Invoice No. is required")}</div>
-                <div className="space-y-1"><p className="text-xs text-muted-foreground">Invoice Date</p><Input type="date" value={it.invoiceDate} onChange={(e) => setItem(i, { invoiceDate: e.target.value })} className={`h-9 ${errCls(!it.invoiceDate)}`} />{fieldErr(!it.invoiceDate, "Invoice date is required")}</div>
+                <div className="space-y-1"><p className="text-xs text-muted-foreground">Invoice Date</p><DateInput value={it.invoiceDate} onChange={(v) => setItem(i, { invoiceDate: v })} className={`h-9 ${errCls(!it.invoiceDate)}`} />{fieldErr(!it.invoiceDate, "Invoice date is required")}</div>
               </div>
               <div className="space-y-1"><p className="text-xs text-muted-foreground">Description</p><Input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="What was this expense for?" className={`h-9 ${errCls(!it.description.trim())}`} />{fieldErr(!it.description.trim(), "Description is required")}</div>
               <div className="grid grid-cols-2 gap-3">

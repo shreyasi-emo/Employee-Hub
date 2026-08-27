@@ -16,12 +16,16 @@ import { money } from "@/lib/format";
 import { format } from "date-fns";
 import { Plane, Hotel, Bus, Train, Car, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon, Clock, Eye, CheckSquare, MousePointerClick, ArrowDownUp } from "lucide-react";
 import { ApprovalCard } from "@/features/company-workspace/components/approval-card";
-import { ApprovalToolbar, ApprovalSelectionBar } from "@/features/company-workspace/components/approval-toolbar";
+import { ApprovalToolbar } from "@/features/company-workspace/components/approval-toolbar";
+import { ApprovalModal, ApprovalFooter } from "@/features/company-workspace/components/approval-modal";
+import { ViewToggle } from "@/features/company-workspace/components/approval-ui";
+import { DataTable } from "@/components/shared/data-table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { EmployeePicker } from "@/components/shared/employee-picker";
 import { Textarea } from "@/components/ui/textarea";
-import { DateInput } from "@/components/shared/datetime-field";
+import { DateInput, TimeField } from "@/components/shared/datetime-field";
 import { RequestDialog } from "@/components/shared/request-dialog";
 import { clampEnd } from "@/lib/date-range";
 
@@ -100,9 +104,23 @@ function FieldRow({ f, value, min, onChange }: { f: F; value: any; min?: string;
   return (
     <div className="space-y-1 min-w-0">
       <Label className="text-[11px]">{f.label}</Label>
-      {f.type === "select"
-        ? <Select value={value || ""} onValueChange={onChange}><SelectTrigger className="h-9 capitalize"><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{(f.options || []).map((o) => <SelectItem key={o} value={o} className="capitalize">{o}</SelectItem>)}</SelectContent></Select>
-        : <Input type={f.type === "number" ? "number" : f.type === "date" ? "date" : f.type === "datetime-local" ? "datetime-local" : "text"} value={value ?? ""} min={min} onChange={(e) => onChange(e.target.value)} className="h-9" />}
+      {f.type === "select" ? (
+        <Select value={value || ""} onValueChange={onChange}><SelectTrigger className="h-9 capitalize"><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{(f.options || []).map((o) => <SelectItem key={o} value={o} className="capitalize">{o}</SelectItem>)}</SelectContent></Select>
+      ) : f.type === "date" ? (
+        <DateInput value={value || ""} onChange={onChange} minDate={min} />
+      ) : f.type === "datetime-local" ? (
+        (() => {
+          const [d, t] = String(value || "").split("T");
+          return (
+            <div className="grid grid-cols-2 gap-2">
+              <DateInput value={d || ""} onChange={(nd) => onChange(nd ? `${nd}T${t || "09:00"}` : "")} />
+              <TimeField value={t || ""} onChange={(nt) => onChange(`${d || ""}T${nt}`)} />
+            </div>
+          );
+        })()
+      ) : (
+        <Input type={f.type === "number" ? "number" : "text"} value={value ?? ""} onChange={(e) => onChange(e.target.value)} className="h-9" />
+      )}
     </div>
   );
 }
@@ -363,7 +381,7 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner", scope
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-border">
           <DialogTitle className="flex items-center gap-2 min-w-0">
             <span className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${cat.tint}1a`, color: cat.tint }}><cat.icon className="h-5 w-5" /></span>
             <span className="truncate">{t.reference}</span>
@@ -435,7 +453,7 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner", scope
 }
 
 // ============================ Travel approvals (HR price/book + CEO decide) ============================
-export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
+export function TravelApprovals({ scope = "hr", open = true, onClose }: { scope?: "ceo" | "hr"; open?: boolean; onClose?: () => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [phase, setPhase] = useState<"pending" | "booked" | "completed">("pending");
@@ -446,6 +464,7 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "amount">("newest");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<"card" | "table">("card");
   const { data: all = [] } = useQuery<any[]>({ queryKey: ["/api/travel"] });
   // CEO surface reviews (approve/reject/query); HR surface prices + books. Scope keeps them separate for super_admin.
   const pendingStatuses = scope === "ceo" ? ["pending_approval", "under_review"] : ["pending_hr", "approved", "under_review"];
@@ -483,8 +502,9 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
   const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => setSel(allSelected ? new Set() : new Set(list.map((t) => t.id)));
   const exitSelection = () => { setSelectionMode(false); setSel(new Set()); };
-  const approveSelected = () => { if (sel.size && window.confirm(`Approve ${sel.size} trip(s)? This cannot be undone.`)) bulkApprove.mutate(Array.from(sel)); };
-  const rejectSelected = () => { if (!sel.size) return; const note = window.prompt(`Reject ${sel.size} trip(s)? Enter a reason:`); if (note && note.trim()) bulkReject.mutate({ ids: Array.from(sel), note: note.trim() }); };
+  const changeView = (v: "card" | "table") => { setView(v); setPage(1); };
+  const listTotal = list.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const allFilteredIds = list.map((t) => t.id);
 
   const renderCard = (t: any) => {
     const cat = TRAVEL_CATS[t.category] || TRAVEL_CATS.flight;
@@ -519,58 +539,102 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
     );
   };
 
+  const travelCols = [
+    ...(scope === "ceo" && selectionMode ? [{ key: "__sel", header: "", render: (t: any) => <div onClick={(e) => e.stopPropagation()}><Checkbox checked={sel.has(t.id)} onCheckedChange={() => toggleSel(t.id)} /></div> }] : []),
+    { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (t: any) => t.reference },
+    { key: "requester", header: "Requester", render: (t: any) => <span className="text-foreground">{t.employeeName || "—"}<span className="text-muted-foreground"> ({t.employeeCode || "—"})</span></span> },
+    { key: "category", header: "Category", cellClassName: "capitalize text-muted-foreground", render: (t: any) => (TRAVEL_CATS[t.category] || TRAVEL_CATS.flight).label },
+    { key: "route", header: "Route", cellClassName: "text-muted-foreground", render: (t: any) => t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "—") : `${t.details?.from || "?"} → ${t.details?.to || "?"}` },
+    { key: "date", header: "Submitted", cellClassName: "text-muted-foreground", render: (t: any) => t.createdAt ? format(new Date(t.createdAt), "dd MMM yyyy") : "—" },
+    { key: "amount", header: "Amount", align: "right" as const, cellClassName: "font-semibold text-foreground", render: (t: any) => { const a = Number(t.amount) || 0; return a > 0 ? money(a) : "—"; } },
+    { key: "status", header: "Status", render: (t: any) => <Badge className={`text-xs ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge> },
+  ];
+
+  const toolbar = (
+    <ApprovalToolbar
+      search={search}
+      onSearch={(v) => { setSearch(v); setPage(1); }}
+      viewToggle={<ViewToggle view={view} onChange={changeView} />}
+      filters={<>
+        {scope === "hr" && (
+          <div className="segmented-toggle inline-flex p-0.5 h-9 flex-shrink-0">
+            {(["pending", "booked", "completed"] as const).map((p) => (
+              <button key={p} onClick={() => { setPhase(p); setPage(1); }} className={`px-3 h-full rounded-[9px] text-xs font-medium capitalize ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`travel-phase-${p}`}>{p}</button>
+            ))}
+          </div>
+        )}
+        <Select value={catFilter} onValueChange={(v) => { setCatFilter(v as any); setPage(1); }}>
+          <SelectTrigger className="h-9 w-[150px] text-xs flex-shrink-0" data-testid="travel-cat"><SelectValue placeholder="Category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="flight">Flight</SelectItem>
+            <SelectItem value="stay">Stay</SelectItem>
+            <SelectItem value="transport">Transport</SelectItem>
+          </SelectContent>
+        </Select>
+      </>}
+      sort={
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+          <SelectTrigger className="h-9 w-[160px] text-xs flex-shrink-0" data-testid="travel-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="amount">Amount: High → Low</SelectItem>
+          </SelectContent>
+        </Select>
+      }
+      selectable={scope === "ceo"} selectionMode={selectionMode}
+      onSelect={() => setSelectionMode(true)} onExitSelect={exitSelection}
+      allSelected={allSelected} onToggleAll={toggleAll}
+      page={curPage} totalPages={totalPages} onPage={setPage} total={list.length} pageSize={PAGE_SIZE}
+    />
+  );
+
+  const body = view === "table" ? (
+    <div className="card-surface rounded-2xl overflow-hidden">
+      <DataTable columns={travelCols} rows={paged} getRowKey={(t: any) => t.id} paginate={false} emptyText="Nothing here." onRowClick={(t: any) => { if (scope === "ceo" && selectionMode) toggleSel(t.id); else setDetailId(t.id); }} testIdPrefix="travel" />
+    </div>
+  ) : paged.length === 0 ? (
+    <div className="card-surface rounded-2xl py-10 text-center"><Check className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" /><p className="text-sm text-muted-foreground">Nothing here.</p></div>
+  ) : (
+    <div className="space-y-3">{paged.map(renderCard)}</div>
+  );
+
+  const detail = <TravelDetailDialog id={detailId} open={!!detailId} onClose={() => setDetailId(null)} context="approver" scope={scope} />;
+
+  if (scope === "ceo") {
+    return (
+      <>
+        <ApprovalModal
+          open={open}
+          onClose={() => onClose?.()}
+          icon={Plane}
+          title="Travel approvals"
+          count={list.length}
+          toolbar={toolbar}
+          footer={
+            <ApprovalFooter
+              total={listTotal}
+              itemCount={list.length}
+              selectedCount={sel.size}
+              busy={busy}
+              onApprove={(s) => bulkApprove.mutate(s === "selected" ? Array.from(sel) : allFilteredIds)}
+              onReject={(s, note) => bulkReject.mutate({ ids: s === "selected" ? Array.from(sel) : allFilteredIds, note })}
+            />
+          }
+        >
+          {body}
+        </ApprovalModal>
+        {detail}
+      </>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      <ApprovalToolbar
-        search={search}
-        onSearch={(v) => { setSearch(v); setPage(1); }}
-        filters={<>
-          {scope === "hr" && (
-            <div className="segmented-toggle inline-flex p-0.5 h-9 flex-shrink-0">
-              {(["pending", "booked", "completed"] as const).map((p) => (
-                <button key={p} onClick={() => { setPhase(p); setPage(1); }} className={`px-3 h-full rounded-[9px] text-xs font-medium capitalize ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`travel-phase-${p}`}>{p}</button>
-              ))}
-            </div>
-          )}
-          <Select value={catFilter} onValueChange={(v) => { setCatFilter(v as any); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[150px] text-xs flex-shrink-0" data-testid="travel-cat"><SelectValue placeholder="Category" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="flight">Flight</SelectItem>
-              <SelectItem value="stay">Stay</SelectItem>
-              <SelectItem value="transport">Transport</SelectItem>
-            </SelectContent>
-          </Select>
-        </>}
-        sort={
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-            <SelectTrigger className="h-9 w-[160px] text-xs flex-shrink-0" data-testid="travel-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Newest first</SelectItem>
-              <SelectItem value="oldest">Oldest first</SelectItem>
-              <SelectItem value="amount">Amount: High → Low</SelectItem>
-            </SelectContent>
-          </Select>
-        }
-        selectable={scope === "ceo"} selectionMode={selectionMode} onSelect={() => setSelectionMode(true)}
-        page={curPage} totalPages={totalPages} onPage={setPage}
-      />
-      {scope === "ceo" && selectionMode && (
-        <ApprovalSelectionBar
-          count={sel.size} allSelected={allSelected} onToggleAll={toggleAll} onDone={exitSelection}
-          actions={<>
-            <Button size="sm" variant="outline" className="h-9 text-[#FF6F62] border-[#FF6F62]/40 hover:bg-[#FF6F62]/10" disabled={busy || !sel.size} onClick={rejectSelected}><X className="h-4 w-4 mr-1.5" /> Reject</Button>
-            <Button size="sm" className="h-9 btn-primary-gradient" disabled={busy || !sel.size} onClick={approveSelected}><Check className="h-4 w-4 mr-1.5" /> Approve ({sel.size})</Button>
-          </>}
-        />
-      )}
-
-      {paged.length === 0 ? (
-        <div className="card-surface rounded-2xl py-10 text-center"><Check className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" /><p className="text-sm text-muted-foreground">Nothing here.</p></div>
-      ) : (
-        <div className="space-y-3">{paged.map(renderCard)}</div>
-      )}
-      <TravelDetailDialog id={detailId} open={!!detailId} onClose={() => setDetailId(null)} context="approver" scope={scope} />
+      {toolbar}
+      {body}
+      {detail}
     </div>
   );
 }

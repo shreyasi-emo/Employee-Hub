@@ -72,7 +72,7 @@ export function ApplyWfhDialog({ open, onClose }: { open: boolean; onClose: () =
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md p-0 overflow-hidden gap-0 flex flex-col max-h-[90vh]">
-        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-border">
           <DialogTitle className="flex items-center gap-2.5">
             <span className="h-9 w-9 rounded-xl bg-[#0E7C7B]/10 text-[#0E7C7B] flex items-center justify-center"><Home className="h-5 w-5" /></span>
             Apply Work from Home
@@ -106,7 +106,7 @@ export function ApplyWfhDialog({ open, onClose }: { open: boolean; onClose: () =
             <Label className="font-normal text-muted-foreground text-xs">Request for multiple days (range)</Label>
           </div>
           {conflict && (
-            <div className="rounded-lg border border-[#FF6F62]/40 bg-[#FF6F62]/10 px-3 py-2 text-xs text-[#C43D30] flex items-start gap-2" data-testid="wfh-conflict">
+            <div className="rounded-lg border border-[#FF6F62]/40 bg-[#FF6F62]/10 px-3 py-2 text-xs text-[#C4402F] flex items-start gap-2" data-testid="wfh-conflict">
               <TriangleAlert className="h-4 w-4 flex-shrink-0 mt-0.5" /> <span>{conflict} Please pick another date.</span>
             </div>
           )}

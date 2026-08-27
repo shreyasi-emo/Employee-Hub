@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateOnboardingTemplate } from "../api/onboarding.api";
@@ -31,7 +32,7 @@ export function TemplateFormDialog({ open, onClose }: { open: boolean; onClose: 
             <Input value={form.description} onChange={(e) => setForm((t) => ({ ...t, description: e.target.value }))} className="mt-1" />
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.isDefault} onChange={(e) => setForm((t) => ({ ...t, isDefault: e.target.checked }))} />
+            <Checkbox checked={form.isDefault} onCheckedChange={(v) => setForm((t) => ({ ...t, isDefault: v === true }))} />
             <span className="text-sm">Set as default template</span>
           </label>
           <div className="flex justify-end gap-2">

@@ -115,7 +115,7 @@ export function AssetDetailDialog({ asset, employees, onClose, canEdit }: { asse
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status</span>
                 <Badge
-                  className={`text-xs capitalize ${asset.status === "assigned" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" : asset.status === "available" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-700"}`}
+                  className={`text-xs capitalize ${asset.status === "assigned" ? "bg-[#206295]/12 text-[#206295]" : asset.status === "available" ? "bg-[#4BDCD9]/25 text-[#0E7C7B]" : "bg-muted text-muted-foreground"}`}
                 >
                   {asset.status}
                 </Badge>

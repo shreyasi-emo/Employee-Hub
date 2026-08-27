@@ -125,7 +125,7 @@ export default function ShiftsPage() {
                     </div>
                     <div className="mt-3 flex flex-wrap gap-1">
                       {DAYS.map((day, i) => (
-                        <span key={day} className={`text-xs px-1.5 py-0.5 rounded ${shift.weeklyOff?.includes(day) ? "bg-destructive/10 text-destructive" : "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"}`}>
+                        <span key={day} className={`text-xs px-1.5 py-0.5 rounded ${shift.weeklyOff?.includes(day) ? "bg-destructive/10 text-destructive" : "bg-[#4BDCD9]/25 text-[#0E7C7B]"}`}>
                           {SHORT_DAYS[i]}
                         </span>
                       ))}

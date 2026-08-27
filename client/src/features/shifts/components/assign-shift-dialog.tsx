@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DateInput } from "@/components/shared/datetime-field";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -77,7 +78,7 @@ export function AssignShiftDialog({ open, onOpenChange, employees, shifts }: {
               <div className="mt-1 border border-border rounded-md divide-y divide-border max-h-40 overflow-y-auto">
                 {employees.map(e => (
                   <label key={e.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50">
-                    <input type="checkbox" checked={selectedEmployees.includes(e.id)} onChange={() => toggleEmployee(e.id)} className="rounded" />
+                    <Checkbox checked={selectedEmployees.includes(e.id)} onCheckedChange={() => toggleEmployee(e.id)} />
                     <span className="text-sm">{e.firstName} {e.lastName}</span>
                     <span className="text-xs text-muted-foreground ml-auto">{e.employeeCode}</span>
                   </label>

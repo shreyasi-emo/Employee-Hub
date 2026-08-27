@@ -16,7 +16,7 @@ export function PayslipView({ payslip, employees }: { payslip: any; employees: a
           <p className="font-semibold">{monthName} {payslip.year}</p>
           <p className="text-xs text-muted-foreground">{payslip.presentDays} / {payslip.totalWorkingDays} days</p>
           {parseFloat(payslip.lopDays) > 0 && (
-            <p className="text-xs text-red-600">LOP: {payslip.lopDays} days</p>
+            <p className="text-xs text-[#C4402F]">LOP: {payslip.lopDays} days</p>
           )}
         </div>
       </div>
@@ -43,7 +43,7 @@ export function PayslipView({ payslip, employees }: { payslip: any; employees: a
           <Separator className="my-2" />
           <div className="flex justify-between text-sm font-semibold">
             <span>Gross Salary</span>
-            <span className="text-green-600">{fmt(payslip.grossSalary)}</span>
+            <span className="text-[#0E7C7B]">{fmt(payslip.grossSalary)}</span>
           </div>
         </div>
         <div>
@@ -62,14 +62,14 @@ export function PayslipView({ payslip, employees }: { payslip: any; employees: a
             ].filter(e => parseFloat(e.val || "0") > 0).map(e => (
               <div key={e.label} className="flex justify-between text-xs">
                 <span className="text-muted-foreground">{e.label}</span>
-                <span className="font-medium text-red-600">-{fmt(e.val)}</span>
+                <span className="font-medium text-[#C4402F]">-{fmt(e.val)}</span>
               </div>
             ))}
           </div>
           <Separator className="my-2" />
           <div className="flex justify-between text-sm font-semibold">
             <span>Total Deductions</span>
-            <span className="text-red-600">-{fmt(payslip.totalDeductions)}</span>
+            <span className="text-[#C4402F]">-{fmt(payslip.totalDeductions)}</span>
           </div>
         </div>
       </div>

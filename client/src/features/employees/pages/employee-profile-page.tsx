@@ -4,7 +4,7 @@ import { useAuth, isHR, isAdmin } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, User, Briefcase, CreditCard, FileText, Package, Target, History as HistoryIcon, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   useEmployee, useDepartments, useDesignations, useEmployeeSalary,
@@ -49,7 +49,7 @@ export default function EmployeeProfilePage() {
 
   if (isLoading || !empId) {
     return (
-      <div className="p-6 max-w-4xl mx-auto space-y-4">
+      <div className="p-6 max-w-[92rem] mx-auto space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-48 w-full" />
       </div>
@@ -68,9 +68,18 @@ export default function EmployeeProfilePage() {
   const dept = departments.find((d: any) => d.id === employee.departmentId);
   const desig = designations.find((d: any) => d.id === employee.designationId);
   const manager = employees.find((e: any) => e.id === employee.managerId);
+  const tabDefs = [
+    { value: "personal", label: "Personal", icon: User, show: true },
+    { value: "salary", label: "Salary", icon: CreditCard, show: canSeeSalary },
+    { value: "payslips", label: "Payslips", icon: FileText, show: true },
+    { value: "assets", label: "Assets", icon: Package, show: true },
+    { value: "performance", label: "Performance", icon: Target, show: true },
+    { value: "history", label: "History", icon: HistoryIcon, show: true },
+    { value: "audit", label: "Audit", icon: Shield, show: isAdminUser },
+  ].filter((t) => t.show);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-6 max-w-[92rem] mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="secondary" size="icon" className="h-10 w-10 flex-shrink-0" onClick={() => navigate("/employees")} aria-label="Back" data-testid="button-back">
           <ChevronLeft className="h-4 w-4" />
@@ -87,22 +96,21 @@ export default function EmployeeProfilePage() {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="personal" data-testid="tab-personal">Personal</TabsTrigger>
-          <TabsTrigger value="employment" data-testid="tab-employment">Employment</TabsTrigger>
-          {canSeeSalary && <TabsTrigger value="salary" data-testid="tab-salary">Salary</TabsTrigger>}
-          <TabsTrigger value="payslips" data-testid="tab-payslips">Payslips</TabsTrigger>
-          <TabsTrigger value="assets" data-testid="tab-assets">Assets</TabsTrigger>
-          <TabsTrigger value="performance" data-testid="tab-performance">Performance</TabsTrigger>
-          <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
-          {isAdminUser && <TabsTrigger value="audit" data-testid="tab-audit">Audit</TabsTrigger>}
+        <TabsList className="flex-wrap h-auto gap-1.5 bg-transparent p-0 justify-start">
+          {tabDefs.map((t) => (
+            <TabsTrigger
+              key={t.value}
+              value={t.value}
+              data-testid={`tab-${t.value}`}
+              className={`gap-1.5 rounded-[16px] px-3.5 h-9 text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none ${activeTab === t.value ? "btn-primary-gradient text-white" : "bg-muted/60 text-muted-foreground hover-elevate"}`}
+            >
+              <t.icon className="h-4 w-4" /> {t.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="personal" className="mt-4">
-          <PersonalTab employee={employee} showBank={isHrUser} />
-        </TabsContent>
-
-        <TabsContent value="employment" className="mt-4">
+        <TabsContent value="personal" className="mt-4 space-y-4">
+          <PersonalTab employee={employee} showBank={isHrUser} onEdit={isHrUser ? () => setShowEdit(true) : undefined} />
           <EmploymentTab employee={employee} dept={dept} desig={desig} manager={manager} />
         </TabsContent>
 

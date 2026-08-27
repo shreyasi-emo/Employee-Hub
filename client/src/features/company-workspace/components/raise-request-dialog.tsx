@@ -66,11 +66,11 @@ export function RaiseRequestDialog({ open, onOpenChange }: any) {
             <>
               <div>
                 <label className="text-sm font-medium">Item link (Amazon / website)</label>
-                <Input value={form.itemLink} onChange={e => setForm((f: any) => ({ ...f, itemLink: e.target.value }))} placeholder="https://amazon.in/…" />
+                <Input type="url" value={form.itemLink} onChange={e => setForm((f: any) => ({ ...f, itemLink: e.target.value }))} placeholder="https://amazon.in/…" />
               </div>
               <div>
                 <label className="text-sm font-medium">Item photo URL</label>
-                <Input value={form.itemPhotoUrl} onChange={e => setForm((f: any) => ({ ...f, itemPhotoUrl: e.target.value }))} placeholder="https://… (Drive link or image URL)" />
+                <Input type="url" value={form.itemPhotoUrl} onChange={e => setForm((f: any) => ({ ...f, itemPhotoUrl: e.target.value }))} placeholder="https://… (Drive link or image URL)" />
               </div>
             </>
           )}
@@ -98,7 +98,7 @@ export function RaiseRequestDialog({ open, onOpenChange }: any) {
             <label className="text-sm font-medium">Description</label>
             <Textarea rows={3} value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={() => create.mutate(form)} disabled={create.isPending || !form.title}>
               {create.isPending ? "Raising…" : "Raise"}

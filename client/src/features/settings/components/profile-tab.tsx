@@ -68,7 +68,7 @@ export function ProfileTab() {
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="+91 98765 43210" data-testid="input-phone" />
+                      <Input {...field} type="tel" inputMode="tel" placeholder="+91 98765 43210" data-testid="input-phone" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -140,7 +140,7 @@ export function ProfileTab() {
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="+91 98765 43210" data-testid="input-emergency-phone" />
+                          <Input {...field} type="tel" inputMode="tel" placeholder="+91 98765 43210" data-testid="input-emergency-phone" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

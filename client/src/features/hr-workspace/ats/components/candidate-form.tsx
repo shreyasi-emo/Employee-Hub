@@ -40,7 +40,7 @@ export function CandidateFormDialog({ open, onClose }: { open: boolean; onClose:
             </div>
             <div className="space-y-1.5">
               <Label>Phone</Label>
-              <Input {...form.register("phone")} placeholder="+91 9876543210" data-testid="input-cand-phone" />
+              <Input type="tel" inputMode="tel" {...form.register("phone")} placeholder="+91 9876543210" data-testid="input-cand-phone" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">

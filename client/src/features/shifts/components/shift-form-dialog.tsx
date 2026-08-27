@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { TimeField } from "@/components/shared/datetime-field";
 
 export function ShiftFormDialog({ open, onOpenChange, editShift }: { open: boolean; onOpenChange: (v: boolean) => void; editShift?: any }) {
   const { toast } = useToast();
@@ -38,7 +39,7 @@ export function ShiftFormDialog({ open, onOpenChange, editShift }: { open: boole
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader>
+        <DialogHeader className="border-b border-border">
           <DialogTitle>{editShift ? "Edit Shift" : "Create Shift"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
@@ -49,11 +50,11 @@ export function ShiftFormDialog({ open, onOpenChange, editShift }: { open: boole
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium">Start Time *</label>
-              <Input type="time" value={form.startTime} onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))} className="mt-1" data-testid="input-shift-start" />
+              <div className="mt-1"><TimeField value={form.startTime} onChange={(v) => setForm(f => ({ ...f, startTime: v }))} testId="input-shift-start" /></div>
             </div>
             <div>
               <label className="text-sm font-medium">End Time *</label>
-              <Input type="time" value={form.endTime} onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))} className="mt-1" data-testid="input-shift-end" />
+              <div className="mt-1"><TimeField value={form.endTime} onChange={(v) => setForm(f => ({ ...f, endTime: v }))} testId="input-shift-end" /></div>
             </div>
           </div>
           <div>
@@ -80,7 +81,7 @@ export function ShiftFormDialog({ open, onOpenChange, editShift }: { open: boole
             <label className="text-sm font-medium">Description</label>
             <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="mt-1" placeholder="Optional notes" />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button
               onClick={() => mutation.mutate({ ...form, weeklyOff })}

@@ -29,13 +29,13 @@ function DriverSelect({ employees, driverUserId, driverName, onSelect }: any) {
     <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         {current ? (
-          <button type="button" className="w-full flex items-center gap-2 rounded-[16px] border-[1.5px] border-[#1A4B94] bg-[#1A4B94]/[0.06] px-2.5 py-1.5 text-left" data-testid="driver-select">
+          <button type="button" className="w-full flex items-center gap-2 rounded-[16px] border-[1.5px] border-[#206295] bg-[#206295]/[0.06] px-2.5 py-1.5 text-left" data-testid="driver-select">
             <Avatar className="h-7 w-7 flex-shrink-0"><AvatarImage src={current.avatarUrl} /><AvatarFallback className="text-[10px] bg-[#206295]/15 text-[#206295]">{driverInitials(empName(current))}</AvatarFallback></Avatar>
             <span className="text-sm font-medium text-foreground truncate flex-1">{empName(current)}</span>
-            <ChevronDown className="h-4 w-4 text-[#1A4B94] flex-shrink-0" />
+            <ChevronDown className="h-4 w-4 text-[#206295] flex-shrink-0" />
           </button>
         ) : (
-          <button type="button" className="w-full flex items-center justify-between rounded-[16px] border-[1.5px] border-[#1A4B94] bg-[#1A4B94]/[0.06] px-3 py-2 text-sm font-medium text-[#1A4B94]" data-testid="driver-select">
+          <button type="button" className="w-full flex items-center justify-between rounded-[16px] border-[1.5px] border-[#206295] bg-[#206295]/[0.06] px-3 py-2 text-sm font-medium text-[#206295]" data-testid="driver-select">
             <span className="inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Assign Driver</span>
             <ChevronDown className="h-4 w-4" />
           </button>
@@ -51,7 +51,7 @@ function DriverSelect({ employees, driverUserId, driverName, onSelect }: any) {
               <button key={e.id} type="button" onClick={() => pick(e)} className="w-full flex items-center gap-2 rounded-[12px] px-2 py-1.5 text-sm text-left hover-elevate" data-testid={`driver-opt-${e.id}`}>
                 <Avatar className="h-6 w-6 flex-shrink-0"><AvatarImage src={e.avatarUrl} /><AvatarFallback className="text-[9px] bg-[#206295]/15 text-[#206295]">{driverInitials(name)}</AvatarFallback></Avatar>
                 <span className="flex-1 truncate">{name}</span>
-                {sel && <Check className="h-4 w-4 text-[#1A4B94] flex-shrink-0" />}
+                {sel && <Check className="h-4 w-4 text-[#206295] flex-shrink-0" />}
               </button>
             );
           })}
@@ -90,7 +90,7 @@ export function ManageVehicleDialog({ open, onClose, vehicles, employees }: any)
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg h-[85vh] p-0 overflow-hidden gap-0 flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <DialogTitle className="flex items-center gap-2">
             {screen === "form" && vehicles.length > 0 && (
               <button onClick={backToList} className="inline-flex items-center text-muted-foreground hover:text-foreground" data-testid="manage-back"><ArrowLeft className="h-4 w-4" /></button>
@@ -174,7 +174,7 @@ export function ManageVehicleDialog({ open, onClose, vehicles, employees }: any)
                         set("driverPhone", e.phone || e.personalPhone || e.contactNumber || e.mobile || "");
                       }} />
                   </div>
-                  <div className="space-y-1"><Label className="text-xs">Driver Phone</Label><Input value={form.driverPhone} onChange={(e) => set("driverPhone", e.target.value)} placeholder="+91…" /></div>
+                  <div className="space-y-1"><Label className="text-xs">Driver Phone</Label><Input type="tel" inputMode="tel" value={form.driverPhone} onChange={(e) => set("driverPhone", e.target.value)} placeholder="+91…" /></div>
                   <div className="space-y-1"><Label className="text-xs">Status</Label>
                     <Select value={form.status} onValueChange={(v) => set("status", v)}>
                       <SelectTrigger data-testid="vehicle-status"><SelectValue /></SelectTrigger>

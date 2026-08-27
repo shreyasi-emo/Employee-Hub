@@ -9,7 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CheckCircle2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { DateInput } from "@/components/shared/datetime-field";
+import { CheckCircle2, User, Briefcase, CreditCard, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { EMP_TYPES, EMP_STATUSES, GENDERS, SYSTEM_ROLES, MARITAL } from "../lib/employee-constants";
 import {
@@ -19,10 +21,14 @@ import {
 import { useSaveEmployee, useCreateDepartment, useCreateDesignation } from "../api/employees.api";
 import { SelectWithAddNew } from "./select-with-add-new";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// Sectioned like the request forms: an icon badge + title over each grouped block.
+function Section({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h4>
+      <div className="flex items-center gap-2">
+        <span className="h-6 w-6 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Icon className="h-3.5 w-3.5" /></span>
+        <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
+      </div>
       {children}
     </div>
   );
@@ -67,7 +73,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
           <DialogHeader><DialogTitle>Employee Created</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+              <CheckCircle2 className="h-5 w-5 text-[#0E7C7B] flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-foreground">Employee account created successfully.</p>
                 <p className="text-sm text-muted-foreground mt-1">They can now log in using their company Google account.</p>
@@ -89,27 +95,29 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{isEdit ? "Edit Employee" : "Add New Employee"}</DialogTitle></DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((d) => mutation.mutate(cleanPayload(d)))} className="space-y-6">
-            <Section title="Personal">
+          <form onSubmit={form.handleSubmit((d) => mutation.mutate(cleanPayload(d)))} className="space-y-5">
+            <Section icon={User} title="Personal">
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={form.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name *</FormLabel>{T({ ...field })}<FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name *</FormLabel>{T({ ...field })}<FormMessage /></FormItem>)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email *</FormLabel>{T({ ...field, type: "email" })}<FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel>{T({ ...field })}<FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel>{T({ ...field, type: "tel", inputMode: "tel" })}<FormMessage /></FormItem>)} />
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <FormField control={form.control} name="dateOfBirth" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel>{T({ ...field, type: "date" })}</FormItem>)} />
+                <FormField control={form.control} name="dateOfBirth" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><DateInput value={field.value} onChange={field.onChange} /></FormItem>)} />
                 <FormField control={form.control} name="gender" render={({ field }) => (<FormItem><FormLabel>Gender</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger></FormControl><SelectContent>{GENDERS.map((g) => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                 <FormField control={form.control} name="maritalStatus" render={({ field }) => (<FormItem><FormLabel>Marital Status</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger></FormControl><SelectContent>{MARITAL.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select></FormItem>)} />
               </div>
             </Section>
 
-            <Section title="Employment">
+            <Separator />
+
+            <Section icon={Briefcase} title="Employment">
               <div className="grid grid-cols-2 gap-3">
-                <FormField control={form.control} name="joinDate" render={({ field }) => (<FormItem><FormLabel>Join Date *</FormLabel>{T({ ...field, type: "date" })}<FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="confirmationDate" render={({ field }) => (<FormItem><FormLabel>Confirmation Date</FormLabel>{T({ ...field, type: "date" })}</FormItem>)} />
+                <FormField control={form.control} name="joinDate" render={({ field }) => (<FormItem><FormLabel>Join Date *</FormLabel><DateInput value={field.value} onChange={field.onChange} /><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="confirmationDate" render={({ field }) => (<FormItem><FormLabel>Confirmation Date</FormLabel><DateInput value={field.value} onChange={field.onChange} /></FormItem>)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={form.control} name="departmentId" render={({ field }) => (<FormItem><FormLabel>Department</FormLabel><SelectWithAddNew value={field.value} onChange={field.onChange} placeholder="Select department" testId="select-department" options={departments.map((d) => ({ value: d.id, label: d.name }))} onCreate={(name) => createDepartment(name, makeDeptCode(name, departments))} /></FormItem>)} />
@@ -134,15 +142,17 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
               </div>
             </Section>
 
-            <Section title="Statutory & Bank">
+            <Separator />
+
+            <Section icon={CreditCard} title="Statutory & Bank">
               <div className="grid grid-cols-3 gap-3">
                 <FormField control={form.control} name="panNumber" render={({ field }) => (<FormItem><FormLabel>PAN</FormLabel>{T({ ...field })}</FormItem>)} />
-                <FormField control={form.control} name="aadhaarMasked" render={({ field }) => (<FormItem><FormLabel>Aadhaar (masked)</FormLabel>{T({ ...field })}</FormItem>)} />
-                <FormField control={form.control} name="uan" render={({ field }) => (<FormItem><FormLabel>UAN</FormLabel>{T({ ...field })}</FormItem>)} />
+                <FormField control={form.control} name="aadhaarMasked" render={({ field }) => (<FormItem><FormLabel>Aadhaar (masked)</FormLabel>{T({ ...field, inputMode: "numeric" })}</FormItem>)} />
+                <FormField control={form.control} name="uan" render={({ field }) => (<FormItem><FormLabel>UAN</FormLabel>{T({ ...field, inputMode: "numeric" })}</FormItem>)} />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <FormField control={form.control} name="bankName" render={({ field }) => (<FormItem><FormLabel>Bank Name</FormLabel>{T({ ...field })}</FormItem>)} />
-                <FormField control={form.control} name="bankAccountMasked" render={({ field }) => (<FormItem><FormLabel>Account (masked)</FormLabel>{T({ ...field })}</FormItem>)} />
+                <FormField control={form.control} name="bankAccountMasked" render={({ field }) => (<FormItem><FormLabel>Account (masked)</FormLabel>{T({ ...field, inputMode: "numeric" })}</FormItem>)} />
                 <FormField control={form.control} name="ifscCode" render={({ field }) => (<FormItem><FormLabel>IFSC</FormLabel>{T({ ...field })}</FormItem>)} />
               </div>
               <div className="flex items-center gap-6">
@@ -151,19 +161,21 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
               </div>
             </Section>
 
-            <Section title="Address & Emergency">
+            <Separator />
+
+            <Section icon={MapPin} title="Address & Emergency">
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={form.control} name="currentAddress" render={({ field }) => (<FormItem><FormLabel>Current Address</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="permanentAddress" render={({ field }) => (<FormItem><FormLabel>Permanent Address</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>)} />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <FormField control={form.control} name="emergencyContactName" render={({ field }) => (<FormItem><FormLabel>Emergency Name</FormLabel>{T({ ...field })}</FormItem>)} />
-                <FormField control={form.control} name="emergencyContactPhone" render={({ field }) => (<FormItem><FormLabel>Emergency Phone</FormLabel>{T({ ...field })}</FormItem>)} />
+                <FormField control={form.control} name="emergencyContactPhone" render={({ field }) => (<FormItem><FormLabel>Emergency Phone</FormLabel>{T({ ...field, type: "tel", inputMode: "tel" })}</FormItem>)} />
                 <FormField control={form.control} name="emergencyContactRelation" render={({ field }) => (<FormItem><FormLabel>Relation</FormLabel>{T({ ...field })}</FormItem>)} />
               </div>
             </Section>
 
-            <div className="flex justify-end gap-2 pt-1">
+            <div className="flex justify-end gap-2 border-t border-border pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-employee">
                 {mutation.isPending ? "Saving…" : isEdit ? "Save Changes" : "Create Employee"}

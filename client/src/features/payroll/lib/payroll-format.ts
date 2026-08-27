@@ -3,10 +3,10 @@ export const months = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
 
 export const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
-  draft: { label: "Draft", bg: "bg-gray-100 dark:bg-gray-700", text: "text-gray-800 dark:text-gray-300" },
-  review: { label: "In Review", bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-800 dark:text-amber-300" },
-  approved: { label: "Approved", bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-800 dark:text-blue-300" },
-  locked: { label: "Locked", bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-800 dark:text-green-300" },
+  draft: { label: "Draft", bg: "bg-muted", text: "text-muted-foreground" },
+  review: { label: "In Review", bg: "bg-[#FFA962]/25", text: "text-[#D98324]" },
+  approved: { label: "Approved", bg: "bg-[#206295]/12", text: "text-[#206295]" },
+  locked: { label: "Locked", bg: "bg-[#4BDCD9]/25", text: "text-[#0E7C7B]" },
 };
 
 export function fmt(val: any) {

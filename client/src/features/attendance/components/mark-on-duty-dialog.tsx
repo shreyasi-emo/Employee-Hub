@@ -40,7 +40,7 @@ export function MarkOnDutyDialog({ open, onClose }: { open: boolean; onClose: ()
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md p-0 overflow-hidden gap-0 flex flex-col max-h-[90vh]">
-        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-border">
           <DialogTitle className="flex items-center gap-2.5">
             <span className="h-9 w-9 rounded-xl bg-[#4A90C2]/10 text-[#4A90C2] flex items-center justify-center"><Route className="h-5 w-5" /></span>
             Mark On Duty

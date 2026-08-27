@@ -21,6 +21,7 @@ import {
   User, CalendarClock, Clock, Building2, FileText, MessageSquare,
 } from "lucide-react";
 import { RequestDialog } from "@/components/shared/request-dialog";
+import { DateInput } from "@/components/shared/datetime-field";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -403,7 +404,7 @@ export function OfficePurchaseDetailDialog({ id, open, onClose, onPriced, contex
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <div className="flex items-start justify-between gap-2 pr-6">
             <DialogTitle className="flex items-center gap-2 min-w-0">
               <span className="h-9 w-9 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><ShoppingCart className="h-5 w-5" /></span>
@@ -548,7 +549,7 @@ export function OfficePurchaseDetailDialog({ id, open, onClose, onPriced, contex
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1 min-w-0"><Label className="text-[11px]">Order / tracking info (optional)</Label><Input value={orderInfo} onChange={(e) => setOrderInfo(e.target.value)} className="h-9" /></div>
-                <div className="space-y-1 min-w-0"><Label className="text-[11px]">Expected delivery (optional)</Label><Input type="date" value={expDate} onChange={(e) => setExpDate(e.target.value)} className="h-9" /></div>
+                <div className="space-y-1 min-w-0"><Label className="text-[11px]">Expected delivery (optional)</Label><DateInput value={expDate} onChange={(v) => setExpDate(v)} className="h-9" /></div>
               </div>
               <div className="space-y-1"><Label className="text-[11px]">Invoice (goes to Finance)</Label><FileUpload value={invoice} onChange={setInvoice} label="Upload invoice" /></div>
             </div>

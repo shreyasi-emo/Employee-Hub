@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -136,11 +137,9 @@ export function CyclesTab({ onSelectCycle }: { onSelectCycle: (id: string) => vo
                 { key: "goalWeightEnforced", label: "Enforce Goal Weights (sum=100%)" },
               ].map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
+                  <Checkbox
                     checked={(form as any)[key]}
-                    onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))}
+                    onCheckedChange={v => setForm(f => ({ ...f, [key]: v === true }))}
                     data-testid={`checkbox-${key}`}
                   />
                   <span className="text-sm">{label}</span>

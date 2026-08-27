@@ -151,7 +151,7 @@ export default function MyApprovalsPage() {
             <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">Nothing awaiting your approval.</p></div>
           ) : (
             <>
-              {effectiveTab === "reimbursements" && <ReimbApprovals items={financeReimbQueue} allItems={reimb} nameByUser={nameByUser} allowBulk={canCeoReimb} />}
+              {effectiveTab === "reimbursements" && <ReimbApprovals items={financeReimbQueue} allItems={reimb} nameByUser={nameByUser} allowBulk={canCeoReimb} showPhaseToggle />}
               {effectiveTab === "office_purchases" && <OfficePurchaseApprovals allItems={opAll} canTriage={canOpTriage} canCeo={false} />}
               {effectiveTab === "travel" && <TravelApprovals scope="hr" />}
             </>
@@ -160,16 +160,8 @@ export default function MyApprovalsPage() {
       )}
 
       {batchCat && <CeoReviewModal key={batchCat.title + (batchCat.lane || "")} cfg={batchCat} onClose={() => setBatchCat(null)} />}
-      {travelModal && (
-        <ExpandableApprovalDialog open onClose={() => setTravelModal(false)} title="Travel approvals" icon={Plane} count={travelPend.length} size="lg">
-          <TravelApprovals scope="ceo" />
-        </ExpandableApprovalDialog>
-      )}
-      {reimbModal && (
-        <ExpandableApprovalDialog open onClose={() => setReimbModal(false)} title="Reimbursement approvals" icon={Receipt}>
-          <ReimbApprovals items={ceoReimbQueue} allItems={reimb} nameByUser={nameByUser} allowBulk={canCeoReimb} />
-        </ExpandableApprovalDialog>
-      )}
+      {travelModal && <TravelApprovals scope="ceo" open onClose={() => setTravelModal(false)} />}
+      {reimbModal && <ReimbApprovals asModal open onClose={() => setReimbModal(false)} items={ceoReimbQueue} allItems={reimb} nameByUser={nameByUser} allowBulk={canCeoReimb} />}
     </div>
   );
 }

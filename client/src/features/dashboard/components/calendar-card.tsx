@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/shared/datetime-field";
+import { DateInput, TimeField } from "@/components/shared/datetime-field";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -233,14 +233,7 @@ export function CalendarCard({ holidayDates, upcomingHolidays, employees, readOn
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="ev-time">Time</Label>
-                <Input
-                  id="ev-time"
-                  type="time"
-                  value={form.time}
-                  onChange={(e) => setForm({ ...form, time: e.target.value })}
-                  onClick={(e) => { try { (e.currentTarget as HTMLInputElement).showPicker?.(); } catch {} }}
-                  className="cursor-pointer"
-                />
+                <TimeField value={form.time} onChange={(v) => setForm({ ...form, time: v })} testId="input-event-time" />
               </div>
             </div>
 

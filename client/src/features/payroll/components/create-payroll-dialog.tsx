@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 export function CreatePayrollDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -36,16 +37,19 @@ export function CreatePayrollDialog({ open, onOpenChange }: { open: boolean; onO
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium">Month *</label>
-              <select
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={form.month}
-                onChange={e => setForm(f => ({ ...f, month: parseInt(e.target.value) }))}
-                data-testid="select-payroll-month"
+              <Select
+                value={String(form.month)}
+                onValueChange={v => setForm(f => ({ ...f, month: parseInt(v) }))}
               >
-                {months.map((m, i) => (
-                  <option key={i} value={i + 1}>{m}</option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 w-full" data-testid="select-payroll-month">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((m, i) => (
+                    <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-sm font-medium">Year *</label>

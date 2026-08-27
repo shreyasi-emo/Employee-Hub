@@ -217,7 +217,7 @@ export default function PayrollPage() {
                               </>
                             )}
                             {run.status === "locked" && isSuperAdmin && (
-                              <Button size="sm" variant="outline" className="text-amber-600 border-amber-200"
+                              <Button size="sm" variant="outline" className="text-[#D98324] border-[#D98324]/30"
                                 onClick={() => setShowUnlock(run.id)}
                                 data-testid={`button-unlock-${run.id}`}
                               >
@@ -270,7 +270,7 @@ export default function PayrollPage() {
                                         </span>
                                         <span className="text-xs text-muted-foreground">({slipEmp?.employeeCode})</span>
                                         {parseFloat(slip.lopDays) > 0 && (
-                                          <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 text-xs">
+                                          <Badge className="bg-[#FF6F62]/20 text-[#C4402F] text-xs">
                                             LOP: {slip.lopDays}d
                                           </Badge>
                                         )}
@@ -330,11 +330,11 @@ export default function PayrollPage() {
                         </div>
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">Deductions</p>
-                          <p className="font-medium text-red-600">-{fmt(slip.totalDeductions)}</p>
+                          <p className="font-medium text-[#C4402F]">-{fmt(slip.totalDeductions)}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">Net Pay</p>
-                          <p className="text-lg font-bold text-green-600">{fmt(slip.netPay)}</p>
+                          <p className="text-lg font-bold text-[#0E7C7B]">{fmt(slip.netPay)}</p>
                         </div>
                       </div>
                     </div>
