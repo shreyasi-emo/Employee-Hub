@@ -16,7 +16,8 @@ export function registerLogisticsRoutes(app: Express) {
   app.get("/api/logistics/locations", requireAuth, async (_req, res) => {
     res.json(await storage.listMovementLocations());
   });
-  app.post("/api/logistics/locations", requireAuth, requireLogistics, async (req, res) => {
+  // Common pickup/drop locations are curated by HR, Super Admin, Managers (and the Logistics team).
+  app.post("/api/logistics/locations", requireAuth, requireRole("super_admin", "hr_admin", "hr_executive", "manager", "logistics"), async (req, res) => {
     res.json(await storage.createMovementLocation(req.body));
   });
   app.patch("/api/logistics/locations/:id", requireAuth, requireLogistics, async (req, res) => {

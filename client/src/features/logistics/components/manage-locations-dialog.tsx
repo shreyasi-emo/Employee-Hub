@@ -56,7 +56,7 @@ export function ManageLocationsDialog({ open, onClose, locations = [] }: { open:
               <div className="space-y-1"><Label className="text-[11px]">City</Label><Input className="h-9" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></div>
               <div className="space-y-1"><Label className="text-[11px]">Contact person</Label><Input className="h-9" value={f.contactPerson} onChange={(e) => setF({ ...f, contactPerson: e.target.value })} /></div>
               <div className="space-y-1 col-span-2"><Label className="text-[11px]">Address</Label><Input className="h-9" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>
-              <div className="space-y-1"><Label className="text-[11px]">Contact phone</Label><Input className="h-9" value={f.contactPhone} onChange={(e) => setF({ ...f, contactPhone: e.target.value })} /></div>
+              <div className="space-y-1"><Label className="text-[11px]">Contact phone</Label><Input className="h-9" type="tel" inputMode="tel" value={f.contactPhone} onChange={(e) => setF({ ...f, contactPhone: e.target.value })} /></div>
             </div>
             <div className="flex justify-end">
               <Button size="sm" className="btn-primary-gradient" disabled={!f.name.trim() || save.isPending} onClick={() => save.mutate({ data: { ...f, name: f.name.trim() } })}><Plus className="h-4 w-4 mr-1.5" /> Add location</Button>
