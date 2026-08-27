@@ -16,6 +16,7 @@ import { money } from "@/lib/format";
 import { format } from "date-fns";
 import { Plane, Hotel, Bus, Train, Car, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon, Clock, Eye, CheckSquare, MousePointerClick, ArrowDownUp } from "lucide-react";
 import { ApprovalCard } from "@/features/company-workspace/components/approval-card";
+import { ApprovalToolbar, ApprovalSelectionBar } from "@/features/company-workspace/components/approval-toolbar";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { EmployeePicker } from "@/components/shared/employee-picker";
@@ -443,6 +444,8 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [catFilter, setCatFilter] = useState<"all" | "flight" | "stay" | "transport">("all");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "amount">("newest");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const { data: all = [] } = useQuery<any[]>({ queryKey: ["/api/travel"] });
   // CEO surface reviews (approve/reject/query); HR surface prices + books. Scope keeps them separate for super_admin.
   const pendingStatuses = scope === "ceo" ? ["pending_approval", "under_review"] : ["pending_hr", "approved", "under_review"];
@@ -453,11 +456,16 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
       return pendingStatuses.includes(t.status);
     })
     .filter((t) => catFilter === "all" || t.category === catFilter)
+    .filter((t) => { const qq = search.trim().toLowerCase(); return !qq || `${t.reference || ""} ${t.employeeName || ""} ${t.employeeCode || ""} ${t.category || ""} ${t.details?.city || ""} ${t.details?.toCity || ""} ${t.details?.fromCity || ""} ${t.details?.to || ""} ${t.details?.from || ""}`.toLowerCase().includes(qq); })
     .sort((a, b) => {
       if (sortBy === "amount") return (Number(b.amount) || 0) - (Number(a.amount) || 0);
       const da = +new Date(a.createdAt || 0), db = +new Date(b.createdAt || 0);
       return sortBy === "oldest" ? da - db : db - da;
     });
+  const PAGE_SIZE = 8;
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const curPage = Math.min(page, totalPages);
+  const paged = list.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
 
   // CEO bulk decision — the travel API decides one trip at a time, so bulk loops the per-trip endpoints.
   const bulkApprove = useMutation({
@@ -513,21 +521,19 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
 
   return (
     <div className="space-y-3">
-      {scope === "hr" && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-foreground flex items-center gap-2"><Plane className="h-4 w-4 text-[#206295]" /> Travel</span>
-          <div className="segmented-toggle inline-flex p-0.5 h-8 ml-1">
-            {(["pending", "booked", "completed"] as const).map((p) => (
-              <button key={p} onClick={() => setPhase(p)} className={`px-3 h-full rounded-[9px] text-xs font-medium capitalize ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`travel-phase-${p}`}>{p}</button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {scope === "ceo" && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <Select value={catFilter} onValueChange={(v) => setCatFilter(v as any)}>
-            <SelectTrigger className="h-9 w-[150px] text-xs" data-testid="travel-cat"><SelectValue placeholder="Category" /></SelectTrigger>
+      <ApprovalToolbar
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1); }}
+        filters={<>
+          {scope === "hr" && (
+            <div className="segmented-toggle inline-flex p-0.5 h-9 flex-shrink-0">
+              {(["pending", "booked", "completed"] as const).map((p) => (
+                <button key={p} onClick={() => { setPhase(p); setPage(1); }} className={`px-3 h-full rounded-[9px] text-xs font-medium capitalize ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`travel-phase-${p}`}>{p}</button>
+              ))}
+            </div>
+          )}
+          <Select value={catFilter} onValueChange={(v) => { setCatFilter(v as any); setPage(1); }}>
+            <SelectTrigger className="h-9 w-[150px] text-xs flex-shrink-0" data-testid="travel-cat"><SelectValue placeholder="Category" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               <SelectItem value="flight">Flight</SelectItem>
@@ -535,34 +541,34 @@ export function TravelApprovals({ scope = "hr" }: { scope?: "ceo" | "hr" }) {
               <SelectItem value="transport">Transport</SelectItem>
             </SelectContent>
           </Select>
+        </>}
+        sort={
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-            <SelectTrigger className="h-9 w-[160px] text-xs" data-testid="travel-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 w-[160px] text-xs flex-shrink-0" data-testid="travel-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="newest">Newest first</SelectItem>
               <SelectItem value="oldest">Oldest first</SelectItem>
               <SelectItem value="amount">Amount: High → Low</SelectItem>
             </SelectContent>
           </Select>
-          <div className="ml-auto flex items-center gap-2">
-            {selectionMode ? (
-              <>
-                <Button variant="outline" size="sm" className="h-9" onClick={toggleAll} data-testid="travel-select-all"><CheckSquare className="h-4 w-4 mr-1.5" /> {allSelected ? "Clear" : "All"}</Button>
-                <span className="text-xs text-muted-foreground">{sel.size} selected</span>
-                <Button size="sm" variant="outline" className="h-9 text-[#FF6F62] border-[#FF6F62]/40 hover:bg-[#FF6F62]/10" disabled={busy || !sel.size} onClick={rejectSelected}><X className="h-4 w-4 mr-1.5" /> Reject</Button>
-                <Button size="sm" className="h-9 btn-primary-gradient" disabled={busy || !sel.size} onClick={approveSelected}><Check className="h-4 w-4 mr-1.5" /> Approve ({sel.size})</Button>
-                <Button variant="secondary" size="sm" className="h-9" onClick={exitSelection} data-testid="travel-select-done">Done</Button>
-              </>
-            ) : (
-              <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelectionMode(true)} data-testid="travel-select"><MousePointerClick className="h-4 w-4 mr-1.5" /> Select</Button>
-            )}
-          </div>
-        </div>
+        }
+        selectable={scope === "ceo"} selectionMode={selectionMode} onSelect={() => setSelectionMode(true)}
+        page={curPage} totalPages={totalPages} onPage={setPage}
+      />
+      {scope === "ceo" && selectionMode && (
+        <ApprovalSelectionBar
+          count={sel.size} allSelected={allSelected} onToggleAll={toggleAll} onDone={exitSelection}
+          actions={<>
+            <Button size="sm" variant="outline" className="h-9 text-[#FF6F62] border-[#FF6F62]/40 hover:bg-[#FF6F62]/10" disabled={busy || !sel.size} onClick={rejectSelected}><X className="h-4 w-4 mr-1.5" /> Reject</Button>
+            <Button size="sm" className="h-9 btn-primary-gradient" disabled={busy || !sel.size} onClick={approveSelected}><Check className="h-4 w-4 mr-1.5" /> Approve ({sel.size})</Button>
+          </>}
+        />
       )}
 
-      {list.length === 0 ? (
+      {paged.length === 0 ? (
         <div className="card-surface rounded-2xl py-10 text-center"><Check className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" /><p className="text-sm text-muted-foreground">Nothing here.</p></div>
       ) : (
-        <div className="space-y-3">{list.map(renderCard)}</div>
+        <div className="space-y-3">{paged.map(renderCard)}</div>
       )}
       <TravelDetailDialog id={detailId} open={!!detailId} onClose={() => setDetailId(null)} context="approver" scope={scope} />
     </div>

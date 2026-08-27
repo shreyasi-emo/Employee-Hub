@@ -9,12 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { CommentThread } from "@/components/shared/comment-thread";
 import { ExpandToggle } from "./expandable-approval-dialog";
 import { ApprovalCard } from "./approval-card";
-import { Check, X, MessageSquare, ExternalLink, Layers, ShoppingCart, Package, ArrowDownUp, Search, CalendarClock, Building2, MousePointerClick, CheckSquare } from "lucide-react";
+import { ApprovalToolbar, ApprovalSelectionBar } from "./approval-toolbar";
+import { Check, X, MessageSquare, ExternalLink, Layers, ShoppingCart, Package, ArrowDownUp, CalendarClock, Building2 } from "lucide-react";
 
 // Priority chip for office purchases (procurement carries no priority).
 const PRI: Record<string, string> = { high: "bg-[#FF6F62]/20 text-[#C4402F]", medium: "bg-[#FFA962]/25 text-[#D98324]", low: "bg-[#64748B]/15 text-[#64748B]" };
@@ -48,6 +48,7 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
   const [bulkNote, setBulkNote] = useState("");
   const [maximized, setMaximized] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
+  const [page, setPage] = useState(1);
   const allIds = rows.map((r) => r.id);
   const actIds = sel.size > 0 ? Array.from(sel) : allIds;  // Approve/Reject act on ticked rows when any are selected, else the whole lane.
   const total = rows.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0);
@@ -59,6 +60,10 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
     return out;
   })();
   const gTotal = (arr: any[]) => arr.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0);
+  const PAGE_SIZE = 8;
+  const totalPages = Math.max(1, Math.ceil(groups.length / PAGE_SIZE));
+  const curPage = Math.min(page, totalPages);
+  const pagedGroups = groups.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
   const rejectBtn = "border-[#FF6F62]/40 text-[#FF6F62] hover:bg-[#FF6F62]/10 hover:text-[#FF6F62]";
   const queryBtn = "border-[#D98324]/40 text-[#D98324] hover:bg-[#FFA962]/15 hover:text-[#D98324]";
   const normUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
@@ -157,37 +162,34 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
           <DialogHeader className="space-y-0">
             <DialogTitle className="pr-16">{cfg.title} | {cfg.lane || "Pending"} ({rows.length})</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center gap-2 mt-3">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search requests…" className="h-9 pl-8" data-testid="ceo-search" />
-            </div>
-            {cfg.kind === "office" && (
-              <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as any)}>
-                <SelectTrigger className="h-9 w-[130px] text-xs flex-shrink-0" data-testid="ceo-priority"><SelectValue placeholder="Priority" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-              <SelectTrigger className="h-9 w-[160px] text-xs flex-shrink-0" data-testid="ceo-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="amount">Amount: High → Low</SelectItem>
-                <SelectItem value="age">Oldest first</SelectItem>
-              </SelectContent>
-            </Select>
-            {selectionMode ? (
-              <>
-                <Button variant="outline" size="sm" className="h-9 flex-shrink-0" onClick={toggleAll} data-testid="ceo-select-all"><CheckSquare className="h-4 w-4 mr-1.5" /> {allSelected ? "Clear" : "All"}</Button>
-                <Button variant="secondary" size="sm" className="h-9 flex-shrink-0" onClick={exitSelection} data-testid="ceo-select-done">Done</Button>
-              </>
-            ) : (
-              <Button variant="secondary" size="sm" className="h-9 flex-shrink-0" onClick={() => setSelectionMode(true)} data-testid="ceo-select"><MousePointerClick className="h-4 w-4 mr-1.5" /> Select</Button>
-            )}
+          <div className="mt-3 space-y-2">
+            <ApprovalToolbar
+              search={search}
+              onSearch={(v) => { setSearch(v); setPage(1); }}
+              filters={cfg.kind === "office" ? (
+                <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v as any); setPage(1); }}>
+                  <SelectTrigger className="h-9 w-[130px] text-xs flex-shrink-0" data-testid="ceo-priority"><SelectValue placeholder="Priority" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : undefined}
+              sort={
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                  <SelectTrigger className="h-9 w-[160px] text-xs flex-shrink-0" data-testid="ceo-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="amount">Amount: High → Low</SelectItem>
+                    <SelectItem value="age">Oldest first</SelectItem>
+                  </SelectContent>
+                </Select>
+              }
+              selectable selectionMode={selectionMode} onSelect={() => setSelectionMode(true)}
+              page={curPage} totalPages={totalPages} onPage={setPage}
+            />
+            {selectionMode && <ApprovalSelectionBar count={sel.size} allSelected={allSelected} onToggleAll={toggleAll} onDone={exitSelection} />}
           </div>
         </div>
         <ExpandToggle expanded={maximized} onToggle={() => setMaximized((v) => !v)} />
@@ -195,20 +197,18 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
         {/* Body — only this scrolls; the padding gives the cards room so their shadows aren't clipped */}
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
           <div className="space-y-3">
-            {sortedRows.length === 0 && <p className="text-sm text-muted-foreground py-10 text-center">Nothing pending here.</p>}
-            {cfg.grouped
-              ? groups.map((g) => g.rows.length > 1
-                  ? (
-                    <div key={g.key} className="rounded-xl border border-[#206295]/25 bg-[#206295]/[0.03] p-2 space-y-2">
-                      <div className="flex items-center justify-between px-1.5 pt-0.5">
-                        <span className="text-[11px] font-semibold text-[#206295] uppercase tracking-wide flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> HR group | {g.rows.length} requests</span>
-                        <span className="text-xs font-bold text-[#206295] tabular-nums">{money(gTotal(g.rows))}</span>
-                      </div>
-                      {g.rows.map(renderRow)}
-                    </div>
-                  )
-                  : renderRow(g.rows[0]))
-              : sortedRows.map(renderRow)}
+            {pagedGroups.length === 0 && <p className="text-sm text-muted-foreground py-10 text-center">Nothing pending here.</p>}
+            {pagedGroups.map((g) => (cfg.grouped && g.rows.length > 1)
+              ? (
+                <div key={g.key} className="rounded-xl border border-[#206295]/25 bg-[#206295]/[0.03] p-2 space-y-2">
+                  <div className="flex items-center justify-between px-1.5 pt-0.5">
+                    <span className="text-[11px] font-semibold text-[#206295] uppercase tracking-wide flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> HR group | {g.rows.length} requests</span>
+                    <span className="text-xs font-bold text-[#206295] tabular-nums">{money(gTotal(g.rows))}</span>
+                  </div>
+                  {g.rows.map(renderRow)}
+                </div>
+              )
+              : renderRow(g.rows[0]))}
           </div>
         </div>
 

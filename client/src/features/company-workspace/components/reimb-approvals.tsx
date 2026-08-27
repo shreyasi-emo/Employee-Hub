@@ -150,7 +150,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
           {phase === "completed" && (
             <Button variant="secondary" size="sm" className="h-9" onClick={() => doExport(sorted)} data-testid="button-export-reimb"><Download className="h-4 w-4 mr-1" /> Export</Button>
           )}
-          {allowBulk && phase === "pending" && view === "card" && !selectionMode && (
+          {allowBulk && phase === "pending" && !selectionMode && (
             <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelectionMode(true)} data-testid="button-select">
               <MousePointerClick className="h-4 w-4 mr-1" /> Select
             </Button>
@@ -191,6 +191,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
           <div className="card-surface rounded-2xl">
             <DataTable
               columns={[
+                ...(allowBulk && selectionMode ? [{ key: "__sel", header: "", render: (r: any) => <div onClick={(e) => e.stopPropagation()}><Checkbox checked={sel.has(r.id)} onCheckedChange={() => toggle(r.id)} data-testid={`select-reimb-row-${r.id}`} /></div> }] : []),
                 { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground" },
                 { key: "requester", header: "Requester", render: (r: any) => <span className="text-foreground">{r.employeeName || "—"}<span className="text-muted-foreground"> ({r.employeeCode || "—"})</span></span> },
                 { key: "category", header: "Category", cellClassName: "text-muted-foreground capitalize", render: (r: any) => r.category || "—" },
@@ -203,7 +204,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
               ]}
               rows={pageItems}
               getRowKey={(r: any) => r.id}
-              onRowClick={(r: any) => openDetail(r)}
+              onRowClick={(r: any) => (selectionMode ? toggle(r.id) : openDetail(r))}
               testIdPrefix="completed-reimb"
             />
           </div>
