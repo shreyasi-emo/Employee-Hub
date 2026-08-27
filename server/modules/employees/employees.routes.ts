@@ -133,8 +133,10 @@ export function registerEmployeeRoutes(app: Express) {
 
     const emp = await storage.createEmployee(parsed.data as any);
 
-    // System Role (feature access). HR can set it; only a Super Admin may grant super_admin.
+    // System Role (feature access). Only HR Admin + Super Admin may set it; anyone else always
+    // creates the account as "employee". A Super Admin is additionally required to grant super_admin.
     let sysRole: string = (roleEnum.enumValues as readonly string[]).includes(req.body.systemRole) ? req.body.systemRole : "employee";
+    if (!hasRole(req, "super_admin", "hr_admin")) sysRole = "employee";
     if (sysRole === "super_admin" && req.currentUser!.role !== "super_admin") sysRole = "employee";
 
     // Create user account in INVITED state (no password set)
@@ -179,24 +181,31 @@ export function registerEmployeeRoutes(app: Express) {
     const old = await storage.getEmployee(req.params.id);
     if (!old) return res.status(404).json({ error: "Not found" });
 
-    // System Role guard: only a Super Admin may assign or alter the super_admin role.
-    const wantsRoleChange = req.body.systemRole && (roleEnum.enumValues as readonly string[]).includes(req.body.systemRole);
-    const linkedUser = wantsRoleChange ? (await storage.getAllUsers()).find(u => u.employeeId === req.params.id) : undefined;
-    if (wantsRoleChange && linkedUser) {
-      const touchingSuperAdmin = req.body.systemRole === "super_admin" || linkedUser.role === "super_admin";
+    // System Role guard: only HR Admin + Super Admin may change a role; only a Super Admin may
+    // assign or alter super_admin. Gated on an *actual* change so an HR Executive editing other
+    // fields (their payload still echoes the current role) is never blocked.
+    const roleProvided = req.body.systemRole && (roleEnum.enumValues as readonly string[]).includes(req.body.systemRole);
+    const linkedUser = roleProvided ? (await storage.getAllUsers()).find(u => u.employeeId === req.params.id) : undefined;
+    const roleChanging = !!(roleProvided && linkedUser && linkedUser.role !== req.body.systemRole);
+    if (roleChanging) {
+      if (!hasRole(req, "super_admin", "hr_admin")) {
+        return res.status(403).json({ error: "Only an HR Admin or Super Admin can change a system role." });
+      }
+      const touchingSuperAdmin = req.body.systemRole === "super_admin" || linkedUser!.role === "super_admin";
       if (touchingSuperAdmin && req.currentUser!.role !== "super_admin") {
         return res.status(403).json({ error: "Only a Super Admin can assign or change the Super Admin role." });
       }
     }
 
-    // userId (the login-account link) and employeeCode are server-managed — never settable via this update.
-    const { userId, employeeCode, id, createdAt, updatedAt, ...safeEmp } = req.body;
+    // userId (login-account link) and employeeCode are server-managed; systemRole is a virtual field
+    // that lives on the user account (applied below), never a column on employees — strip all of them.
+    const { userId, employeeCode, id, createdAt, updatedAt, systemRole, ...safeEmp } = req.body;
     const emp = await storage.updateEmployee(req.params.id, safeEmp);
 
     // Apply the System Role change to the linked user account.
-    if (wantsRoleChange && linkedUser && linkedUser.role !== req.body.systemRole) {
-      await storage.updateUser(linkedUser.id, { role: req.body.systemRole });
-      await log(req, "UPDATE_USER_ROLE", "user", linkedUser.id, { role: linkedUser.role }, { role: req.body.systemRole });
+    if (roleChanging) {
+      await storage.updateUser(linkedUser!.id, { role: req.body.systemRole });
+      await log(req, "UPDATE_USER_ROLE", "user", linkedUser!.id, { role: linkedUser!.role }, { role: req.body.systemRole });
     }
     await log(req, "UPDATE_EMPLOYEE", "employee", emp.id, { ...old, panNumber: undefined }, { ...emp, panNumber: undefined });
 

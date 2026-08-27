@@ -9,7 +9,7 @@ import { AppLayout } from "./layout/app-layout";
 // performance, my-requests/approvals, logistics, requests, resources, reimbursements, own profile)
 // are intentionally left open — the backend is the real boundary; this is defence-in-depth + UX.
 const ROUTE_ROLES: Record<string, string[]> = {
-  "/employees": ["super_admin", "hr_admin", "hr_executive", "manager", "hr_ops"],
+  "/employees": ["super_admin", "hr_admin", "hr_executive", "manager"],
   "/assets": ["super_admin", "hr_admin", "hr_executive", "manager"],
   "/shifts": ["super_admin", "hr_admin", "hr_executive", "manager", "hr_ops"],
   "/onboarding": ["super_admin", "hr_admin", "hr_executive", "manager", "hr_ops"],

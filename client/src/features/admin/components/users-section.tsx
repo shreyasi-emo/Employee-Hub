@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth, getRoleLabel } from "@/lib/auth";
+import { useAuth, getRoleLabel, ALL_ROLES } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,10 @@ export function UsersSection() {
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"] });
   const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Assignable roles — full set from the shared list; super_admin only offered to a super_admin
+  // (the API rejects anyone else assigning it, so don't dangle an option that 403s). Mirrors the
+  // employee form's role picker so both surfaces can grant every role, logistics included.
+  const assignableRoles = ALL_ROLES.filter((r) => r !== "super_admin" || user?.role === "super_admin");
 
   const updateUser = useMutation({
     mutationFn: ({ id, ...data }: any) => apiRequest("PUT", `/api/users/${id}`, data),
@@ -88,7 +92,7 @@ export function UsersSection() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["super_admin", "hr_admin", "hr_executive", "finance", "manager", "employee"].map(r => (
+                      {assignableRoles.map(r => (
                         <SelectItem key={r} value={r} className="text-xs">{getRoleLabel(r as any)}</SelectItem>
                       ))}
                     </SelectContent>

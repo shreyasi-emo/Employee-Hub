@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth, isHR } from "@/lib/auth";
+import { useAuth, isAdmin } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,7 +36,8 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
   const { toast } = useToast();
   const { data: auth } = useAuth();
   const viewerRole = auth?.user?.role;
-  const canManageRoles = !!auth?.user && (viewerRole === "super_admin" || isHR(auth.user));
+  // Only HR Admin + Super Admin may grant/alter a system role (HR Executive edits every other field).
+  const canManageRoles = isAdmin(auth?.user ?? null);
   const roleOptions = SYSTEM_ROLES.filter((r) => r.value !== "super_admin" || viewerRole === "super_admin");
   const isEdit = !!employee;
   const [created, setCreated] = useState<{ name: string; email: string } | null>(null);
