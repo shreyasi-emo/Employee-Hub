@@ -15,7 +15,7 @@ import {
   ceoApprovalNotes, referenceDocs,
 
   approvalWorkflows, approvalSteps, approvalRequests, approvalDecisions,
-  recruitmentAgencies, pipelineStages, jobRequisitions, candidates, applications, applicationTimeline,
+  recruitmentAgencies, pipelineStages, jobRequisitions, candidates, applications, applicationTimeline, candidateDocRequests,
   interviews, interviewFeedback, offers, vendors, purchaseRequests, travelRequests, travelBookings,
   workspacePayments, adminTickets, adminTicketComments, hrTasks,
   type User, type InsertUser, type Employee, type InsertEmployee,
@@ -1033,6 +1033,107 @@ export const storage = {
     const [c] = await db.update(candidates).set({ ...data, updatedAt: new Date() }).where(eq(candidates.id, id)).returning();
     return c;
   },
+  // ----- Candidate document collection (pre-onboarding) -----
+  async createDocRequest(data: { candidateId: string; token: string }) {
+    const [r] = await db.insert(candidateDocRequests).values(data).returning();
+    return r;
+  },
+  async getDocRequestByToken(token: string) {
+    const rows = await db
+      .select({ r: candidateDocRequests, name: candidates.name, email: candidates.email, phone: candidates.phone })
+      .from(candidateDocRequests)
+      .leftJoin(candidates, eq(candidates.id, candidateDocRequests.candidateId))
+      .where(eq(candidateDocRequests.token, token));
+    if (!rows.length) return undefined;
+    const { r, name, email, phone } = rows[0];
+    return { ...r, candidateName: name, candidateEmail: email, candidatePhone: phone };
+  },
+  async listDocRequests() {
+    const rows = await db
+      .select({ r: candidateDocRequests, name: candidates.name, email: candidates.email })
+      .from(candidateDocRequests)
+      .leftJoin(candidates, eq(candidates.id, candidateDocRequests.candidateId))
+      .orderBy(desc(candidateDocRequests.createdAt));
+    return rows.map(({ r, name, email }) => ({ ...r, candidateName: name, candidateEmail: email }));
+  },
+  async submitDocRequest(token: string, data: { formData: any; files: any }) {
+    const [r] = await db.update(candidateDocRequests)
+      .set({ status: "submitted", submittedAt: new Date(), formData: data.formData, files: data.files, updatedAt: new Date() })
+      .where(eq(candidateDocRequests.token, token)).returning();
+    return r;
+  },
+  async getDocRequest(id: string) {
+    const rows = await db
+      .select({ r: candidateDocRequests, name: candidates.name, email: candidates.email, phone: candidates.phone })
+      .from(candidateDocRequests)
+      .leftJoin(candidates, eq(candidates.id, candidateDocRequests.candidateId))
+      .where(eq(candidateDocRequests.id, id));
+    if (!rows.length) return undefined;
+    const { r, name, email, phone } = rows[0];
+    return { ...r, candidateName: name, candidateEmail: email, candidatePhone: phone };
+  },
+  async updateDocRequest(id: string, data: any) {
+    const [r] = await db.update(candidateDocRequests).set({ ...data, updatedAt: new Date() }).where(eq(candidateDocRequests.id, id)).returning();
+    return r;
+  },
+  // Convert a submitted candidate into an employee: assign a code, create the record, move the docs.
+  async onboardCandidateDocRequest(id: string, actorId: string) {
+    const [req] = await db.select().from(candidateDocRequests).where(eq(candidateDocRequests.id, id));
+    if (!req) throw new Error("Request not found.");
+    if (req.status === "onboarded") throw new Error("This candidate is already onboarded.");
+    if (req.status !== "submitted") throw new Error("The candidate hasn't submitted their documents yet.");
+    if (!req.joinDate) throw new Error("Enter the date of joining first.");
+    if (!req.offerLetter) throw new Error("Upload the signed offer letter first.");
+    const [cand] = await db.select().from(candidates).where(eq(candidates.id, req.candidateId));
+    if (!cand) throw new Error("Candidate not found.");
+
+    const code = await this.getNextEmployeeCode();
+    const fd: any = req.formData || {};
+    const files: any = req.files || {};
+    const parts = String(cand.name || "").trim().split(/\s+/);
+    const firstName = parts[0] || cand.name || "Employee";
+    const lastName = parts.slice(1).join(" ") || "";
+    const maskAcct = (a: string) => (a && a.length > 4 ? `${"X".repeat(a.length - 4)}${a.slice(-4)}` : a || null);
+
+    const [emp] = await db.insert(employees).values({
+      employeeCode: code,
+      firstName, lastName,
+      email: cand.email,
+      phone: cand.phone || null,
+      joinDate: req.joinDate as any,
+      currentAddress: fd.currentAddress || null,
+      permanentAddress: fd.permanentAddress || null,
+      emergencyContactPhone: fd.emergencyPhone || null,
+      emergencyContactRelation: fd.emergencyRelation || null,
+      ifscCode: fd.ifsc || null,
+      bankAccountMasked: fd.accountNumber ? maskAcct(fd.accountNumber) : null,
+    } as any).returning();
+
+    // Move the collected documents into the employee document store.
+    const docDefs: [string, string, any][] = [
+      ["PAN Card", "identity", files.pan],
+      ["Aadhaar Card", "identity", files.aadhaar],
+      ["Photo ID (Passport / DL / Voter ID)", "identity", files.photoId],
+      ["Previous Offer Letter", "employment", files.offerLetter],
+      ["Increment Letter(s)", "employment", files.incrementLetters],
+      ["Relieving Letter(s)", "employment", files.relievingLetters],
+      ["Payslips (last 3 months)", "employment", files.payslips],
+      ["Bank Passbook / Cancelled Cheque", "bank", files.bankProof],
+      ["Signed Offer Letter", "offer", req.offerLetter],
+    ];
+    for (const [name, category, f] of docDefs) {
+      if (f && f.fileData) {
+        await db.insert(documents).values({
+          employeeId: emp.id, name, category,
+          fileUrl: f.fileData, mimeType: f.fileType || null, uploadedBy: actorId, isPublic: false,
+        } as any);
+      }
+    }
+
+    await db.update(candidates).set({ linkedEmployeeId: emp.id, updatedAt: new Date() }).where(eq(candidates.id, cand.id));
+    await db.update(candidateDocRequests).set({ status: "onboarded", employeeId: emp.id, employeeCode: code, updatedAt: new Date() }).where(eq(candidateDocRequests.id, id));
+    return { employee: emp, employeeCode: code };
+  },
 
   // ====== APPLICATIONS ======
   async getApplications(requisitionId?: string, candidateId?: string) {
@@ -1314,7 +1415,7 @@ export const storage = {
     return r;
   },
   async createLogisticsMovement(data: any) {
-    const ref = `MOV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const ref = `MOV-${new Date().getFullYear()}-${(Date.now() * 1000 + Math.floor(Math.random() * 1000)).toString(36).slice(-6).toUpperCase()}`;
     const [r] = await db.insert(logisticsMovements).values({ ...data, reference: ref }).returning();
     return r;
   },
@@ -1347,7 +1448,7 @@ export const storage = {
     return r;
   },
   async createLogisticsRequest(data: any) {
-    const ref = `LR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const ref = `LR-${new Date().getFullYear()}-${(Date.now() * 1000 + Math.floor(Math.random() * 1000)).toString(36).slice(-6).toUpperCase()}`;
     const [r] = await db.insert(logisticsRequests).values({ ...data, reference: ref }).returning();
     return r;
   },

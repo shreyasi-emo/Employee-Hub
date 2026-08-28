@@ -20,6 +20,7 @@ import SettingsPage from "@/features/settings/pages/settings-page";
 import InviteAcceptPage from "@/features/auth/pages/invite-accept-page";
 import ShiftsPage from "@/features/shifts/pages/shifts-page";
 import OnboardingPage from "@/features/onboarding/pages/onboarding-page";
+import CandidateDocForm from "@/features/onboarding/pages/candidate-doc-form";
 import ATSPage from "@/features/hr-workspace/pages/ats-page";
 import HROpsPage from "@/features/hr-workspace/pages/hr-ops-page";
 import OfficeAdminPage from "@/features/hr-workspace/pages/office-admin-page";
@@ -57,7 +58,7 @@ export function AppRoutes() {
   const { data: auth, isLoading } = useAuth();
   const [location] = useLocation();
 
-  if (isLoading && location !== "/login") {
+  if (isLoading && location !== "/login" && !location.startsWith("/onboard")) {
     return <AppBootSplash />;
   }
 
@@ -66,6 +67,7 @@ export function AppRoutes() {
       <Route path="/login" component={LoginPage} />
       <Route path="/invite/:token" component={() => <InviteAcceptPage mode="invite" />} />
       <Route path="/reset-password/:token" component={() => <InviteAcceptPage mode="reset" />} />
+      <Route path="/onboard/:token" component={CandidateDocForm} />
       <Route path="/" component={() => <Redirect to="/dashboard" />} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
       <Route path="/employees" component={() => <ProtectedRoute component={EmployeesPage} />} />

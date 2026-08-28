@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { TemplateFormDialog } from "../components/template-form";
 import { TaskFormDialog } from "../components/task-form";
+import { DocCollection } from "../components/doc-collection";
 import { useAuth, isHR } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -101,7 +102,7 @@ function InstanceCard({ instance, employees, templates }: { instance: any; emplo
               <p className="font-medium text-sm text-foreground">
                 {emp ? `${emp.firstName} ${emp.lastName}` : instance.employeeId}
               </p>
-              <p className="text-xs text-muted-foreground">{emp?.employeeCode} · {template?.name || "Default Template"}</p>
+              <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">{emp?.employeeCode || "—"}<span className="w-px h-3 bg-border" />{template?.name || "Default Template"}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -250,6 +251,7 @@ export default function OnboardingPage() {
         <TabsList>
           <TabsTrigger value="active" data-testid="tab-active-onboarding">Active ({active.length})</TabsTrigger>
           <TabsTrigger value="completed" data-testid="tab-completed-onboarding">Completed ({completed.length})</TabsTrigger>
+          {hrUser && <TabsTrigger value="documents" data-testid="tab-doc-collection">Documents</TabsTrigger>}
           {hrUser && <TabsTrigger value="templates" data-testid="tab-templates">Templates</TabsTrigger>}
         </TabsList>
 
@@ -285,6 +287,12 @@ export default function OnboardingPage() {
             </div>
           )}
         </TabsContent>
+
+        {hrUser && (
+          <TabsContent value="documents" className="mt-4">
+            <DocCollection />
+          </TabsContent>
+        )}
 
         {hrUser && (
           <TabsContent value="templates" className="mt-4">

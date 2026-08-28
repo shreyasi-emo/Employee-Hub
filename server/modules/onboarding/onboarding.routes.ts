@@ -10,6 +10,7 @@ import {
   hasRole, hashPassword, verifyPassword,
 } from "../../shared/auth";
 import { log, hashToken } from "../../shared/audit";
+import { sendEmail } from "../../shared/email";
 import { getDaysInMonth, countWeekends } from "../../shared/date-utils";
 import { sanitizeEmployeeForRole } from "../../utils/sanitize";
 import { googleStart, googleCallback, logout as googleLogout } from "../../google-auth";
@@ -83,6 +84,103 @@ export function registerOnboardingRoutes(app: Express) {
       data.completedAt = new Date();
     }
     res.json(await storage.updateOnboardingTaskItem(req.params.id, data));
+  });
+
+  // =========================================================================
+  // CANDIDATE DOCUMENT COLLECTION (pre-onboarding) — HR triggers, candidate fills a tokenized public form
+  // =========================================================================
+
+  // HR: add a candidate (or reuse one) and generate + "send" a unique doc-collection link.
+  app.post("/api/onboarding/doc-requests", requireAuth, requireHR, async (req, res) => {
+    const { name, email, phone, candidateId } = req.body || {};
+    let cid = candidateId;
+    if (!cid) {
+      if (!name?.trim() || !email?.trim()) return res.status(400).json({ error: "Candidate name and email are required." });
+      const c = await storage.createCandidate({ name: name.trim(), email: email.trim(), phone: phone?.trim() || null });
+      cid = c.id;
+    }
+    const token = crypto.randomBytes(24).toString("base64url"); // unguessable public token
+    const request = await storage.createDocRequest({ candidateId: cid, token });
+    const cand = await storage.getCandidate(cid);
+    const link = `${req.protocol}://${req.get("host")}/onboard/${token}`;
+    const emailResult = await sendEmail({
+      to: cand?.email || "",
+      subject: "Complete your onboarding documents — EMO Energy",
+      text: `Hi ${cand?.name || ""},\n\nWelcome aboard! Please complete your onboarding by filling this secure form and uploading your documents:\n\n${link}\n\nThis link is unique to you.\n\n— EMO Energy HR`,
+      html: `<p>Hi ${cand?.name || ""},</p><p>Welcome aboard! Please complete your onboarding by filling this secure form and uploading your documents:</p><p><a href="${link}">${link}</a></p><p>This link is unique to you.</p><p>— EMO Energy HR</p>`,
+    });
+    res.json({ ...request, candidateName: cand?.name, candidateEmail: cand?.email, link, email: emailResult });
+  });
+
+  // HR: list all doc requests with candidate + status.
+  app.get("/api/onboarding/doc-requests", requireAuth, requireHR, async (_req, res) => {
+    res.json(await storage.listDocRequests());
+  });
+
+  // Public (no login) — fetch the form for a token: prefill + status.
+  app.get("/api/onboarding/collect/:token", async (req, res) => {
+    const r = await storage.getDocRequestByToken(req.params.token);
+    if (!r) return res.status(404).json({ error: "This link is invalid or has expired." });
+    res.json({
+      status: r.status,
+      candidateName: r.candidateName,
+      candidateEmail: r.candidateEmail,
+      candidatePhone: r.candidatePhone,
+      submittedAt: r.submittedAt,
+    });
+  });
+
+  // Public (no login) — candidate submits their form + documents.
+  app.post("/api/onboarding/collect/:token", async (req, res) => {
+    const r = await storage.getDocRequestByToken(req.params.token);
+    if (!r) return res.status(404).json({ error: "This link is invalid or has expired." });
+    if (r.status === "submitted") return res.status(409).json({ error: "You have already submitted your documents." });
+    const { formData, files } = req.body || {};
+    if (!formData || typeof formData !== "object") return res.status(400).json({ error: "Missing form data." });
+    await storage.submitDocRequest(req.params.token, { formData, files: files || {} });
+    try {
+      await storage.notifyByRole(["super_admin", "hr_admin", "hr_executive"], {
+        type: "onboarding_docs_submitted",
+        title: "Onboarding documents submitted",
+        body: `${r.candidateName || "A candidate"} submitted their onboarding documents.`,
+        link: "/onboarding",
+      });
+    } catch {}
+    res.json({ success: true });
+  });
+
+  // HR: fetch one request with the submitted data + files (for the review / onboard screen).
+  app.get("/api/onboarding/doc-requests/:id", requireAuth, requireHR, async (req, res) => {
+    const r = await storage.getDocRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    res.json(r);
+  });
+
+  // HR: set date of joining and/or upload the signed offer letter (gates onboarding).
+  app.patch("/api/onboarding/doc-requests/:id", requireAuth, requireHR, async (req, res) => {
+    const { joinDate, offerLetter } = req.body || {};
+    const patch: any = {};
+    if (joinDate !== undefined) patch.joinDate = joinDate || null;
+    if (offerLetter !== undefined) patch.offerLetter = offerLetter || null;
+    if (!Object.keys(patch).length) return res.status(400).json({ error: "Nothing to update." });
+    res.json(await storage.updateDocRequest(req.params.id, patch));
+  });
+
+  // HR: onboard — assign an employee code, create the employee, and move the documents across.
+  app.post("/api/onboarding/doc-requests/:id/onboard", requireAuth, requireHR, async (req, res) => {
+    try {
+      const result = await storage.onboardCandidateDocRequest(req.params.id, req.currentUser!.id);
+      try {
+        await storage.notifyByRole(["super_admin", "hr_admin", "hr_executive"], {
+          type: "employee_onboarded", title: "New employee onboarded",
+          body: `${result.employee.firstName} ${result.employee.lastName} onboarded as ${result.employeeCode}.`,
+          link: `/employees/${result.employee.id}`,
+        });
+      } catch {}
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message || "Could not onboard." });
+    }
   });
 
 }

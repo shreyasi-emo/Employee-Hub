@@ -664,6 +664,26 @@ export const onboardingTaskItems = pgTable("onboarding_task_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Candidate document collection (pre-onboarding) — a tokenized public form the candidate fills.
+export const candidateDocRequests = pgTable("candidate_doc_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: varchar("candidate_id").notNull(),
+  position: text("position"),                       // role being onboarded into
+  department: text("department"),
+  token: varchar("token").notNull().unique(),      // unguessable public link token
+  status: text("status").notNull().default("sent"), // sent | submitted
+  formData: jsonb("form_data"),                     // typed candidate answers (address, bank, etc.)
+  files: jsonb("files"),                            // { pan, aadhaar, payslips: [...], ... } base64 docs
+  sentAt: timestamp("sent_at").defaultNow(),
+  submittedAt: timestamp("submitted_at"),
+  joinDate: date("join_date"),                  // HR-entered date of joining
+  offerLetter: jsonb("offer_letter"),           // signed offer letter (HR upload) — gates onboarding
+  employeeId: varchar("employee_id"),           // set once onboarded
+  employeeCode: text("employee_code"),          // set once onboarded
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Audit Logs
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1055,6 +1075,7 @@ export const insertOnboardingTemplateSchema = createInsertSchema(onboardingTempl
 export const insertOnboardingTaskSchema = createInsertSchema(onboardingTasks).omit({ id: true, createdAt: true });
 export const insertOnboardingInstanceSchema = createInsertSchema(onboardingInstances).omit({ id: true, createdAt: true });
 export const insertOnboardingTaskItemSchema = createInsertSchema(onboardingTaskItems).omit({ id: true, createdAt: true });
+export const insertCandidateDocRequestSchema = createInsertSchema(candidateDocRequests).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Workspace insert schemas
 export const insertApprovalWorkflowSchema = createInsertSchema(approvalWorkflows).omit({ id: true, createdAt: true });
@@ -1182,6 +1203,8 @@ export type InsertOnboardingInstance = z.infer<typeof insertOnboardingInstanceSc
 
 export type OnboardingTaskItem = typeof onboardingTaskItems.$inferSelect;
 export type InsertOnboardingTaskItem = z.infer<typeof insertOnboardingTaskItemSchema>;
+export type CandidateDocRequest = typeof candidateDocRequests.$inferSelect;
+export type InsertCandidateDocRequest = z.infer<typeof insertCandidateDocRequestSchema>;
 
 // Workspace types
 export type ApprovalWorkflow = typeof approvalWorkflows.$inferSelect;
