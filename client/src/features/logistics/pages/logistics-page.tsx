@@ -14,9 +14,12 @@ import { useLogisticsRequests, useLogisticsLocations } from "../api/logistics.ap
 import { RaiseLogisticsDialog } from "../components/raise-logistics-dialog";
 import { LogisticsRequestCard } from "../components/logistics-request-card";
 import { LogisticsDetailDialog } from "../components/logistics-detail-dialog";
+import { SplitTabs } from "@/components/shared/split-tabs";
 
 const HANDLER_ROLES = ["super_admin", "logistics"];
 const ACTIVE = ["pending", "in_progress"];
+const fmtDate = (d: any) => { if (!d) return "—"; const s = String(d); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return format(m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(s), "d MMM yyyy"); };
+const flatLoc = (s: any) => String(s || "—").split(/\s*—\s*/).filter(Boolean).join(", ") || "—";
 
 export default function LogisticsPage() {
   const { data: auth } = useAuth();
@@ -25,6 +28,7 @@ export default function LogisticsPage() {
   const [raise, setRaise] = useState(false);
   const [detail, setDetail] = useState<any>(null);
 
+  const [tab, setTab] = useState<"mine" | "process">("mine");
   const [phase, setPhase] = useState<"active" | "done">("active");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -36,12 +40,21 @@ export default function LogisticsPage() {
   const locName = (id: string) => locations.find((l: any) => l.id === id)?.name;
   const routeOf = (r: any) => `${r.fromLocationText || locName(r.fromLocationId) || ""} ${r.toLocationText || locName(r.toLocationId) || ""}`;
 
-  const activeCount = requests.filter((r) => ACTIVE.includes(r.status)).length;
-  const doneCount = requests.length - activeCount;
+  const me = auth?.user?.id;
+  // Handlers get two surfaces: their own requests (Mine) and others' awaiting action (To Process).
+  const mineAll = requests.filter((r) => r.requesterId === me);
+  const processAll = isHandler ? requests.filter((r) => r.requesterId !== me) : [];
+  const activeTab = isHandler ? tab : "mine";
+  const base = activeTab === "process" ? processAll : mineAll;
+  const activeCount = base.filter((r) => ACTIVE.includes(r.status)).length;
+  const doneCount = base.length - activeCount;
+  const mineActive = mineAll.filter((r) => ACTIVE.includes(r.status)).length;
+  const processActive = processAll.filter((r) => ACTIVE.includes(r.status)).length;
 
   const rows = useMemo(() => {
+    const source = activeTab === "process" ? requests.filter((r) => r.requesterId !== me) : requests.filter((r) => r.requesterId === me);
     const q = search.trim().toLowerCase();
-    let list = requests.filter((r) => (phase === "active" ? ACTIVE.includes(r.status) : !ACTIVE.includes(r.status)));
+    let list = source.filter((r) => (phase === "active" ? ACTIVE.includes(r.status) : !ACTIVE.includes(r.status)));
     if (typeFilter !== "all") list = list.filter((r) => r.requestType === typeFilter);
     if (q) list = list.filter((r) => `${r.reference} ${routeOf(r)} ${r.goodsCategory || ""} ${r.pocName || ""}`.toLowerCase().includes(q));
     const upd = (r: any) => +new Date(r.updatedAt || r.createdAt || 0);
@@ -57,10 +70,9 @@ export default function LogisticsPage() {
       return upd(b) - upd(a);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requests, locations, phase, typeFilter, search, sortBy]);
+  }, [requests, locations, activeTab, me, phase, typeFilter, search, sortBy]);
 
   const paged = usePaged(rows);
-  const urgentCount = rows.filter((r: any) => r.priority === "urgent").length;
 
   return (
     <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
@@ -73,20 +85,32 @@ export default function LogisticsPage() {
             <p className="text-sm text-muted-foreground mt-0.5">{isHandler ? "Process inward & outward movement requests" : "Raise and track your movement requests"}</p>
           </div>
         </div>
-        <Button className="btn-primary-gradient" onClick={() => setRaise(true)} data-testid="logistics-raise"><Plus className="h-4 w-4 mr-1.5" /> Raise Request</Button>
+        {activeTab === "mine" && <Button className="btn-primary-gradient" onClick={() => setRaise(true)} data-testid="logistics-raise"><Plus className="h-4 w-4 mr-1.5" /> Raise Request</Button>}
       </div>
+
+      {/* My Requests vs handler To-Process queue */}
+      {isHandler && (
+        <SplitTabs
+          value={tab}
+          onValueChange={(v) => { setTab(v as "mine" | "process"); setPhase("active"); paged.setPage(1); }}
+          tabs={[
+            { value: "mine", label: "My Requests", count: mineActive },
+            { value: "process", label: "To Process", count: processActive },
+          ]}
+        />
+      )}
 
       {/* Controls — view · phase · search · type · sort */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
-          <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
-          <button onClick={() => setView("table")} aria-label="Table view" data-testid="view-table" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
+          <button onClick={() => setView("card")} aria-label="Card view" aria-pressed={view === "card"} data-testid="view-card" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
+          <button onClick={() => setView("table")} aria-label="Table view" aria-pressed={view === "table"} data-testid="view-table" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
         </div>
-        <div className="h-10 w-px flex-shrink-0 bg-foreground/30" />
+        <div className="hidden sm:block h-10 w-px flex-shrink-0 bg-foreground/30" />
         <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0" data-testid="logistics-phase-toggle">
           {(["active", "done"] as const).map((p) => (
-            <button key={p} onClick={() => { setPhase(p); paged.setPage(1); }} data-testid={`logistics-phase-${p}`} className={`px-3 h-full rounded-[10px] text-xs font-medium whitespace-nowrap ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}>
-              {p === "active" ? `Active (${activeCount})` : `Completed (${doneCount})`}
+            <button key={p} onClick={() => { setPhase(p); paged.setPage(1); }} aria-pressed={phase === p} data-testid={`logistics-phase-${p}`} className={`px-3 h-full rounded-[10px] text-xs font-medium whitespace-nowrap ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}>
+              {p === "active" ? `Active (${activeCount})` : `Closed (${doneCount})`}
             </button>
           ))}
         </div>
@@ -102,7 +126,7 @@ export default function LogisticsPage() {
             <SelectItem value="outboard">Outboard</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={sortBy} onValueChange={setSortBy}>
+        <Select value={sortBy} onValueChange={(v) => { setSortBy(v); paged.setPage(1); }}>
           <SelectTrigger className="h-10 w-[210px] gap-1 flex-shrink-0" data-testid="select-sort"><ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /><span className="text-muted-foreground">Sort:</span><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="updated">Latest Update</SelectItem>
@@ -119,12 +143,41 @@ export default function LogisticsPage() {
         <Card className="border-0"><CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (r: any) => r.reference },
-              { key: "type", header: "Type", cellClassName: "text-muted-foreground", render: (r: any) => (r.requestType === "inboard" ? "Inboard" : "Outboard") },
-              { key: "route", header: "Route", cellClassName: "text-foreground max-w-[20rem] truncate", render: (r: any) => `${r.fromLocationText || locName(r.fromLocationId) || "—"} → ${r.toLocationText || locName(r.toLocationId) || "—"}` },
-              { key: "cargo", header: "Cargo", cellClassName: "text-muted-foreground whitespace-nowrap", render: (r: any) => `${r.quantity} unit${r.quantity !== 1 ? "s" : ""}${r.weightKg ? ` · ${Number(r.weightKg)} kg` : ""}` },
-              { key: "pickup", header: "Pickup", cellClassName: "text-muted-foreground whitespace-nowrap", render: (r: any) => (r.pickupDate ? format(new Date(r.pickupDate), "d MMM yyyy") : "—") },
-              { key: "status", header: "Status", render: (r: any) => <Badge className={`text-xs ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge> },
+              { key: "reference", header: "Order ID", cellClassName: "", render: (r: any) => (
+                <div className="flex items-center gap-2">
+                  <span className="h-7 w-7 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Truck className="h-3.5 w-3.5" /></span>
+                  <div className="min-w-0">
+                    <span className="font-semibold text-[#206295] whitespace-nowrap">{r.reference}</span>
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+                      <span>{r.requestType === "inboard" ? "Inboard" : "Outboard"}</span>
+                      {r.priority === "urgent" && <span className="font-semibold text-[#C4402F]">· Urgent</span>}
+                    </div>
+                  </div>
+                </div>
+              ) },
+              { key: "requester", header: "Requester", cellClassName: "", render: (r: any) => (
+                <div className="min-w-0 max-w-[12rem]">
+                  <p className="font-medium text-foreground truncate">{r.requesterName || "Unassigned"}</p>
+                  {r.requesterDept && <p className="text-xs text-muted-foreground truncate">{r.requesterDept}</p>}
+                </div>
+              ) },
+              { key: "route", header: "Route", render: (r: any) => (
+                <div className="min-w-0 max-w-[16rem]">
+                  <div className="flex items-center gap-2 min-w-0"><span className="h-2 w-2 rounded-full border border-muted-foreground flex-shrink-0" /><span className="truncate text-foreground">{flatLoc(r.fromLocationText || locName(r.fromLocationId))}</span></div>
+                  <div className="ml-[3px] h-3 w-px bg-muted-foreground/40" />
+                  <div className="flex items-center gap-2 min-w-0"><span className="h-2 w-2 rounded-full bg-[#206295] flex-shrink-0" /><span className="truncate text-foreground">{flatLoc(r.toLocationText || locName(r.toLocationId))}</span></div>
+                </div>
+              ) },
+              { key: "cargo", header: "Cargo", cellClassName: "", render: (r: any) => (
+                <div className="min-w-0 max-w-[10rem]">
+                  <p className="text-foreground whitespace-nowrap">{Number(r.quantity) || 0} unit{Number(r.quantity) === 1 ? "" : "s"}</p>
+                  {r.goodsCategory && <p className="text-xs text-muted-foreground truncate capitalize">{r.goodsCategory}</p>}
+                </div>
+              ) },
+              { key: "weight", header: "Weight", align: "right", cellClassName: "whitespace-nowrap", render: (r: any) => (r.weightKg ? `${Number(r.weightKg)} kg` : "—") },
+              { key: "pickup", header: "Pickup", cellClassName: "text-muted-foreground whitespace-nowrap", render: (r: any) => fmtDate(r.pickupDate) },
+              { key: "eta", header: "ETA", cellClassName: "text-muted-foreground whitespace-nowrap", render: (r: any) => fmtDate(r.deliveryDate) },
+              { key: "status", header: "Status", cellClassName: "", render: (r: any) => <Badge className={`gap-1.5 text-xs ${statusClass(r.status)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" /> {statusLabel(r.status)}</Badge> },
             ]}
             rows={rows}
             getRowKey={(r: any) => r.id}
@@ -136,14 +189,16 @@ export default function LogisticsPage() {
         <div className="space-y-3">
           {(() => {
             const out: any[] = [];
+            const pageUrgent = paged.pageItems.filter((r: any) => r.priority === "urgent").length;
+            const pageStandard = paged.pageItems.length - pageUrgent;
             let prev: boolean | null = null;
             paged.pageItems.forEach((r) => {
               if (phase === "active") {
                 const u = r.priority === "urgent";
                 if (u !== prev) {
-                  const count = u ? urgentCount : rows.length - urgentCount;
+                  const count = u ? pageUrgent : pageStandard;
                   out.push(
-                    <div key={`sec-${u}`} className="flex items-center gap-2 pt-1 first:pt-0">
+                    <div key={`sec-${u}`} className="flex items-center gap-2 pt-3 first:pt-0">
                       {u ? <AlertTriangle className="h-3.5 w-3.5 text-[#C4402F] flex-shrink-0" /> : <Package className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
                       <span className={`text-xs font-semibold uppercase tracking-wide ${u ? "text-[#C4402F]" : "text-muted-foreground"}`}>{u ? "Urgent" : "Standard Requests"}</span>
                       <span className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${u ? "bg-[#FF6F62]/20 text-[#C4402F]" : "bg-muted text-muted-foreground"}`}>{count}</span>

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateInput } from "@/components/shared/datetime-field";
+import { clampEnd } from "@/lib/date-range";
 import { RequestDialog } from "@/components/shared/request-dialog";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -40,10 +41,10 @@ const BLANK = {
   goodsCategory: "", description: "", priority: "regular",
 };
 
-// From/To: one combobox — type a free-text address, or hit the chevron to pick a common location.
-// Authorised roles get an inline "Add … as common location" so the picklist stays curated.
 const GOODS_OPTIONS = ["Battery", "Spare parts", "Documents", "Tools / equipment", "Customer shipment"];
 
+// From/To: one combobox — type a free-text address, or hit the chevron to pick a common location.
+// Authorised roles get an inline "Add … as common location" so the picklist stays curated.
 function LocationField({ label, locations, idValue, textValue, onId, onText, canAdd, onAdd }: any) {
   const picked = idValue ? locations.find((l: any) => l.id === idValue) : null;
   const display = picked ? `${picked.name}${picked.city ? ` — ${picked.city}` : ""}` : (textValue || "");
@@ -119,7 +120,7 @@ export function RaiseLogisticsDialog({ open, onClose, locations = [] }: { open: 
     toLocationId: f.toLocationId || null, toLocationText: f.toLocationText.trim() || null,
     pickupDate: f.pickupDate || null, deliveryDate: f.deliveryDate || null,
     pocName: f.pocName.trim() || null, pocPhone: f.pocPhone.trim() || null,
-    quantity: Number(f.quantity) || 1, weightKg: f.weightKg ? String(f.weightKg) : null,
+    quantity: Math.max(1, Math.floor(Number(f.quantity) || 1)), weightKg: f.weightKg ? String(f.weightKg) : null,
     goodsCategory: f.goodsCategory.trim() || null, description: f.description.trim() || null,
     priority: f.priority,
   });
@@ -166,7 +167,7 @@ export function RaiseLogisticsDialog({ open, onClose, locations = [] }: { open: 
 
             <Section icon={CalendarClock} title="Schedule & contact">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label className="text-[11px]">Preferred pickup date</Label><DateInput value={f.pickupDate} onChange={(v) => set({ pickupDate: v })} testId="logistics-pickup" /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Preferred pickup date</Label><DateInput value={f.pickupDate} onChange={(v) => set({ pickupDate: v, deliveryDate: clampEnd(v, f.deliveryDate) })} testId="logistics-pickup" /></div>
                 <div className="space-y-1"><Label className="text-[11px]">Expected delivery date</Label><DateInput value={f.deliveryDate} onChange={(v) => set({ deliveryDate: v })} minDate={f.pickupDate || undefined} testId="logistics-delivery" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -179,7 +180,7 @@ export function RaiseLogisticsDialog({ open, onClose, locations = [] }: { open: 
 
             <Section icon={Package} title="Shipment details">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label className="text-[11px]">Quantity <span className="text-[#FF6F62]">*</span></Label><Input className="h-9" type="number" min="1" value={f.quantity} onChange={(e) => set({ quantity: e.target.value })} /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Quantity <span className="text-[#FF6F62]">*</span></Label><Input className="h-9" type="number" min="1" step="1" value={f.quantity} onChange={(e) => set({ quantity: e.target.value })} /></div>
                 <div className="space-y-1"><Label className="text-[11px]">Weight (kg) <span className="text-muted-foreground">optional</span></Label><Input className="h-9" type="number" min="0" step="0.001" value={f.weightKg} onChange={(e) => set({ weightKg: e.target.value })} placeholder="—" /></div>
               </div>
               <div className="space-y-1">

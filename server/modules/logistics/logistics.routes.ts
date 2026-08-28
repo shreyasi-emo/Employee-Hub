@@ -8,6 +8,26 @@ import {
 } from "../../shared/auth";
 import { log } from "../../shared/audit";
 import { enqueueZohoPush } from "../../zoho";
+import { z } from "zod";
+
+// Whitelist + validate the client-settable fields of a logistics request (server owns status/requester/reference/proof).
+const createLogisticsRequestSchema = z.object({
+  requestType: z.enum(["inboard", "outboard"]),
+  fromLocationId: z.string().trim().min(1).nullish(),
+  fromLocationText: z.string().trim().min(1).nullish(),
+  toLocationId: z.string().trim().min(1).nullish(),
+  toLocationText: z.string().trim().min(1).nullish(),
+  pickupDate: z.string().nullish(),
+  deliveryDate: z.string().nullish(),
+  pocName: z.string().nullish(),
+  pocPhone: z.string().nullish(),
+  quantity: z.coerce.number().int().positive(),
+  weightKg: z.union([z.string(), z.number()]).nullish(),
+  goodsCategory: z.string().nullish(),
+  description: z.string().nullish(),
+  priority: z.enum(["regular", "urgent"]).default("regular"),
+}).refine((d) => !!(d.fromLocationId || d.fromLocationText), { message: "A pickup location is required" })
+  .refine((d) => !!(d.toLocationId || d.toLocationText), { message: "A drop location is required" });
 
 export function registerLogisticsRoutes(app: Express) {
   // =========================================================================
@@ -20,7 +40,7 @@ export function registerLogisticsRoutes(app: Express) {
   app.post("/api/logistics/locations", requireAuth, requireRole("super_admin", "hr_admin", "hr_executive", "manager", "logistics"), async (req, res) => {
     res.json(await storage.createMovementLocation(req.body));
   });
-  app.patch("/api/logistics/locations/:id", requireAuth, requireLogistics, async (req, res) => {
+  app.patch("/api/logistics/locations/:id", requireAuth, requireRole("super_admin", "hr_admin", "hr_executive", "manager", "logistics"), async (req, res) => {
     res.json(await storage.updateMovementLocation(req.params.id, req.body));
   });
 
@@ -44,7 +64,9 @@ export function registerLogisticsRoutes(app: Express) {
   });
 
   app.post("/api/logistics/movements", requireAuth, async (req, res) => {
-    const body = { ...req.body, requesterId: req.currentUser!.id, status: "submitted" };
+    // Strip server-controlled fields — status transitions + handler stamps go through their own endpoints.
+    const { status, requesterId, receivedById, receivedAt, assignedToId, escalatedToId, reference, id, createdAt, updatedAt, ...safe } = req.body || {};
+    const body = { ...safe, requesterId: req.currentUser!.id, status: "submitted" };
     const m = await storage.createLogisticsMovement(body);
     await storage.addMovementEvent({
       movementId: m.id, actorId: req.currentUser!.id,
@@ -153,9 +175,10 @@ export function registerLogisticsRoutes(app: Express) {
   });
 
   app.post("/api/logistics/requests", requireAuth, async (req, res) => {
-    // Any employee can raise. Status/handler/proof fields are server-controlled.
-    const { status, processedById, completedById, completedAt, cancelledById, proof, requesterId, reference, id, createdAt, updatedAt, ...safe } = req.body || {};
-    const created = await storage.createLogisticsRequest({ ...safe, requesterId: req.currentUser!.id, status: "pending" });
+    // Any employee can raise. Whitelist-validate input; status/handler/proof/reference are server-controlled.
+    const parsed = createLogisticsRequestSchema.safeParse(req.body || {});
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid request" });
+    const created = await storage.createLogisticsRequest({ ...parsed.data, requesterId: req.currentUser!.id, status: "pending" });
     try {
       await storage.notifyByRole(["super_admin", "logistics"], {
         type: "logistics_request", title: "New Logistics Request",
@@ -188,7 +211,7 @@ export function registerLogisticsRoutes(app: Express) {
   app.post("/api/logistics/requests/:id/complete", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
     const r = await storage.getLogisticsRequest(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    if (r.status === "completed" || r.status === "cancelled") return res.status(400).json({ error: "Request is already closed." });
+    if (r.status !== "in_progress") return res.status(400).json({ error: `Cannot complete a request that is ${r.status}. Start processing it first.` });
     const proof = req.body?.proof;
     if (!proof || !proof.fileData) return res.status(400).json({ error: "Proof of delivery / document is required to complete." });
     const updated = await storage.updateLogisticsRequest(req.params.id, { status: "completed", completedById: req.currentUser!.id, completedAt: new Date(), proof });

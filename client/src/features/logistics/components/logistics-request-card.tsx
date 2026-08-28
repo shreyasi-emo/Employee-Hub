@@ -15,8 +15,9 @@ const Sep = () => <span className="w-px h-3 bg-border flex-shrink-0" />;
 function Endpoint({ label, loc, date }: { label: string; loc: string; date: any }) {
   return (
     <div className="min-w-0 flex-1">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 flex-shrink-0" /> {label}</p>
-      <p className="text-[15px] font-bold text-foreground truncate mt-1">{flatLoc(loc)}</p>
+      <MapPin className="h-4 w-4 text-muted-foreground" />
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mt-1">{label}</p>
+      <p className="text-[15px] font-bold text-foreground truncate mt-0.5">{flatLoc(loc)}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{fmtDate(date)}</p>
     </div>
   );
@@ -64,9 +65,9 @@ export function LogisticsRequestCard({ r, locName, onOpen }: {
           {/* MIDDLE — from (pickup) ···🚚···> to (drop) */}
           <div className="flex items-start gap-3 min-w-0 lg:flex-1 lg:px-5">
             <Endpoint label="From (Pickup)" loc={from} date={r.pickupDate} />
-            <div className="flex items-center flex-1 min-w-[2rem] pt-5">
+            <div className="flex items-center flex-1 min-w-[2rem] self-center">
               <span className="flex-1 border-t border-dashed border-border" />
-              <Truck className="h-4 w-4 text-muted-foreground mx-1.5 flex-shrink-0" />
+              <span className="mx-1.5 flex-shrink-0 rounded-md border border-border bg-muted/60 p-1.5"><Truck className="h-4 w-4 text-muted-foreground" /></span>
               <span className="flex-1 border-t border-dashed border-border" />
             </div>
             <Endpoint label="To (Drop)" loc={to} date={r.deliveryDate} />
@@ -81,7 +82,7 @@ export function LogisticsRequestCard({ r, locName, onOpen }: {
               <Badge className={`gap-1.5 text-xs w-fit mt-1.5 ${statusClass(r.status)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" /> {statusLabel(r.status)}</Badge>
               <p className="text-[11px] text-muted-foreground mt-1.5">Requested {fmtDate(r.createdAt)}</p>
             </div>
-            <div className="hidden lg:block w-px self-stretch bg-border/50 flex-shrink-0" />
+            <div className="hidden lg:block w-px self-stretch bg-border flex-shrink-0" />
             <div className="flex items-center lg:pl-4" onClick={(e) => e.stopPropagation()}>
               <Button variant="outline" size="sm" className="border-[#206295]/40 text-[#206295] hover:bg-[#206295]/10 hover:text-[#206295]" onClick={() => onOpen(r)} data-testid={`view-logistics-${r.id}`}>View Details <ChevronRight className="h-4 w-4 ml-0.5" /></Button>
             </div>
