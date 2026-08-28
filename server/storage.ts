@@ -1328,12 +1328,19 @@ export const storage = {
   },
   // ----- Logistics Requests (Inboard / Outboard) -----
   async listLogisticsRequests(filters: { requesterId?: string; status?: string } = {}) {
-    let q = db.select().from(logisticsRequests).$dynamic();
     const conds: any[] = [];
     if (filters.requesterId) conds.push(eq(logisticsRequests.requesterId, filters.requesterId));
     if (filters.status) conds.push(eq(logisticsRequests.status, filters.status));
+    let q = db
+      .select({ r: logisticsRequests, firstName: employees.firstName, lastName: employees.lastName, dept: departments.name })
+      .from(logisticsRequests)
+      .leftJoin(users, eq(users.id, logisticsRequests.requesterId))
+      .leftJoin(employees, eq(employees.id, users.employeeId))
+      .leftJoin(departments, eq(departments.id, employees.departmentId))
+      .$dynamic();
     if (conds.length) q = q.where(and(...conds));
-    return q.orderBy(desc(logisticsRequests.createdAt));
+    const rows = await q.orderBy(desc(logisticsRequests.createdAt));
+    return rows.map(({ r, firstName, lastName, dept }) => ({ ...r, requesterName: [firstName, lastName].filter(Boolean).join(" ") || null, requesterDept: dept || null }));
   },
   async getLogisticsRequest(id: string) {
     const [r] = await db.select().from(logisticsRequests).where(eq(logisticsRequests.id, id));

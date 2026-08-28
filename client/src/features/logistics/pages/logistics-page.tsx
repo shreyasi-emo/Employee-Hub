@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable } from "@/components/shared/data-table";
 import { usePaged, PaginationBar } from "@/components/shared/pagination";
-import { Truck, Plus, Search, LayoutGrid, Table2, ArrowDownUp } from "lucide-react";
+import { Truck, Plus, Search, LayoutGrid, Table2, ArrowDownUp, AlertTriangle, Package } from "lucide-react";
 import { format } from "date-fns";
 import { statusClass, statusLabel } from "@/lib/status";
 import { useLogisticsRequests, useLogisticsLocations } from "../api/logistics.api";
@@ -47,19 +47,20 @@ export default function LogisticsPage() {
     const upd = (r: any) => +new Date(r.updatedAt || r.createdAt || 0);
     const crt = (r: any) => +new Date(r.createdAt || 0);
     return [...list].sort((a, b) => {
-      if (sortBy === "newest") return crt(b) - crt(a);
-      if (sortBy === "oldest") return crt(a) - crt(b);
-      if (sortBy === "urgent") {
+      // Urgent always floats to the top section while active.
+      if (phase === "active") {
         const u = (r: any) => (r.priority === "urgent" ? 1 : 0);
         if (u(a) !== u(b)) return u(b) - u(a);
-        return upd(b) - upd(a);
       }
+      if (sortBy === "newest") return crt(b) - crt(a);
+      if (sortBy === "oldest") return crt(a) - crt(b);
       return upd(b) - upd(a);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requests, locations, phase, typeFilter, search, sortBy]);
 
   const paged = usePaged(rows);
+  const urgentCount = rows.filter((r: any) => r.priority === "urgent").length;
 
   return (
     <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
@@ -107,7 +108,6 @@ export default function LogisticsPage() {
             <SelectItem value="updated">Latest Update</SelectItem>
             <SelectItem value="newest">Newest</SelectItem>
             <SelectItem value="oldest">Oldest</SelectItem>
-            <SelectItem value="urgent">Urgent First</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -134,7 +134,28 @@ export default function LogisticsPage() {
         </CardContent></Card>
       ) : (
         <div className="space-y-3">
-          {paged.pageItems.map((r) => <LogisticsRequestCard key={r.id} r={r} locName={locName} onOpen={setDetail} />)}
+          {(() => {
+            const out: any[] = [];
+            let prev: boolean | null = null;
+            paged.pageItems.forEach((r) => {
+              if (phase === "active") {
+                const u = r.priority === "urgent";
+                if (u !== prev) {
+                  const count = u ? urgentCount : rows.length - urgentCount;
+                  out.push(
+                    <div key={`sec-${u}`} className="flex items-center gap-2 pt-1 first:pt-0">
+                      {u ? <AlertTriangle className="h-3.5 w-3.5 text-[#C4402F] flex-shrink-0" /> : <Package className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${u ? "text-[#C4402F]" : "text-muted-foreground"}`}>{u ? "Urgent" : "Standard Requests"}</span>
+                      <span className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${u ? "bg-[#FF6F62]/20 text-[#C4402F]" : "bg-muted text-muted-foreground"}`}>{count}</span>
+                    </div>,
+                  );
+                  prev = u;
+                }
+              }
+              out.push(<LogisticsRequestCard key={r.id} r={r} locName={locName} onOpen={setDetail} />);
+            });
+            return out;
+          })()}
           <PaginationBar page={paged.page} totalPages={paged.totalPages} count={paged.count} size={paged.size} onPage={paged.setPage} />
         </div>
       )}

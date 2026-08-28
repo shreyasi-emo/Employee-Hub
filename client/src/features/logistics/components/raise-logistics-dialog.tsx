@@ -42,6 +42,8 @@ const BLANK = {
 
 // From/To: one combobox — type a free-text address, or hit the chevron to pick a common location.
 // Authorised roles get an inline "Add … as common location" so the picklist stays curated.
+const GOODS_OPTIONS = ["Battery", "Spare parts", "Documents", "Tools / equipment", "Customer shipment"];
+
 function LocationField({ label, locations, idValue, textValue, onId, onText, canAdd, onAdd }: any) {
   const picked = idValue ? locations.find((l: any) => l.id === idValue) : null;
   const display = picked ? `${picked.name}${picked.city ? ` — ${picked.city}` : ""}` : (textValue || "");
@@ -182,8 +184,21 @@ export function RaiseLogisticsDialog({ open, onClose, locations = [] }: { open: 
               </div>
               <div className="space-y-1">
                 <Label className="text-[11px]">Type of goods / item category</Label>
-                <Input className="h-9" list="logistics-goods" value={f.goodsCategory} onChange={(e) => set({ goodsCategory: e.target.value })} placeholder="e.g. Battery, Spare parts, Documents, Tools" />
-                <datalist id="logistics-goods"><option value="Battery" /><option value="Spare parts" /><option value="Documents" /><option value="Tools / equipment" /><option value="Customer shipment" /></datalist>
+                <div className="relative">
+                  <Input className="h-9 pr-9" value={f.goodsCategory} onChange={(e) => set({ goodsCategory: e.target.value })} placeholder="e.g. Battery, Spare parts, Documents" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" aria-label="Pick a category" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted">
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[240px]">
+                      {GOODS_OPTIONS.map((g) => (
+                        <DropdownMenuItem key={g} onClick={() => set({ goodsCategory: g })}>{g}</DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
               <div className="space-y-1"><Label className="text-[11px]">Description / special instructions</Label><Textarea rows={2} className="resize-none" value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder="Anything the logistics team should know…" /></div>
               <div className="space-y-1.5">
