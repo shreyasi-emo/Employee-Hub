@@ -122,7 +122,7 @@ export default function PayrollPage() {
   const isSuperAdmin = user?.role === "super_admin";
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Payroll</h1>

@@ -1,72 +1,107 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Megaphone, Trash2, Calendar, Tag } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Calendar, User, Trash2, MoreVertical } from "lucide-react";
 import { format } from "date-fns";
-import { categoryColors } from "../lib/categories";
+import { categoryColors, catMeta, URGENT_TINT } from "../lib/categories";
 
-export function AnnouncementCard({ ann, canManage, onDelete }: {
+const fmtDate = (d: any) => `${format(new Date(d), "MMM d, yyyy")} | ${format(new Date(d), "h:mm a")}`;
+
+function MoreMenu({ id, onDelete }: { id: string; onDelete: (id: string) => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground flex-shrink-0" data-testid={`announcement-menu-${id}`}>
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem
+          className="text-[#FF6F62] focus:text-[#FF6F62]"
+          onClick={() => { if (window.confirm("Delete this announcement?")) onDelete(id); }}
+          data-testid={`button-delete-announcement-${id}`}
+        >
+          <Trash2 className="h-4 w-4 mr-2" /> Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function Badges({ ann, isUrgent, isExpired }: { ann: any; isUrgent: boolean; isExpired: boolean }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Badge className={`text-[10px] uppercase tracking-wide font-semibold border-0 ${categoryColors[ann.category] || categoryColors.general}`}>{ann.category}</Badge>
+      {isUrgent && <Badge className={`text-[10px] uppercase tracking-wide font-semibold border-0 ${URGENT_TINT}`}>Urgent</Badge>}
+      {isExpired && <Badge variant="outline" className="text-[10px]">Expired</Badge>}
+    </div>
+  );
+}
+
+export function AnnouncementCard({ ann, canManage, onDelete, author, view = "list" }: {
   ann: any;
   canManage: boolean;
   onDelete: (id: string) => void;
+  author?: string | null;
+  view?: "list" | "grid";
 }) {
-  const catColor = categoryColors[ann.category] || categoryColors.general;
+  const [expanded, setExpanded] = useState(false);
+  const meta = catMeta(ann.category);
+  const Icon = meta.icon;
   const isUrgent = ann.priority === "urgent";
   const isExpired = ann.expiresAt && new Date(ann.expiresAt) < new Date();
 
-  return (
-    <Card
-      className={`hover-elevate ${isUrgent ? "border-red-200 dark:border-red-800/30" : ""} ${isExpired ? "opacity-60" : ""}`}
-      data-testid={`announcement-${ann.id}`}
-    >
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-4 flex-1 min-w-0">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isUrgent ? "bg-red-100 dark:bg-red-900/20" : "bg-primary/10"}`}>
-              <Megaphone className={`h-5 w-5 ${isUrgent ? "text-red-600 dark:text-red-400" : "text-primary"}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-2 flex-wrap">
-                <h3 className="font-semibold text-foreground leading-snug">{ann.title}</h3>
-                <Badge className={`text-xs capitalize flex-shrink-0 ${catColor}`}>{ann.category}</Badge>
-                {isUrgent && (
-                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 text-xs">Urgent</Badge>
-                )}
-                {isExpired && <Badge variant="outline" className="text-xs">Expired</Badge>}
-              </div>
-              <p className="text-sm text-muted-foreground mt-2 whitespace-pre-line leading-relaxed">{ann.content}</p>
-              <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground flex-wrap">
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {format(new Date(ann.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                </span>
-                {ann.visibleTo && ann.visibleTo !== "all" && (
-                  <span className="flex items-center gap-1">
-                    <Tag className="h-3 w-3" />
-                    Visible to: {ann.visibleTo}
-                  </span>
-                )}
-                {ann.expiresAt && (
-                  <span>
-                    Expires: {format(new Date(ann.expiresAt), "MMM d, yyyy")}
-                  </span>
-                )}
-              </div>
-            </div>
+  if (view === "grid") {
+    return (
+      <Card className={`card-hover h-full ${isExpired ? "opacity-60" : ""}`} data-testid={`announcement-${ann.id}`}>
+        <CardContent className="p-5 flex flex-col h-full">
+          <div className="flex items-start justify-between gap-2">
+            <div className={`h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.tile}`}><Icon className="h-6 w-6" /></div>
+            {canManage && <MoreMenu id={ann.id} onDelete={onDelete} />}
           </div>
-          {canManage && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground flex-shrink-0"
-              onClick={() => onDelete(ann.id)}
-              data-testid={`button-delete-announcement-${ann.id}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+          <div className="mt-3"><Badges ann={ann} isUrgent={isUrgent} isExpired={isExpired} /></div>
+          <h3 className="font-semibold text-foreground mt-1.5 leading-snug">{ann.title}</h3>
+          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line leading-relaxed line-clamp-3 flex-1">{ann.content}</p>
+          <div className="mt-3 pt-3 border-t border-border flex flex-col gap-1.5 text-xs text-muted-foreground">
+            <span className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5 flex-shrink-0" /> {fmtDate(ann.createdAt)}</span>
+            {author && <span className="flex items-center gap-2"><User className="h-3.5 w-3.5 flex-shrink-0" /> {author}</span>}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // List view — a flush row for the divide-y container.
+  return (
+    <div className={`p-5 flex items-start gap-4 ${isExpired ? "opacity-60" : ""}`} data-testid={`announcement-${ann.id}`}>
+      <div className={`h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.tile}`}><Icon className="h-6 w-6" /></div>
+
+      <div className="flex-1 min-w-0">
+        <Badges ann={ann} isUrgent={isUrgent} isExpired={isExpired} />
+        <h3 className="font-semibold text-foreground mt-1.5 leading-snug">{ann.title}</h3>
+        <p className={`text-sm text-muted-foreground mt-1 whitespace-pre-line leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>{ann.content}</p>
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="mt-2 inline-flex items-center rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground hover-elevate"
+          data-testid={`read-more-${ann.id}`}
+        >
+          {expanded ? "Show less" : "Read More"}
+        </button>
+      </div>
+
+      <div className="hidden lg:block w-px self-stretch bg-border" />
+
+      <div className="hidden lg:flex flex-col gap-2.5 w-52 flex-shrink-0 pt-0.5">
+        <span className="flex items-center gap-2 text-xs text-muted-foreground"><Calendar className="h-3.5 w-3.5 flex-shrink-0" /> {fmtDate(ann.createdAt)}</span>
+        {author && <span className="flex items-center gap-2 text-xs text-muted-foreground"><User className="h-3.5 w-3.5 flex-shrink-0" /> {author}</span>}
+      </div>
+
+      {canManage && <MoreMenu id={ann.id} onDelete={onDelete} />}
+    </div>
   );
 }

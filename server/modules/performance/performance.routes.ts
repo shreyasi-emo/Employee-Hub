@@ -87,9 +87,16 @@ export function registerPerformanceRoutes(app: Express) {
     let empId = employeeId as string | undefined;
 
     if (user.role === "employee" && user.employeeId) {
-      empId = user.employeeId;
-    } else if (user.role === "manager" && !empId) {
-      // manager sees their direct reports
+      return res.json(await storage.getGoals(cycleId as string, user.employeeId));
+    }
+
+    if (user.role === "manager") {
+      // Managers are scoped to their own direct reports — never the whole company.
+      const teamIds = new Set((await storage.getEmployeesByManager(user.employeeId || "")).map((e: any) => e.id));
+      if (empId && !teamIds.has(empId)) empId = undefined; // ignore out-of-team requests
+      if (empId) return res.json(await storage.getGoals(cycleId as string, empId));
+      const all = await storage.getGoals(cycleId as string, undefined);
+      return res.json((all as any[]).filter((g: any) => teamIds.has(g.employeeId)));
     }
 
     const gs = await storage.getGoals(cycleId as string, empId);

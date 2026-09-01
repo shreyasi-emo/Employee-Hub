@@ -18,7 +18,7 @@ export default function ResourcesPage() {
   const del = useDeleteReferenceDoc({ onSuccess: () => toast({ title: "Removed" }) });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
       <ResourcesHeader canManage={canManage} onUpload={() => setOpen(true)} />
 
       <Tabs value={tab} onValueChange={setTab}>

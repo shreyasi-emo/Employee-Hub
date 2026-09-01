@@ -81,7 +81,7 @@ export default function OfficeAdminPage() {
   );
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-5">
+    <div className="p-6 max-w-[92rem] mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Building2 className="h-6 w-6 text-primary" /> Office Admin Ops

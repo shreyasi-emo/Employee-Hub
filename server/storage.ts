@@ -50,6 +50,23 @@ export const DEFAULT_LEAVE_BALANCES: Record<string, number> = {
   CL: 12, SL: 8, EL: 15, ML: 0, PL: 0, CO: 3, LOP: 0,
 };
 
+// Short, year-less reference codes, e.g. LR-4Q7X. Uses an unambiguous alphabet (no 0/O/1/I)
+// and retries against the table so codes stay unique.
+const REF_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function shortRefCode(len = 4) {
+  let s = "";
+  for (let i = 0; i < len; i++) s += REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)];
+  return s;
+}
+async function genRef(prefix: string, table: any): Promise<string> {
+  for (let i = 0; i < 25; i++) {
+    const ref = `${prefix}-${shortRefCode(4)}`;
+    const hit = await db.select({ id: table.id }).from(table).where(eq(table.reference, ref)).limit(1);
+    if (!hit.length) return ref;
+  }
+  return `${prefix}-${shortRefCode(6)}`; // extremely unlikely fallback
+}
+
 export const storage = {
   // ====== USERS ======
   async getUser(id: string) {
@@ -1034,7 +1051,7 @@ export const storage = {
     return c;
   },
   // ----- Candidate document collection (pre-onboarding) -----
-  async createDocRequest(data: { candidateId: string; token: string }) {
+  async createDocRequest(data: { candidateId: string; token: string; position?: string | null; department?: string | null }) {
     const [r] = await db.insert(candidateDocRequests).values(data).returning();
     return r;
   },
@@ -1415,7 +1432,7 @@ export const storage = {
     return r;
   },
   async createLogisticsMovement(data: any) {
-    const ref = `MOV-${new Date().getFullYear()}-${(Date.now() * 1000 + Math.floor(Math.random() * 1000)).toString(36).slice(-6).toUpperCase()}`;
+    const ref = await genRef("MOV", logisticsMovements);
     const [r] = await db.insert(logisticsMovements).values({ ...data, reference: ref }).returning();
     return r;
   },
@@ -1448,7 +1465,7 @@ export const storage = {
     return r;
   },
   async createLogisticsRequest(data: any) {
-    const ref = `LR-${new Date().getFullYear()}-${(Date.now() * 1000 + Math.floor(Math.random() * 1000)).toString(36).slice(-6).toUpperCase()}`;
+    const ref = await genRef("LR", logisticsRequests);
     const [r] = await db.insert(logisticsRequests).values({ ...data, reference: ref }).returning();
     return r;
   },
@@ -1592,7 +1609,7 @@ export const storage = {
     return r;
   },
   async createReimbursement(data: any) {
-    const ref = `RMB-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const ref = await genRef("RMB", reimbursements);
     const [r] = await db.insert(reimbursements).values({ ...data, reference: ref }).returning();
     return r;
   },
@@ -1614,7 +1631,7 @@ export const storage = {
     return r;
   },
   async createOfficePurchase(data: any) {
-    const ref = `OP-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const ref = await genRef("OP", officePurchases);
     const [r] = await db.insert(officePurchases).values({ ...data, reference: ref }).returning();
     return r;
   },
@@ -1636,7 +1653,7 @@ export const storage = {
     return r;
   },
   async createProcurementRequest(data: any) {
-    const ref = `PRQ-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const ref = await genRef("PRQ", procurementRequests);
     const [r] = await db.insert(procurementRequests).values({ ...data, reference: ref }).returning();
     return r;
   },
@@ -1659,7 +1676,7 @@ export const storage = {
     return r;
   },
   async createTripRequest(data: any) {
-    const ref = `TRV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const ref = await genRef("TRV", tripRequests);
     const [r] = await db.insert(tripRequests).values({ ...data, reference: ref }).returning();
     return r;
   },
@@ -1685,7 +1702,7 @@ export const storage = {
     return r;
   },
   async createRequest(data: any) {
-    const ref = `REQ-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const ref = await genRef("REQ", requestsTable);
     const [r] = await db.insert(requestsTable).values({ ...data, reference: ref }).returning();
     return r;
   },
@@ -1715,7 +1732,7 @@ export const storage = {
     return r;
   },
   async createCeoApprovalNote(data: any) {
-    const ref = `APR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const ref = await genRef("APR", ceoApprovalNotes);
     const [r] = await db.insert(ceoApprovalNotes).values({ ...data, reference: ref }).returning();
     return r;
   },

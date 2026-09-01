@@ -41,7 +41,7 @@ export default function AssetsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
       <AssetsHeader total={assets.length} canManage={canManage} onAdd={() => setShowAdd(true)} />
 
       <AssetsFilterBar

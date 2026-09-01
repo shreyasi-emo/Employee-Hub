@@ -45,7 +45,7 @@ export function registerShiftRoutes(app: Express) {
 
   app.get("/api/shift-assignments", requireAuth, async (req, res) => {
     const { employeeId } = req.query;
-    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
+    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "ceo_approver"];
     if (!hrRoles.includes(req.currentUser!.role) && req.currentUser!.employeeId !== employeeId) {
       return res.status(403).json({ error: "Access denied" });
     }

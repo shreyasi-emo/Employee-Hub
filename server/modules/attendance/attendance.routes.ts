@@ -78,8 +78,9 @@ export function registerAttendanceRoutes(app: Express) {
     const m = parseInt(month as string) || new Date().getMonth() + 1;
     const y = parseInt(year as string) || new Date().getFullYear();
 
-    // Check access
-    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
+    // Check access — a plain manager is employee-like here (own record only); team attendance
+    // reaches them through the team-scoped approvals feed, not arbitrary employeeId lookups.
+    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "ceo_approver"];
     if (!allowedRoles.includes(req.currentUser!.role) && req.currentUser!.employeeId !== empId) {
       return res.status(403).json({ error: "Access denied" });
     }
@@ -91,9 +92,9 @@ export function registerAttendanceRoutes(app: Express) {
     res.json([...records, ...expandApprovedLeaveDays(leaves, from, to, existing)]);
   });
 
-  // Org-wide monthly attendance (for summaries / side panel). HR/manager only.
+  // Org-wide monthly attendance (for summaries / side panel). HR/admin only.
   app.get("/api/attendance/month", requireAuth, async (req, res) => {
-    if (!["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"].includes(req.currentUser!.role)) {
+    if (!["super_admin", "hr_admin", "hr_executive", "ceo_approver"].includes(req.currentUser!.role)) {
       return res.status(403).json({ error: "Access denied" });
     }
     const m = parseInt(req.query.month as string) || new Date().getMonth() + 1;
@@ -106,9 +107,9 @@ export function registerAttendanceRoutes(app: Express) {
     res.json([...records, ...expandApprovedLeaveDays(leaves, from, to, existing)]);
   });
 
-  // Org-wide attendance within a date range. HR/manager only.
+  // Org-wide attendance within a date range. HR/admin only.
   app.get("/api/attendance/range", requireAuth, async (req, res) => {
-    if (!["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"].includes(req.currentUser!.role)) {
+    if (!["super_admin", "hr_admin", "hr_executive", "ceo_approver"].includes(req.currentUser!.role)) {
       return res.status(403).json({ error: "Access denied" });
     }
     const { from, to } = req.query;
@@ -129,7 +130,7 @@ export function registerAttendanceRoutes(app: Express) {
     if (!from || !to || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return res.status(400).json({ error: "Valid from and to dates are required." });
     }
-    const privileged = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"].includes(viewer.role);
+    const privileged = ["super_admin", "hr_admin", "hr_executive", "ceo_approver"].includes(viewer.role);
     if (!privileged && viewer.employeeId !== employeeId) return res.status(403).json({ error: "Access denied" });
 
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -241,8 +242,8 @@ export function registerAttendanceRoutes(app: Express) {
   // Consecutive-days streak ending today for one employee's *current* status (skips weekends/holidays
   // without breaking the run). Used on hover in the Today's Attendance list.
   app.get("/api/attendance/streak", requireAuth, async (req, res) => {
-    // Others' streaks only for HR/managers; everyone else sees their own.
-    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver");
+    // Others' streaks only for HR/admin; everyone else (incl. managers) sees their own.
+    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive", "ceo_approver");
     const empId = (privileged && req.query.employeeId) ? (req.query.employeeId as string) : req.currentUser!.employeeId;
     if (!empId) return res.status(400).json({ error: "employeeId required" });
     const pad = (n: number) => String(n).padStart(2, "0");

@@ -41,9 +41,15 @@ export function registerLeaveRoutes(app: Express) {
   // ===== LEAVE BALANCES =====
   app.get("/api/leave-balances", requireAuth, async (req, res) => {
     const { employeeId, year } = req.query;
-    // Only HR/managers may read another employee's balances; everyone else is forced to their own.
-    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive", "manager");
-    const empId = (privileged && employeeId) ? (employeeId as string) : (req.currentUser!.employeeId || "");
+    const viewer = req.currentUser!;
+    // HR/admin may read anyone's balances; a manager only their direct reports'; everyone else their own.
+    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive");
+    let empId = viewer.employeeId || "";
+    if (privileged && employeeId) empId = employeeId as string;
+    else if (viewer.role === "manager" && employeeId) {
+      const target = await storage.getEmployee(employeeId as string);
+      if (target && target.managerId === viewer.employeeId) empId = employeeId as string; // else falls back to own
+    }
     if (!empId) return res.status(400).json({ error: "Employee ID required" });
     const y = parseInt(year as string) || new Date().getFullYear();
     res.json(await storage.getLeaveBalances(empId, y));
@@ -250,9 +256,15 @@ export function registerLeaveRoutes(app: Express) {
   // ===== LEAVE LEDGER =====
   app.get("/api/leave-ledger", requireAuth, async (req, res) => {
     const { employeeId, leaveTypeId } = req.query;
-    // Only HR/managers may read another employee's ledger; everyone else is forced to their own.
-    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive", "manager");
-    const empId = (privileged && employeeId) ? (employeeId as string) : (req.currentUser!.employeeId || "");
+    const viewer = req.currentUser!;
+    // HR/admin may read anyone's ledger; a manager only their direct reports'; everyone else their own.
+    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive");
+    let empId = viewer.employeeId || "";
+    if (privileged && employeeId) empId = employeeId as string;
+    else if (viewer.role === "manager" && employeeId) {
+      const target = await storage.getEmployee(employeeId as string);
+      if (target && target.managerId === viewer.employeeId) empId = employeeId as string; // else falls back to own
+    }
     if (!empId) return res.status(400).json({ error: "Employee ID required" });
     res.json(await storage.getLeaveLedger(empId, leaveTypeId as string));
   });

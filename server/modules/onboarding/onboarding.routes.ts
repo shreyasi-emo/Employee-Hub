@@ -59,7 +59,7 @@ export function registerOnboardingRoutes(app: Express) {
   });
 
   app.get("/api/onboarding/instances", requireAuth, async (req, res) => {
-    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
+    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "ceo_approver"];
     if (hrRoles.includes(req.currentUser!.role)) {
       res.json(await storage.getOnboardingInstances());
     } else {
@@ -68,7 +68,7 @@ export function registerOnboardingRoutes(app: Express) {
   });
 
   app.get("/api/onboarding/instances/:id/tasks", requireAuth, async (req, res) => {
-    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
+    const hrRoles = ["super_admin", "hr_admin", "hr_executive", "ceo_approver"];
     if (!hrRoles.includes(req.currentUser!.role)) {
       const mine = await storage.getOnboardingInstances(req.currentUser!.employeeId || "");
       if (!mine.some((i: any) => i.id === req.params.id)) return res.status(403).json({ error: "Forbidden" });
@@ -92,15 +92,16 @@ export function registerOnboardingRoutes(app: Express) {
 
   // HR: add a candidate (or reuse one) and generate + "send" a unique doc-collection link.
   app.post("/api/onboarding/doc-requests", requireAuth, requireHR, async (req, res) => {
-    const { name, email, phone, candidateId } = req.body || {};
+    const { name, email, phone, position, department, candidateId } = req.body || {};
     let cid = candidateId;
     if (!cid) {
       if (!name?.trim() || !email?.trim()) return res.status(400).json({ error: "Candidate name and email are required." });
+      if (name.trim().split(/\s+/).length < 2) return res.status(400).json({ error: "Candidate's first and last name are required." });
       const c = await storage.createCandidate({ name: name.trim(), email: email.trim(), phone: phone?.trim() || null });
       cid = c.id;
     }
     const token = crypto.randomBytes(24).toString("base64url"); // unguessable public token
-    const request = await storage.createDocRequest({ candidateId: cid, token });
+    const request = await storage.createDocRequest({ candidateId: cid, token, position: position?.trim() || null, department: department?.trim() || null });
     const cand = await storage.getCandidate(cid);
     const link = `${req.protocol}://${req.get("host")}/onboard/${token}`;
     const emailResult = await sendEmail({

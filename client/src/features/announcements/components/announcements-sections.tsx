@@ -1,51 +1,92 @@
-// The page's own chrome: title bar and the category filter pills.
+// The page's own chrome: title bar, stat cards, and the filter/sort/view toolbar.
 // Kept beside the page so announcements-page.tsx stays a list of named parts.
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Megaphone, Plus } from "lucide-react";
+import { StatCard } from "@/components/shared/stat-card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Megaphone, Plus, ArrowDownUp, List, LayoutGrid } from "lucide-react";
+import { catMeta } from "../lib/categories";
 
-export function AnnouncementsHeader({ count, canManage, onNew }: {
-  count: number; canManage: boolean; onNew: () => void;
-}) {
+const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+export function AnnouncementsHeader({ canManage, onNew }: { canManage: boolean; onNew: () => void }) {
   return (
-    <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="flex items-start justify-between gap-4 flex-wrap">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Announcements</h1>
-        <p className="text-sm text-muted-foreground">{count} announcements</p>
+        <p className="text-sm text-muted-foreground mt-1">Stay informed with the latest updates and important notifications.</p>
       </div>
       {canManage && (
-        <Button onClick={onNew} data-testid="button-new-announcement">
-          <Plus className="h-4 w-4 mr-2" />
-          New Announcement
+        <Button onClick={onNew} className="btn-primary-gradient" data-testid="button-new-announcement">
+          <Plus className="h-4 w-4 mr-2" /> New Announcement
         </Button>
       )}
     </div>
   );
 }
 
-export function CategoryFilterPills({ announcements, categories, value, onChange }: {
-  announcements: any[]; categories: any[]; value: string; onChange: (v: string) => void;
+export function AnnouncementStats({ announcements, categories }: { announcements: any[]; categories: string[] }) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <StatCard title="Total" value={announcements.length} subtitle="All announcements" icon={Megaphone} color="bg-[#206295]/15 text-[#206295]" />
+      {categories.map((cat) => {
+        const meta = catMeta(cat);
+        return (
+          <StatCard
+            key={cat}
+            title={cap(cat)}
+            value={announcements.filter((a) => a.category === cat).length}
+            subtitle={meta.desc}
+            icon={meta.icon}
+            color={meta.tile}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+export function AnnouncementsToolbar({ announcements, categories, categoryFilter, onCategory, sort, onSort, view, onView }: {
+  announcements: any[]; categories: string[];
+  categoryFilter: string; onCategory: (v: string) => void;
+  sort: string; onSort: (v: string) => void;
+  view: "list" | "grid"; onView: (v: "list" | "grid") => void;
 }) {
   return (
-    <div className="flex gap-2 flex-wrap">
-      <button
-        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${value === "all" ? "btn-primary-gradient text-white border-transparent" : "bg-muted text-muted-foreground border-border hover-elevate"}`}
-        onClick={() => onChange("all")}
-        data-testid="filter-all"
-      >
-        All ({announcements.length})
-      </button>
-      {categories.map((cat: any) => (
-        <button
-          key={cat}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors capitalize ${value === cat ? "btn-primary-gradient text-white border-transparent" : "bg-muted text-muted-foreground border-border hover-elevate"}`}
-          onClick={() => onChange(cat)}
-          data-testid={`filter-${cat}`}
-        >
-          {cat} ({announcements.filter((a: any) => a.category === cat).length})
-        </button>
-      ))}
+    <div className="flex items-center justify-between gap-3 flex-wrap">
+      {/* Canonical shadcn Tabs (same as My Requests / Team Requests) */}
+      <Tabs value={categoryFilter} onValueChange={onCategory}>
+        <TabsList>
+          <TabsTrigger value="all" data-testid="filter-all">All ({announcements.length})</TabsTrigger>
+          {categories.map((c) => (
+            <TabsTrigger key={c} value={c} data-testid={`filter-${c}`}>
+              {cap(c)} ({announcements.filter((a) => a.category === c).length})
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      <div className="flex items-center gap-3">
+        <Select value={sort} onValueChange={onSort}>
+          <SelectTrigger className="h-10 w-[170px] gap-1 flex-shrink-0" data-testid="select-sort">
+            <ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            <span className="text-muted-foreground">Sort:</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="latest">Newest</SelectItem>
+            <SelectItem value="oldest">Oldest</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Canonical view toggle (segmented-toggle + btn-primary-gradient), same as My Requests */}
+        <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
+          <button onClick={() => onView("list")} aria-label="List view" data-testid="view-list" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "list" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><List className="h-4 w-4" /></button>
+          <button onClick={() => onView("grid")} aria-label="Grid view" data-testid="view-grid" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "grid" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -53,7 +94,7 @@ export function CategoryFilterPills({ announcements, categories, value, onChange
 export function AnnouncementsLoading() {
   return (
     <div className="space-y-4">
-      {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 w-full" />)}
+      {[1, 2, 3].map((i) => <Skeleton key={i} className="h-32 w-full" />)}
     </div>
   );
 }

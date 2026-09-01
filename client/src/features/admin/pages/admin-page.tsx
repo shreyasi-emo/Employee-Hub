@@ -22,7 +22,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Admin Settings</h1>
         <p className="text-sm text-muted-foreground">Configure organization structure and policies</p>

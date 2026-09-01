@@ -25,8 +25,8 @@ import {
 
 export function registerAssetRoutes(app: Express) {
   app.get("/api/assets", requireAuth, async (req, res) => {
-    // HR/managers may query any employee or the full list; everyone else sees only their own assets.
-    const privileged = ["super_admin", "hr_admin", "hr_executive", "manager"].includes(req.currentUser!.role);
+    // HR/admin may query any employee or the full list; everyone else (incl. managers) sees only their own assets.
+    const privileged = ["super_admin", "hr_admin", "hr_executive"].includes(req.currentUser!.role);
     if (privileged) return res.json(await storage.getAssets(req.query.employeeId as string));
     const own = req.currentUser!.employeeId;
     if (!own) return res.json([]);

@@ -1,4 +1,4 @@
-import { useAuth, isManager, hasRole } from "@/lib/auth";
+import { useAuth, hasRole } from "@/lib/auth";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MyAttendanceView } from "../components/my-attendance-view";
 import { OrgAttendanceView } from "../components/org-attendance-view";
@@ -8,7 +8,9 @@ import { OrgAttendanceView } from "../components/org-attendance-view";
 export default function AttendancePage() {
   const { data: auth } = useAuth();
   const user = auth?.user || null;
-  const canSeeAll = isManager(user) || hasRole(user, "ceo_approver");
+  // Org-wide attendance is HR/admin (+ CEO) only. A plain manager is employee-like here —
+  // their team's attendance surfaces through the (team-scoped) approvals feed, not this view.
+  const canSeeAll = hasRole(user, "super_admin", "hr_admin", "hr_executive", "ceo_approver");
   if (!canSeeAll) return <MyAttendanceView />;
   return (
     <Tabs defaultValue="mine" className="w-full">

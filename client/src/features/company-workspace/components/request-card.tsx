@@ -7,13 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ShoppingCart, Car, TicketIcon, Receipt, CheckCircle2, Ban, History, MoreVertical, Eye, CalendarClock, Copy } from "lucide-react";
+import { ShoppingCart, Car, TicketIcon, Receipt, CheckCircle2, Ban, History, MoreVertical, Eye, CalendarClock, Copy, User } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "../reimbursements/components/status-badge";
 import { statusClass, statusLabel } from "@/lib/status";
 
 // Unified enterprise request card — Identity (ref · title · date) | Approval Status | Payable.
-export function RequestCard({ item, type, onOpen }: { item: any; type: "purchase" | "travel" | "ticket" | "reimbursement"; onOpen: (item: any) => void }) {
+// `readOnly` drops the click-through + overflow menu (e.g. the manager's Team Requests view);
+// `byline` shows who raised it (only meaningful when the list spans multiple requesters).
+export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { item: any; type: "purchase" | "travel" | "ticket" | "reimbursement"; onOpen?: (item: any) => void; readOnly?: boolean; byline?: string }) {
   const { toast } = useToast();
   const Icon = type === "purchase" ? ShoppingCart : type === "travel" ? Car : type === "ticket" ? TicketIcon : Receipt;
   const reference = refOf(type, item);
@@ -40,7 +42,7 @@ export function RequestCard({ item, type, onOpen }: { item: any; type: "purchase
   });
 
   return (
-    <Card data-testid={`card-request-${item.id}`} className={`border-0 hover-elevate active-elevate-2 cursor-pointer ${item.status === "changes_requested" ? "ring-1 ring-[#FF6F62]/50 bg-[#FF6F62]/[0.04]" : ""}`} onClick={() => onOpen(item)}>
+    <Card data-testid={`card-request-${item.id}`} className={`border-0 ${readOnly ? "" : "hover-elevate active-elevate-2 cursor-pointer"} ${item.status === "changes_requested" ? "ring-1 ring-[#FF6F62]/50 bg-[#FF6F62]/[0.04]" : ""}`} onClick={readOnly ? undefined : () => onOpen?.(item)}>
       <CardContent className="p-[17px]">
         <div className="flex items-stretch gap-0">
           {/* Identity */}
@@ -61,6 +63,7 @@ export function RequestCard({ item, type, onOpen }: { item: any; type: "purchase
               </div>
               <h3 className="text-[18px] leading-tight font-semibold text-foreground tracking-tight truncate mt-0.5">{title}</h3>
               <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 flex-shrink-0" /> {dateLine}</p>
+              {byline && <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5 flex-shrink-0" /> {byline}</p>}
             </div>
           </div>
 
@@ -110,23 +113,25 @@ export function RequestCard({ item, type, onOpen }: { item: any; type: "purchase
             )}
           </div>
 
-          {/* Overflow */}
-          <div className="flex-shrink-0 flex items-center pl-2" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" data-testid={`more-${type}-${item.id}`}><MoreVertical className="h-4 w-4" /></Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={() => onOpen(item)}><Eye className="h-4 w-4 mr-2" /> View details</DropdownMenuItem>
-                {canRevoke && (
-                  <DropdownMenuItem className="text-[#FF6F62] focus:text-[#FF6F62]" disabled={revoke.isPending}
-                    onClick={() => { if (window.confirm("Revoke this request? This cannot be undone.")) revoke.mutate(); }}>
-                    <Ban className="h-4 w-4 mr-2" /> Revoke
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {/* Overflow — hidden in read-only views (e.g. a manager's team view) */}
+          {!readOnly && (
+            <div className="flex-shrink-0 flex items-center pl-2" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" data-testid={`more-${type}-${item.id}`}><MoreVertical className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => onOpen?.(item)}><Eye className="h-4 w-4 mr-2" /> View details</DropdownMenuItem>
+                  {canRevoke && (
+                    <DropdownMenuItem className="text-[#FF6F62] focus:text-[#FF6F62]" disabled={revoke.isPending}
+                      onClick={() => { if (window.confirm("Revoke this request? This cannot be undone.")) revoke.mutate(); }}>
+                      <Ban className="h-4 w-4 mr-2" /> Revoke
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

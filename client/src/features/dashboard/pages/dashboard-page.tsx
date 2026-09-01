@@ -1,8 +1,7 @@
 import { CARD_STYLE, ATT_COLORS } from "../lib/dashboard-visuals";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth, isHR, isManager, getRoleLabel, getRoleBadgeColor } from "@/lib/auth";
+import { useAuth, isHR, isManager, getRoleLabel } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,7 +26,9 @@ export default function DashboardPage() {
   const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
 
-  const { data: stats, isLoading: statsLoading } = useQuery<Stats>({ queryKey: ["/api/dashboard/stats"] });
+  // Company-wide totals — only fetched for the HR/admin layout, so a plain manager's
+  // browser never receives org-wide numbers (the stats grid is hidden for them anyway).
+  const { data: stats, isLoading: statsLoading } = useQuery<Stats>({ queryKey: ["/api/dashboard/stats"], enabled: isHR(user!) });
   const { data: announcements = [], isLoading: annLoading } = useQuery<any[]>({ queryKey: ["/api/announcements"] });
   const { data: leaveRequests = [] } = useQuery<any[]>({ queryKey: ["/api/leave-requests"] });
   const { data: employees = [] } = useQuery<any[]>({
@@ -51,8 +52,11 @@ export default function DashboardPage() {
   const { data: designations = [] } = useQuery<any[]>({ queryKey: ["/api/designations"], enabled: !!user });
   const { data: allBookings = [] } = useQuery<any[]>({ queryKey: ["/api/vehicles/bookings"], enabled: !!user, retry: false });
 
-  // Service-request counts + calendar data for the admin dashboard layout
-  const showAdminLayout = isHR(user!) || isManager(user!);
+  // Service-request counts + calendar data for the admin dashboard layout.
+  // A plain `manager` gets the employee layout (isHR covers every HR/admin role but
+  // manager), with a Pending Leave Approvals card in place of My Pending Requests.
+  const showAdminLayout = isHR(user!);
+  const isTeamManager = user?.role === "manager";
   const { data: requestSummary } = useQuery<any>({
     queryKey: ["/api/my-requests/summary"],
     enabled: !!user,
@@ -213,8 +217,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      {(isHR(user!) || isManager(user!)) && (
+      {/* Stats Grid — company-wide overview, HR/admin only. */}
+      {showAdminLayout && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statsLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
@@ -282,21 +286,17 @@ export default function DashboardPage() {
                       so line one stays a single clean string however long the name runs. */}
                   <div className="min-w-0 flex-1">
                     <p className="text-lg font-bold text-foreground truncate">{emp.firstName} {emp.lastName}</p>
-                    <div className="flex items-center gap-2 flex-wrap mt-1.5">
-                      {/* Matched to the status pill beside it: same radius, padding, text size and
-                          no border, so the two chips are the same height. Badge's own base is
-                          rounded-[12px] / py-0.5 / border, which rendered it visibly shorter. */}
-                      {user?.role && <Badge className={`rounded-full border-0 px-2.5 py-1 text-xs font-semibold ${getRoleBadgeColor(user.role as any)}`}>{getRoleLabel(user.role as any)}</Badge>}
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: `${todayMeta.color}1F`, color: todayMeta.color }}>
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: todayMeta.color }} /> Today · {todayMeta.label}
-                      </span>
-                      {(designationName || deptName) && (
-                        <span className="text-xs text-muted-foreground truncate">{designationName || ""}{designationName && deptName ? " · " : ""}{deptName || ""}</span>
-                      )}
-                    </div>
+                    {/* Designation | Dept — semibold dark-grey, in place of the role/status chips. */}
+                    {(designationName || deptName) && (
+                      <p className="text-[11.5px] font-semibold text-foreground/80 truncate mt-1.5">
+                        {designationName || ""}
+                        {designationName && deptName && <span className="mx-1.5 font-normal text-muted-foreground">|</span>}
+                        {deptName || ""}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="hidden sm:flex sm:w-64 flex-shrink-0 flex-col gap-3.5 text-xs text-muted-foreground pt-1">
+                  <div className="hidden sm:flex sm:w-56 flex-shrink-0 flex-col gap-3.5 text-xs text-muted-foreground pt-1">
                     {empEmail && <p className="inline-flex items-center gap-2 w-full min-w-0"><Mail className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /><span className="truncate">{empEmail}</span></p>}
                     <p className="inline-flex items-center gap-2"><UserCheck className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /> {managerName ? <>Reports to <span className="font-medium text-foreground">{managerName}</span></> : "No manager assigned"}</p>
                   </div>
@@ -343,14 +343,25 @@ export default function DashboardPage() {
             color="bg-[#4BDCD9]/25 text-[#206295]"
             href="/leave"
           />
-          <StatCard
-            title="My Pending Requests"
-            value={myPendingCount}
-            icon={ClipboardList}
-            subtitle="Awaiting approval"
-            color="bg-[#206295]/15 text-[#206295]"
-            href="/my-requests"
-          />
+          {isTeamManager ? (
+            <StatCard
+              title="Pending Leave Approvals"
+              value={pendingLeaveRequests.length}
+              icon={ClipboardList}
+              subtitle="From your team"
+              color="bg-[#206295]/15 text-[#206295]"
+              href="/leave"
+            />
+          ) : (
+            <StatCard
+              title="My Pending Requests"
+              value={myPendingCount}
+              icon={ClipboardList}
+              subtitle="Awaiting approval"
+              color="bg-[#206295]/15 text-[#206295]"
+              href="/my-requests"
+            />
+          )}
         </div>
       )}
 

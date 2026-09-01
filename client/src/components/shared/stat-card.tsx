@@ -18,13 +18,14 @@ import { Card, CardContent } from "@/components/ui/card";
 export function StatCard({ title, value, subtitle, icon: Icon, color }: {
   title: string; value: number | string; subtitle?: string; icon: any; color: string;
 }) {
+  // Heading = the descriptive caption (was the bottom line); the separate bottom line is dropped.
+  const heading = subtitle || title;
   return (
     <Card className="border-0 card-hover"><CardContent className="p-5">
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1 flex-1 min-w-0">
-          <p className="text-sm text-muted-foreground">{title}</p>
+          <p className="text-sm font-medium text-muted-foreground">{heading}</p>
           <p className="text-[33px] leading-tight font-bold text-foreground">{value}</p>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
         <div className={`p-2.5 rounded-xl flex-shrink-0 ${color}`}><Icon className="h-5 w-5" /></div>
       </div>

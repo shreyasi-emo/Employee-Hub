@@ -32,7 +32,7 @@ export default function AuditPage() {
   const entityTypes = Array.from(new Set(auditLogs.map((l: any) => l.entityType))).filter(Boolean);
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
       <AuditHeader total={auditLogs.length} />
 
       <AuditFilterBar

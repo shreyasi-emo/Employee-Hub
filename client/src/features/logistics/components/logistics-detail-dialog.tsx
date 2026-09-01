@@ -206,7 +206,7 @@ export function LogisticsDetailDialog({ request: r, isHandler, isOwner, locName,
             ) : (
               <>
                 {canCancel && <Button variant="outline" size="sm" onClick={() => setCancelling(true)}><X className="h-4 w-4 mr-1.5" /> Cancel</Button>}
-                {canStart && <Button size="sm" variant="secondary" disabled={busy} onClick={() => action.mutate({ id: r.id, op: "start" })}><Play className="h-4 w-4 mr-1.5" /> Start processing</Button>}
+                {canStart && <Button size="sm" className="btn-primary-gradient" disabled={busy} onClick={() => action.mutate({ id: r.id, op: "start" })}><Play className="h-4 w-4 mr-1.5" /> Start processing</Button>}
                 {canComplete && <Button size="sm" className="btn-primary-gradient" disabled={busy || !proof} onClick={() => action.mutate({ id: r.id, op: "complete", body: { proof } })}><Check className="h-4 w-4 mr-1.5" /> Complete</Button>}
               </>
             )}
