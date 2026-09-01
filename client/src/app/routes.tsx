@@ -10,19 +10,10 @@ import EmployeeProfilePage from "@/features/employees/pages/employee-profile-pag
 import AttendancePage from "@/features/attendance/pages/attendance-page";
 import LeavePage from "@/features/leave/pages/leave-page";
 import HolidaysPage from "@/features/holidays/pages/holidays-page";
-import PayrollPage from "@/features/payroll/pages/payroll-page";
-import AdminPage from "@/features/admin/pages/admin-page";
 import AnnouncementsPage from "@/features/announcements/pages/announcements-page";
-import AssetsPage from "@/features/assets/pages/assets-page";
-import AuditPage from "@/features/audit/pages/audit-page";
-import PerformancePage from "@/features/performance/pages/performance-page";
 import SettingsPage from "@/features/settings/pages/settings-page";
 import InviteAcceptPage from "@/features/auth/pages/invite-accept-page";
-import ShiftsPage from "@/features/shifts/pages/shifts-page";
-import OnboardingPage from "@/features/onboarding/pages/onboarding-page";
 import CandidateDocForm from "@/features/onboarding/pages/candidate-doc-form";
-import ATSPage from "@/features/hr-workspace/pages/ats-page";
-import HROpsPage from "@/features/hr-workspace/pages/hr-ops-page";
 import OfficeAdminPage from "@/features/hr-workspace/pages/office-admin-page";
 import CompanyWorkspacePage from "@/features/company-workspace/pages/company-workspace-page";
 import MyApprovalsPage from "@/features/company-workspace/pages/my-approvals-page";
@@ -75,17 +66,8 @@ export function AppRoutes() {
       <Route path="/attendance" component={() => <ProtectedRoute component={AttendancePage} />} />
       <Route path="/leave" component={() => <ProtectedRoute component={LeavePage} />} />
       <Route path="/holidays" component={() => <ProtectedRoute component={HolidaysPage} />} />
-      <Route path="/payroll" component={() => <ProtectedRoute component={PayrollPage} />} />
       <Route path="/announcements" component={() => <ProtectedRoute component={AnnouncementsPage} />} />
-      <Route path="/assets" component={() => <ProtectedRoute component={AssetsPage} />} />
-      <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} />} />
-      <Route path="/audit" component={() => <ProtectedRoute component={AuditPage} />} />
-      <Route path="/performance" component={() => <ProtectedRoute component={PerformancePage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
-      <Route path="/shifts" component={() => <ProtectedRoute component={ShiftsPage} />} />
-      <Route path="/onboarding" component={() => <ProtectedRoute component={OnboardingPage} />} />
-      <Route path="/workspace/ats" component={() => <ProtectedRoute component={ATSPage} />} />
-      <Route path="/workspace/hr-ops" component={() => <ProtectedRoute component={HROpsPage} />} />
       <Route path="/workspace/office" component={() => <ProtectedRoute component={OfficeAdminPage} />} />
       <Route path="/workspace/approvals" component={() => <ProtectedRoute component={MyApprovalsPage} />} />
       <Route path="/company-workspace" component={() => <ProtectedRoute component={CompanyWorkspacePage} />} />
@@ -96,7 +78,6 @@ export function AppRoutes() {
       <Route path="/team-requests" component={() => <ProtectedRoute component={TeamRequestsPage} />} />
       <Route path="/logistics" component={() => <ProtectedRoute component={LogisticsPage} />} />
       <Route path="/requests" component={() => <ProtectedRoute component={RequestsPage} />} />
-      <Route path="/approval-notes" component={() => <ProtectedRoute component={ApprovalNotesPage} />} />
       <Route path="/vehicles" component={() => <ProtectedRoute component={VehiclesPage} />} />
       <Route path="/resources" component={() => <ProtectedRoute component={ResourcesPage} />} />
       <Route path="/reimbursements" component={() => <ProtectedRoute component={ReimbursementsPage} />} />
