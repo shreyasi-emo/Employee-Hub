@@ -1,4 +1,4 @@
-import { LogOut, Settings, User, Receipt } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -69,11 +69,6 @@ export function AppHeader() {
                 </a>
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem asChild>
-              <a href="/payroll" data-testid="link-my-payslips">
-                <Receipt className="h-4 w-4 mr-2" /> My Payslips
-              </a>
-            </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <a href="/settings" data-testid="link-settings">
                 <Settings className="h-4 w-4 mr-2" /> Settings
