@@ -86,19 +86,15 @@ export function registerEmployeeRoutes(app: Express) {
   // ===== EMPLOYEES =====
   app.get("/api/employees", requireAuth, async (req, res) => {
     const { status, departmentId, search } = req.query;
-    let emps = await storage.getEmployees({
+    const emps = await storage.getEmployees({
       status: status as string,
       departmentId: departmentId as string,
       search: search as string,
     });
     const viewer = req.currentUser!;
-    // A manager sees only their own team — their direct reports plus themselves — never
-    // the whole company. (HR/admin roles keep the full directory.)
-    if (viewer.role === "manager") {
-      const teamIds = new Set((await storage.getEmployeesByManager(viewer.employeeId || "")).map(e => e.id));
-      if (viewer.employeeId) teamIds.add(viewer.employeeId);
-      emps = emps.filter(e => teamIds.has(e.id));
-    }
+    // The directory is company-wide for everyone (managers included) — everyone should know who
+    // works here. Fields are sanitized per role below, and the sensitive company data (attendance
+    // reports, all leaves/requests, salaries) is what stays team-scoped for a manager, not this list.
     // Attach the linked user's System Role (feature access) for HR/admin views.
     const canSeeRoles = ["super_admin", "hr_admin", "hr_executive"].includes(viewer.role);
     const roleByEmp = canSeeRoles
@@ -116,10 +112,9 @@ export function registerEmployeeRoutes(app: Express) {
     const emp = await storage.getEmployee(req.params.id);
     if (!emp) return res.status(404).json({ error: "Employee not found" });
     const viewer = req.currentUser!;
-    const privilegedRoles = ["super_admin", "hr_admin", "hr_executive", "finance"];
-    // A manager may open their own profile and their direct reports' — no other employee's.
-    const isMyReport = viewer.role === "manager" && emp.managerId === viewer.employeeId;
-    if (!privilegedRoles.includes(viewer.role) && viewer.employeeId !== emp.id && !isMyReport) {
+    // Profile is sanitized per role, so a manager can open any coworker's (directory-level) profile.
+    const privilegedRoles = ["super_admin", "hr_admin", "hr_executive", "finance", "manager"];
+    if (!privilegedRoles.includes(viewer.role) && viewer.employeeId !== emp.id) {
       return res.status(403).json({ error: "Access denied" });
     }
     const out = sanitizeEmployeeForRole(emp as any, viewer.role, viewer.employeeId) as any;
@@ -275,14 +270,10 @@ export function registerEmployeeRoutes(app: Express) {
 
   // ===== ATTENDANCE =====
   app.get("/api/employees/:id/history", requireAuth, async (req, res) => {
-    const viewer = req.currentUser!;
-    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "ceo_approver"];
-    let allowed = allowedRoles.includes(viewer.role) || viewer.employeeId === req.params.id;
-    if (!allowed && viewer.role === "manager") {
-      const target = await storage.getEmployee(req.params.id); // managers: direct reports only
-      allowed = !!target && target.managerId === viewer.employeeId;
+    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
+    if (!allowedRoles.includes(req.currentUser!.role) && req.currentUser!.employeeId !== req.params.id) {
+      return res.status(403).json({ error: "Access denied" });
     }
-    if (!allowed) return res.status(403).json({ error: "Access denied" });
     res.json(await storage.getEmploymentHistory(req.params.id));
   });
 

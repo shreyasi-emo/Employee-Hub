@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,43 @@ import { format } from "date-fns";
 import { categoryColors, catMeta, URGENT_TINT } from "../lib/categories";
 
 const fmtDate = (d: any) => `${format(new Date(d), "MMM d, yyyy")} | ${format(new Date(d), "h:mm a")}`;
+
+/** Announcement body with a Read More toggle that appears ONLY when the text is actually
+ *  clamped/overflowing. Measures the rendered height against the clamp and re-checks on resize;
+ *  clicking expands the full text inline (and back). */
+function ExpandableText({ text, clampLines, testId }: { text: string; clampLines: 2 | 3; testId: string }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [truncated, setTruncated] = useState(false);
+
+  const measure = () => {
+    const el = ref.current;
+    if (el && !expanded) setTruncated(el.scrollHeight > el.clientHeight + 1);
+  };
+  useLayoutEffect(measure, [text, expanded, clampLines]);
+  useEffect(() => {
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
+
+  const clamp = expanded ? "" : clampLines === 3 ? "line-clamp-3" : "line-clamp-2";
+  return (
+    <>
+      <p ref={ref} className={`text-sm text-muted-foreground mt-1 whitespace-pre-line leading-relaxed ${clamp}`}>{text}</p>
+      {(truncated || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="mt-2 inline-flex items-center rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground hover-elevate"
+          data-testid={testId}
+        >
+          {expanded ? "Show less" : "Read More"}
+        </button>
+      )}
+    </>
+  );
+}
 
 function MoreMenu({ id, onDelete }: { id: string; onDelete: (id: string) => void }) {
   return (
@@ -49,7 +86,6 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
   author?: string | null;
   view?: "list" | "grid";
 }) {
-  const [expanded, setExpanded] = useState(false);
   const meta = catMeta(ann.category);
   const Icon = meta.icon;
   const isUrgent = ann.priority === "urgent";
@@ -65,7 +101,7 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
           </div>
           <div className="mt-3"><Badges ann={ann} isUrgent={isUrgent} isExpired={isExpired} /></div>
           <h3 className="font-semibold text-foreground mt-1.5 leading-snug">{ann.title}</h3>
-          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line leading-relaxed line-clamp-3 flex-1">{ann.content}</p>
+          <div className="flex-1"><ExpandableText text={ann.content} clampLines={3} testId={`read-more-${ann.id}`} /></div>
           <div className="mt-3 pt-3 border-t border-border flex flex-col gap-1.5 text-xs text-muted-foreground">
             <span className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5 flex-shrink-0" /> {fmtDate(ann.createdAt)}</span>
             {author && <span className="flex items-center gap-2"><User className="h-3.5 w-3.5 flex-shrink-0" /> {author}</span>}
@@ -83,15 +119,7 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
       <div className="flex-1 min-w-0">
         <Badges ann={ann} isUrgent={isUrgent} isExpired={isExpired} />
         <h3 className="font-semibold text-foreground mt-1.5 leading-snug">{ann.title}</h3>
-        <p className={`text-sm text-muted-foreground mt-1 whitespace-pre-line leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>{ann.content}</p>
-        <button
-          type="button"
-          onClick={() => setExpanded((e) => !e)}
-          className="mt-2 inline-flex items-center rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground hover-elevate"
-          data-testid={`read-more-${ann.id}`}
-        >
-          {expanded ? "Show less" : "Read More"}
-        </button>
+        <ExpandableText text={ann.content} clampLines={2} testId={`read-more-${ann.id}`} />
       </div>
 
       <div className="hidden lg:block w-px self-stretch bg-border" />

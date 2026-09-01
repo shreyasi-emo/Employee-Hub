@@ -288,7 +288,7 @@ export default function DashboardPage() {
                     <p className="text-lg font-bold text-foreground truncate">{emp.firstName} {emp.lastName}</p>
                     {/* Designation | Dept — semibold dark-grey, in place of the role/status chips. */}
                     {(designationName || deptName) && (
-                      <p className="text-[11.5px] font-semibold text-foreground/80 truncate mt-1.5">
+                      <p className="text-[12.5px] font-semibold text-foreground/80 truncate mt-1.5">
                         {designationName || ""}
                         {designationName && deptName && <span className="mx-1.5 font-normal text-muted-foreground">|</span>}
                         {deptName || ""}
@@ -296,7 +296,7 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  <div className="hidden sm:flex sm:w-56 flex-shrink-0 flex-col gap-3.5 text-xs text-muted-foreground pt-1">
+                  <div className="hidden sm:flex sm:w-56 flex-shrink-0 flex-col gap-3.5 text-[13px] text-muted-foreground pt-1">
                     {empEmail && <p className="inline-flex items-center gap-2 w-full min-w-0"><Mail className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /><span className="truncate">{empEmail}</span></p>}
                     <p className="inline-flex items-center gap-2"><UserCheck className="h-3.5 w-3.5 text-[#206295] flex-shrink-0" /> {managerName ? <>Reports to <span className="font-medium text-foreground">{managerName}</span></> : "No manager assigned"}</p>
                   </div>
@@ -311,13 +311,13 @@ export default function DashboardPage() {
                   {([
                     [Hash, "Employee ID", emp.employeeCode || "—"],
                     empEmploymentType ? [Briefcase, "Employment", empEmploymentType.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())] : null,
-                    empJoinDate ? [CalendarDays, "Joined", `${format(new Date(empJoinDate), "MMM yyyy")}${tenure ? ` · ${tenure}` : ""}`] : null,
+                    empJoinDate ? [CalendarDays, "Joined", `${format(new Date(empJoinDate), "MMM yyyy")}${tenure ? ` | ${tenure}` : ""}`] : null,
                   ].filter(Boolean) as [any, string, string][]).map(([Icon, label, value], i) => (
                     <div key={label} className={`flex-1 min-w-0 flex items-center gap-2.5 ${i > 0 ? "border-l border-border/70 pl-4" : ""}`}>
                       <Icon className="h-4 w-4 text-[#206295] flex-shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-[11px] leading-tight text-muted-foreground">{label}</p>
-                        <p className="text-xs leading-tight font-medium text-foreground truncate mt-0.5">{value}</p>
+                        <p className="text-[12px] leading-tight text-muted-foreground">{label}</p>
+                        <p className="text-[13px] leading-tight font-medium text-foreground truncate mt-0.5">{value}</p>
                       </div>
                     </div>
                   ))}
