@@ -8,6 +8,9 @@ import { Plus, Package, Shield, User, CreditCard, MapPin, Briefcase, Calendar, A
 import { format } from "date-fns";
 import { InfoRow } from "./employee-ui";
 
+// Title-case enum-ish values ("single" → "Single", "full time" → "Full Time").
+const cap = (s?: string | null) => (s ? s.replace(/\b\w/g, (c) => c.toUpperCase()) : s);
+
 // Card header with an icon-led title and an optional right-aligned Edit link (opens the edit dialog).
 function CardHead({ icon: Icon, title, onEdit }: { icon: any; title: string; onEdit?: () => void }) {
   return (
@@ -27,8 +30,8 @@ export function PersonalTab({ employee, showBank, onEdit }: { employee: any; sho
         <CardHead icon={User} title="Personal Details" onEdit={onEdit} />
         <CardContent className="grid grid-cols-2 gap-4">
           <InfoRow label="Date of Birth" value={employee.dateOfBirth ? format(new Date(employee.dateOfBirth), "MMM d, yyyy") : null} />
-          <InfoRow label="Gender" value={employee.gender} />
-          <InfoRow label="Marital Status" value={employee.maritalStatus} />
+          <InfoRow label="Gender" value={cap(employee.gender)} />
+          <InfoRow label="Marital Status" value={cap(employee.maritalStatus)} />
           <InfoRow label="PAN Number" value={employee.panNumber} />
           <InfoRow label="Aadhaar (Masked)" value={employee.aadhaarMasked} />
           <InfoRow label="UAN" value={employee.uan} />
@@ -68,7 +71,7 @@ function EligibilityRow({ label, eligible }: { label: string; eligible: boolean 
     <div className="flex flex-col gap-0.5">
       <p className="text-xs text-muted-foreground">{label}</p>
       <div className="flex items-center gap-1">
-        {eligible ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <AlertCircle className="h-4 w-4 text-muted-foreground" />}
+        {eligible ? <CheckCircle2 className="h-4 w-4 text-[#0E7C7B]" /> : <AlertCircle className="h-4 w-4 text-muted-foreground" />}
         <span className="text-sm font-medium">{eligible ? "Yes" : "No"}</span>
       </div>
     </div>
@@ -79,11 +82,7 @@ export function EmploymentTab({ employee, dept, desig, manager }: { employee: an
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Briefcase className="h-4 w-4" /> Position
-          </CardTitle>
-        </CardHeader>
+        <CardHead icon={Briefcase} title="Position" />
         <CardContent className="grid grid-cols-2 gap-4">
           <InfoRow label="Designation" value={desig?.name} />
           <InfoRow label="Department" value={dept?.name} />
@@ -93,26 +92,20 @@ export function EmploymentTab({ employee, dept, desig, manager }: { employee: an
         </CardContent>
       </Card>
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Calendar className="h-4 w-4" /> Timeline
-          </CardTitle>
-        </CardHeader>
+        <CardHead icon={Calendar} title="Timeline" />
         <CardContent className="grid grid-cols-2 gap-4">
           <InfoRow label="Join Date" value={employee.joinDate ? format(new Date(employee.joinDate), "MMM d, yyyy") : null} />
           <InfoRow label="Confirmation Date" value={employee.confirmationDate ? format(new Date(employee.confirmationDate), "MMM d, yyyy") : null} />
           <InfoRow label="Probation (Days)" value={employee.probationDays?.toString()} />
           <InfoRow label="Notice Period (Days)" value={employee.noticePeriodDays?.toString()} />
-          <InfoRow label="Employment Type" value={employee.employmentType?.replace("_", " ")} />
+          <InfoRow label="Employment Type" value={cap(employee.employmentType?.replace("_", " "))} />
           {employee.lastWorkingDate && (
             <InfoRow label="Last Working Day" value={format(new Date(employee.lastWorkingDate), "MMM d, yyyy")} />
           )}
         </CardContent>
       </Card>
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Statutory</CardTitle>
-        </CardHeader>
+        <CardHead icon={Shield} title="Statutory" />
         <CardContent className="grid grid-cols-2 gap-4">
           <EligibilityRow label="PF Eligible" eligible={!!employee.pfEligible} />
           <EligibilityRow label="ESI Eligible" eligible={!!employee.esiEligible} />
@@ -144,7 +137,7 @@ export function SalaryTab({ salaryStructures, canAdd, onAdd }: {
                 <CardTitle className="text-sm font-semibold">
                   Effective from {format(new Date(s.effectiveFrom), "MMM d, yyyy")}
                 </CardTitle>
-                {i === 0 && <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Current</Badge>}
+                {i === 0 && <Badge className="bg-[#0E7C7B]/15 text-[#0E7C7B]">Current</Badge>}
                 {s.effectiveTo && (
                   <span className="text-xs text-muted-foreground">Until {format(new Date(s.effectiveTo), "MMM d, yyyy")}</span>
                 )}
@@ -190,7 +183,7 @@ export function PayslipsTab({ payslips }: { payslips: any[] }) {
                   {new Date(slip.year, slip.month - 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {slip.presentDays} days worked · LOP: {slip.lopDays} days
+                  {slip.presentDays} days worked | LOP: {slip.lopDays} days
                 </p>
               </div>
               <div className="flex items-center gap-6 text-sm">
@@ -200,11 +193,11 @@ export function PayslipsTab({ payslips }: { payslips: any[] }) {
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Deductions</p>
-                  <p className="font-medium text-red-600">-₹{Math.round(parseFloat(slip.totalDeductions || "0")).toLocaleString("en-IN")}</p>
+                  <p className="font-medium text-[#C4402F]">-₹{Math.round(parseFloat(slip.totalDeductions || "0")).toLocaleString("en-IN")}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Net Pay</p>
-                  <p className="font-bold text-green-600">₹{Math.round(parseFloat(slip.netPay || "0")).toLocaleString("en-IN")}</p>
+                  <p className="font-bold text-[#0E7C7B]">₹{Math.round(parseFloat(slip.netPay || "0")).toLocaleString("en-IN")}</p>
                 </div>
               </div>
             </div>
@@ -227,7 +220,7 @@ export function AssignedAssetsTab({ assets }: { assets: any[] }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm text-foreground">{asset.name}</p>
-              <p className="text-xs text-muted-foreground">{asset.assetCode} · {asset.category}</p>
+              <p className="text-xs text-muted-foreground">{asset.assetCode} | {asset.category}</p>
               {asset.serialNumber && (
                 <p className="text-xs text-muted-foreground">S/N: {asset.serialNumber}</p>
               )}

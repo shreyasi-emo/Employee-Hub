@@ -96,14 +96,9 @@ export default function EmployeeProfilePage() {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap h-auto gap-1.5 bg-transparent p-0 justify-start">
+        <TabsList className="flex-wrap h-auto">
           {tabDefs.map((t) => (
-            <TabsTrigger
-              key={t.value}
-              value={t.value}
-              data-testid={`tab-${t.value}`}
-              className={`gap-1.5 rounded-[16px] px-3.5 h-9 text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none ${activeTab === t.value ? "btn-primary-gradient text-white" : "bg-muted/60 text-muted-foreground hover-elevate"}`}
-            >
+            <TabsTrigger key={t.value} value={t.value} data-testid={`tab-${t.value}`} className="gap-1.5">
               <t.icon className="h-4 w-4" /> {t.label}
             </TabsTrigger>
           ))}

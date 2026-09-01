@@ -34,7 +34,7 @@ export function ProfileHeaderCard({ employee, dept, desig, canManage, onStatusCh
                   <h1 className="text-2xl font-bold text-foreground truncate">{employee.firstName} {employee.lastName}</h1>
                   <BadgeCheck className="h-5 w-5 text-[#206295] flex-shrink-0" />
                 </div>
-                <p className="text-sm text-muted-foreground mt-0.5">{desig?.name || "—"}{dept ? ` · ${dept.name}` : ""}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{desig?.name || "—"}{dept ? ` | ${dept.name}` : ""}</p>
                 <div className="flex items-center gap-2 mt-3 flex-wrap">
                   <Badge className={`gap-1 ${statusColors[status] || statusColors.inactive}`}><CheckCircle2 className="h-3.5 w-3.5" /><span className="capitalize">{status?.replace("_", " ")}</span></Badge>
                   <Badge className="bg-[#206295]/10 text-[#206295] hover:bg-[#206295]/10">Employee ID: {employee.employeeCode}</Badge>
