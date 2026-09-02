@@ -114,6 +114,9 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
     return (
       <Card
         className={`card-hover h-full flex flex-col transition-all duration-300 ${expandable ? "cursor-pointer" : ""} ${isExpired ? "opacity-60" : ""}`}
+        // Near-solid (not frosted) so a neighbour gliding past during a reflow is hidden, not seen
+        // through — this is what removes the "overlap" during the animation.
+        style={{ background: "hsl(var(--card))" }}
         data-testid={`announcement-${ann.id}`}
         onClick={expandable ? onToggle : undefined}
       >

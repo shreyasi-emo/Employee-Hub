@@ -116,23 +116,19 @@ function CompanyWorkspaceSection({ hub, subItems, items, isActive }: {
           {subItems.length > 0 ? (
             <Collapsible open={open} onOpenChange={setOpen} asChild>
               <SidebarMenuItem>
-                {/* Row navigates to the hub; only active on the hub page itself (not when a child is). */}
-                <SidebarMenuButton asChild isActive={hubActive} className={`${ROW_CLS} pr-8`} data-testid="nav-company-workspace">
-                  <a href={hub.href} onClick={(e) => handleNavClick(e, hub.href, navigate)}>
-                    <hub.icon className="flex-shrink-0" />
-                    <span className="text-[14px] flex-1 leading-tight">{hub.title}</span>
-                  </a>
-                </SidebarMenuButton>
-                {/* Chevron toggle — a full-row-height button so the chevron is vertically centered with the icon + label. */}
-                <button
-                  type="button"
+                {/* The whole row toggles the sub-menu open/close (chevron is just the indicator).
+                    It doesn't navigate, so it never reloads; the children are the nav targets. */}
+                <SidebarMenuButton
+                  isActive={hubActive}
                   onClick={() => setOpen((o) => !o)}
-                  aria-label="Toggle Company Workspace sub-menu"
                   aria-expanded={open}
-                  className="absolute right-1 top-0 flex h-9 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
+                  className={ROW_CLS}
+                  data-testid="nav-company-workspace"
                 >
-                  <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
-                </button>
+                  <hub.icon className="flex-shrink-0" />
+                  <span className="text-[14px] flex-1 leading-tight">{hub.title}</span>
+                  <ChevronRight className={`h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+                </SidebarMenuButton>
                 <CollapsibleContent>
                   <SidebarMenuSub className="mr-0 gap-0 border-l-0">
                     {subItems.map((c) => (
