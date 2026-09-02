@@ -116,18 +116,18 @@ function CompanyWorkspaceSection({ hub, subItems, items, isActive }: {
           {subItems.length > 0 ? (
             <Collapsible open={open} onOpenChange={setOpen} asChild>
               <SidebarMenuItem>
-                {/* The whole row toggles the sub-menu open/close (chevron is just the indicator).
-                    It doesn't navigate, so it never reloads; the children are the nav targets. */}
-                <SidebarMenuButton
-                  isActive={hubActive}
-                  onClick={() => setOpen((o) => !o)}
-                  aria-expanded={open}
-                  className={ROW_CLS}
-                  data-testid="nav-company-workspace"
-                >
-                  <hub.icon className="flex-shrink-0" />
-                  <span className="text-[14px] flex-1 leading-tight">{hub.title}</span>
-                  <ChevronRight className={`h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+                {/* The whole row BOTH navigates to the hub page AND toggles the sub-menu open/close
+                    (SPA nav via handleNavClick, so it never full-reloads). Chevron is part of the row. */}
+                <SidebarMenuButton asChild isActive={hubActive} className={ROW_CLS} data-testid="nav-company-workspace">
+                  <a
+                    href={hub.href}
+                    aria-expanded={open}
+                    onClick={(e) => { handleNavClick(e, hub.href, navigate); setOpen((o) => !o); }}
+                  >
+                    <hub.icon className="flex-shrink-0" />
+                    <span className="text-[14px] flex-1 leading-tight">{hub.title}</span>
+                    <ChevronRight className={`h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+                  </a>
                 </SidebarMenuButton>
                 <CollapsibleContent>
                   <SidebarMenuSub className="mr-0 gap-0 border-l-0">
