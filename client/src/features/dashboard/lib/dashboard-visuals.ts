@@ -2,7 +2,7 @@ import { nameColor, NAME_PALETTE } from "@/lib/avatar";
 export { nameColor, NAME_PALETTE };
 
 import { Card } from "@/components/ui/card";
-import { DollarSign, Calendar, Building2, Car, Route } from "lucide-react";
+import { Calendar, Building2, Car, Route } from "lucide-react";
 
 // Card styling, calendar class overrides, and the colour palettes the dashboard widgets share.
 // Shared card styling: 20px radius + exact layered background + box-shadow from the reference.
@@ -56,5 +56,4 @@ export const QUICK_ACTIONS = [
   { label: "Book a Car", desc: "Company vehicles", href: "/vehicles", icon: Car, color: "bg-[#206295]/15 text-[#206295]" },
   { label: "Company Workspace", desc: "Services & requests", href: "/company-workspace", icon: Building2, color: "bg-[#4BDCD9]/25 text-[#0E7C7B]" },
   { label: "Request Logistics", desc: "Couriers & moves", href: "/logistics", icon: Route, color: "bg-[#206295]/15 text-[#206295]" },
-  { label: "View Payslips", desc: "Salary & payroll", href: "/payroll", icon: DollarSign, color: "bg-[#4BDCD9]/25 text-[#0E7C7B]" },
 ];

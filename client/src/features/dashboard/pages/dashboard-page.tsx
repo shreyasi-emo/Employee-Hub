@@ -45,9 +45,6 @@ export default function DashboardPage() {
     queryKey: emp ? [`/api/leave-balances?employeeId=${emp.id}&year=${currentYear}`] : [],
     enabled: !!emp,
   });
-  const { data: myPayslips = [] } = useQuery<any[]>({
-    queryKey: ["/api/payslips/me"],
-  });
   const { data: myEmp } = useQuery<any>({ queryKey: ["/api/employees/me"], enabled: !!emp });
   const { data: departments = [] } = useQuery<any[]>({ queryKey: ["/api/departments"], enabled: !!user });
   const { data: designations = [] } = useQuery<any[]>({ queryKey: ["/api/designations"], enabled: !!user });

@@ -10,21 +10,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
-import { ChevronLeft, ChevronDown, User, CreditCard, FileText, Package, Target, History as HistoryIcon, Edit, Mail, Check, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronDown, User, Package, Target, History as HistoryIcon, Edit, Mail, Check, CalendarDays } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  useEmployee, useDepartments, useDesignations, useEmployeeSalary,
-  useEmployeePayslips, useEmployeeAssets, useEmployeeAuditLogs,
-  useEmployeesList, useUpdateEmploymentStatus,
+  useEmployee, useDepartments, useDesignations, useEmployeeAssets,
+  useEmployeeAuditLogs, useEmployeesList, useUpdateEmploymentStatus,
 } from "../api/employees.api";
 import { ProfileSummaryCard } from "../components/profile-summary-card";
-import { ProfileOverview, SalaryTab, PayslipsTab, AssignedAssetsTab } from "../components/profile-tabs";
+import { ProfileOverview, AssignedAssetsTab } from "../components/profile-tabs";
 import { ProfileDocsCard, ProfileActivityCard } from "../components/profile-side-cards";
 import { EmployeePerformanceHistory } from "../components/employee-performance-history";
 import { EmploymentHistoryTab } from "../components/employment-history-tab";
 import { EmployeeFormDialog } from "../components/employee-form-dialog";
 import { SelfEditDialog } from "../components/self-edit-dialog";
-import { AddSalaryDialog } from "../components/add-salary-dialog";
 
 const STATUS_OPTS = ["active", "on_notice", "inactive", "exited"];
 const STATUS_DOT: Record<string, string> = { active: "#0E7C7B", on_notice: "#D98324", inactive: "#64748B", exited: "#C4402F" };
@@ -58,7 +56,6 @@ export default function EmployeeProfilePage() {
   const user = auth?.user;
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
-  const [showAddSalary, setShowAddSalary] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
 
   const fromMyProfile = params.id === "me";
@@ -66,7 +63,6 @@ export default function EmployeeProfilePage() {
   const isAdminUser = isAdmin(user!);
   const isHrUser = isHR(user!);
   const isSelf = user?.employeeId === empId;
-  const canSeeSalary = isAdminUser || isSelf;
   const canEdit = isHrUser || isSelf;
 
   const now = new Date();
@@ -75,8 +71,7 @@ export default function EmployeeProfilePage() {
   const { data: departments = [] } = useDepartments();
   const { data: designations = [] } = useDesignations();
   const { data: employees = [] } = useEmployeesList();
-  const { data: salaryStructures = [] } = useEmployeeSalary(empId, canSeeSalary);
-  const { data: payslips = [] } = useEmployeePayslips(empId);
+  // Salary + payslips are intentionally NOT fetched on this deployment.
   const { data: assets = [] } = useEmployeeAssets(empId);
   const { data: auditLogs = [] } = useEmployeeAuditLogs(empId, isAdminUser);
   const { data: leaveTypes = [] } = useQuery<any[]>({ queryKey: ["/api/leave-types"] });
@@ -133,8 +128,7 @@ export default function EmployeeProfilePage() {
 
   const tabDefs = [
     { value: "overview", label: "Overview", icon: User, show: true },
-    { value: "salary", label: "Salary", icon: CreditCard, show: canSeeSalary },
-    { value: "payslips", label: "Payslips", icon: FileText, show: true },
+    // Salary + Payslips are intentionally NOT exposed on this deployment.
     { value: "assets", label: "Assets", icon: Package, show: true },
     { value: "performance", label: "Performance", icon: Target, show: true },
     { value: "history", label: "History", icon: HistoryIcon, show: true },
@@ -243,16 +237,7 @@ export default function EmployeeProfilePage() {
                 </Card>
               </TabsContent>
 
-              {canSeeSalary && (
-                <TabsContent value="salary" className="mt-0 lg:h-full">
-                  <ScrollArea className="lg:h-full"><div className="lg:pr-3">
-                    <SalaryTab salaryStructures={salaryStructures} canAdd={isAdminUser} onAdd={() => setShowAddSalary(true)} />
-                    <AddSalaryDialog open={showAddSalary} onOpenChange={setShowAddSalary} employeeId={empId!} />
-                  </div></ScrollArea>
-                </TabsContent>
-              )}
-
-              <TabsContent value="payslips" className="mt-0 lg:h-full"><ScrollArea className="lg:h-full"><div className="lg:pr-3"><PayslipsTab payslips={payslips} /></div></ScrollArea></TabsContent>
+              {/* Salary + Payslips tabs are removed from this deployment entirely. */}
               <TabsContent value="assets" className="mt-0 lg:h-full"><ScrollArea className="lg:h-full"><div className="lg:pr-3"><AssignedAssetsTab assets={assets} /></div></ScrollArea></TabsContent>
               <TabsContent value="performance" className="mt-0 lg:h-full"><ScrollArea className="lg:h-full"><div className="lg:pr-3"><EmployeePerformanceHistory empId={empId!} /></div></ScrollArea></TabsContent>
               <TabsContent value="history" className="mt-0 lg:h-full"><div className="lg:h-full px-1 pt-1.5 pb-1"><EmploymentHistoryTab empId={empId!} leaves={myLeaves} leaveTypes={leaveTypes} /></div></TabsContent>
