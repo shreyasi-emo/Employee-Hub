@@ -21,7 +21,9 @@ function JobRow({ icon: Icon, label, value, copyable }: { icon: any; label: stri
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[12.65px] text-muted-foreground leading-tight">{label}</p>
-        <p className="text-sm font-medium text-foreground leading-snug break-words">{value || "—"}</p>
+        {/* copyable values (email/phone) truncate to one clean line instead of breaking mid-word;
+            the copy button + hover title still give the full value. */}
+        <p className={`text-sm font-medium text-foreground leading-snug ${copyable ? "truncate" : "break-words"}`} title={copyable && value ? value : undefined}>{value || "—"}</p>
       </div>
       {copyable && value && (
         <button
@@ -62,15 +64,15 @@ export function ProfileSummaryCard({ employee, dept, desig, manager, canEditPhot
   return (
     <>
     <Card className="h-full flex flex-col overflow-hidden">
-      <CardContent className="p-6 flex flex-col h-full min-h-0">
+      <CardContent className="p-4 flex flex-col h-full min-h-0">
         {/* Identity */}
         <div className="flex flex-col items-center text-center flex-shrink-0">
           <div className="relative">
             {/* key forces a remount when the photo is added/removed so Radix reliably falls back
                 to the letter avatar after a Remove (its load-status would otherwise stay "loaded"). */}
-            <Avatar key={employee.avatarUrl || "letter"} className="h-28 w-28">
+            <Avatar key={employee.avatarUrl || "letter"} className="h-24 w-24">
               {employee.avatarUrl && <AvatarImage src={employee.avatarUrl} />}
-              <AvatarFallback className="text-3xl font-bold" style={{ backgroundColor: `${c}26`, color: c }}>{initials(employee.firstName, employee.lastName)}</AvatarFallback>
+              <AvatarFallback className="text-2xl font-bold" style={{ backgroundColor: `${c}26`, color: c }}>{initials(employee.firstName, employee.lastName)}</AvatarFallback>
             </Avatar>
             {canEditPhoto && (
               <>
@@ -96,19 +98,20 @@ export function ProfileSummaryCard({ employee, dept, desig, manager, canEditPhot
               </>
             )}
           </div>
-          <div className="mt-4 flex items-center justify-center gap-1.5">
-            <h2 className="text-xl font-bold text-foreground leading-tight">{employee.firstName} {employee.lastName}</h2>
+          <div className="mt-3 flex items-center justify-center gap-1.5">
+            <h2 className="text-lg font-bold text-foreground leading-tight">{employee.firstName} {employee.lastName}</h2>
             <BadgeCheck className="h-4 w-4 text-[#206295] flex-shrink-0" />
           </div>
           <p className="text-xs text-muted-foreground mt-1.5">Employee ID: <span className="font-medium text-foreground">{employee.employeeCode}</span></p>
           <Badge className={`mt-2.5 ${statusColors[status] || statusColors.inactive}`}><span className="capitalize">{status?.replace("_", " ")}</span></Badge>
         </div>
 
-        <div className="h-px bg-border my-5 flex-shrink-0" />
+        <div className="h-px bg-border my-4 flex-shrink-0" />
 
-        {/* Job Details — the main job coordinates only; rows distribute to fill the bento. */}
+        {/* Job Details — rows distribute to fill the bento when there's room; on short viewports the
+            list scrolls instead of getting clipped (flex-1 rows + overflow-y-auto = fill OR scroll). */}
         <h3 className="text-sm font-semibold text-foreground flex-shrink-0">Job Details</h3>
-        <div className="mt-2 flex-1 min-h-0 flex flex-col divide-y divide-border">
+        <div className="mt-2 flex-1 min-h-0 overflow-y-auto flex flex-col divide-y divide-border">
           <JobRow icon={Briefcase} label="Designation" value={desig?.name} />
           <JobRow icon={Building2} label="Department" value={dept?.name} />
           <JobRow icon={MapPin} label="Work Location" value={employee.workLocation} />

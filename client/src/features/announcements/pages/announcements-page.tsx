@@ -119,12 +119,12 @@ export default function AnnouncementsPage() {
       ) : sorted.length === 0 ? (
         <AnnouncementsEmpty canManage={canManage} />
       ) : view === "grid" ? (
-        // items-stretch (default) keeps collapsed cards equal-height; the expanded card widens via
-        // col-span. repack() gives the "grow in place, no vacant cell" sequence, applied as CSS `order`
-        // with the DOM order kept STABLE (reordering the array makes framer lose nodes → cards jump/
-        // overlap). Each item animates with full `layout` (size + position together, so the growing card
-        // and its sliding neighbour never overlap mid-flight); the inner motion.div also has `layout`
-        // so framer counter-scales it and the text never distorts. LayoutGroup measures them as one.
+        // items-stretch keeps collapsed cards equal-height; the expanded card widens via col-span.
+        // repack() → CSS `order` (DOM order stays STABLE so framer never loses nodes). `layout="position"`
+        // animates POSITION only (never scales → text stays crisp). The cards are near-opaque (see the
+        // grid AnnouncementCard) so a neighbour gliding past is cleanly hidden, not seen-through — that
+        // see-through was the "overlap", a glass-transparency thing, not a timing thing. zIndex keeps the
+        // expanded card on top. LayoutGroup measures them as one.
         (() => {
           const items = paged.pageItems as any[];
           const expIdx = expandedId ? items.findIndex((a) => a.id === expandedId) : -1;
@@ -140,20 +140,18 @@ export default function AnnouncementsPage() {
                   return (
                     <motion.div
                       key={ann.id}
-                      layout
+                      layout="position"
                       transition={LAYOUT_TWEEN}
-                      style={{ order: orderById.get(ann.id) ?? 0, zIndex: isExp ? 1 : 0 }}
+                      style={{ order: orderById.get(ann.id) ?? 0, zIndex: isExp ? 2 : 1 }}
                       className={`${spanCls} min-w-0`}
                     >
-                      <motion.div layout transition={LAYOUT_TWEEN} className="h-full">
-                        <AnnouncementCard
-                          ann={ann} canManage={canManage} onDelete={(id) => deleteMutation.mutate(id)}
-                          author={authorOf(ann.publishedBy)} view="grid"
-                          expanded={isExp} full={expandedFull}
-                          onToggle={() => openCard(ann.id)}
-                          onNeedFull={() => setExpandedFull(true)}
-                        />
-                      </motion.div>
+                      <AnnouncementCard
+                        ann={ann} canManage={canManage} onDelete={(id) => deleteMutation.mutate(id)}
+                        author={authorOf(ann.publishedBy)} view="grid"
+                        expanded={isExp} full={expandedFull}
+                        onToggle={() => openCard(ann.id)}
+                        onNeedFull={() => setExpandedFull(true)}
+                      />
                     </motion.div>
                   );
                 })}
