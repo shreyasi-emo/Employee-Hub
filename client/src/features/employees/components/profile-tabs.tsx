@@ -4,114 +4,92 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Package, Shield, User, CreditCard, MapPin, Briefcase, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Plus, Package, Shield, User, MapPin, Briefcase, AlertCircle, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
-import { InfoRow } from "./employee-ui";
 
 // Title-case enum-ish values ("single" → "Single", "full time" → "Full Time").
 const cap = (s?: string | null) => (s ? s.replace(/\b\w/g, (c) => c.toUpperCase()) : s);
+const fmtDate = (d: any) => (d ? format(new Date(d), "MMM d, yyyy") : null);
 
-// Card header with an icon-led title and an optional right-aligned Edit link (opens the edit dialog).
-function CardHead({ icon: Icon, title, onEdit }: { icon: any; title: string; onEdit?: () => void }) {
+// One label/value cell in a uniform field grid. Empty shows "—" so the grid stays even.
+function Field({ label, value, wide }: { label: string; value?: string | null; wide?: boolean }) {
   return (
-    <CardHeader className="pb-3">
-      <div className="flex items-center justify-between">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2"><Icon className="h-4 w-4 text-[#206295]" /> {title}</CardTitle>
+    <div className={wide ? "col-span-2 lg:col-span-3" : ""}>
+      <p className="text-[12.65px] text-muted-foreground leading-tight">{label}</p>
+      <p className="text-sm font-medium text-foreground mt-1 break-words leading-snug">{value || "—"}</p>
+    </div>
+  );
+}
+
+const Divider = () => <div className="h-px bg-border" />;
+
+// A titled section inside the profile card: icon-led heading + a uniform 2/3-column field grid.
+function FieldSection({ icon: Icon, title, onEdit, children }: { icon: any; title: string; onEdit?: () => void; children: React.ReactNode }) {
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Icon className="h-4 w-4 text-[#206295]" /> {title}</h3>
         {onEdit && <button type="button" onClick={onEdit} className="text-xs font-medium text-[#206295] hover:underline">Edit</button>}
       </div>
-    </CardHeader>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">{children}</div>
+    </section>
   );
 }
 
-export function PersonalTab({ employee, showBank, onEdit }: { employee: any; showBank: boolean; onEdit?: () => void }) {
+function Eligibility({ label, eligible }: { label: string; eligible: boolean }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Card>
-        <CardHead icon={User} title="Personal Details" onEdit={onEdit} />
-        <CardContent className="grid grid-cols-2 gap-4">
-          <InfoRow label="Date of Birth" value={employee.dateOfBirth ? format(new Date(employee.dateOfBirth), "MMM d, yyyy") : null} />
-          <InfoRow label="Gender" value={cap(employee.gender)} />
-          <InfoRow label="Marital Status" value={cap(employee.maritalStatus)} />
-          <InfoRow label="PAN Number" value={employee.panNumber} />
-          <InfoRow label="Aadhaar (Masked)" value={employee.aadhaarMasked} />
-          <InfoRow label="UAN" value={employee.uan} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHead icon={MapPin} title="Address" onEdit={onEdit} />
-        <CardContent className="space-y-4">
-          <InfoRow label="Current Address" value={employee.currentAddress} />
-          <InfoRow label="Permanent Address" value={employee.permanentAddress} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHead icon={AlertCircle} title="Emergency Contact" onEdit={onEdit} />
-        <CardContent className="grid grid-cols-2 gap-4">
-          <InfoRow label="Name" value={employee.emergencyContactName} />
-          <InfoRow label="Relation" value={employee.emergencyContactRelation} />
-          <InfoRow label="Phone" value={employee.emergencyContactPhone} />
-        </CardContent>
-      </Card>
-      {showBank && (
-        <Card>
-          <CardHead icon={CreditCard} title="Bank Details" onEdit={onEdit} />
-          <CardContent className="grid grid-cols-2 gap-4">
-            <InfoRow label="Bank Name" value={employee.bankName} />
-            <InfoRow label="Account (Masked)" value={employee.bankAccountMasked} />
-            <InfoRow label="IFSC Code" value={employee.ifscCode} />
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function EligibilityRow({ label, eligible }: { label: string; eligible: boolean }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="flex items-center gap-1">
+    <div>
+      <p className="text-[12.65px] text-muted-foreground leading-tight">{label}</p>
+      <div className="flex items-center gap-1.5 mt-1">
         {eligible ? <CheckCircle2 className="h-4 w-4 text-[#0E7C7B]" /> : <AlertCircle className="h-4 w-4 text-muted-foreground" />}
-        <span className="text-sm font-medium">{eligible ? "Yes" : "No"}</span>
+        <span className="text-sm font-medium text-foreground">{eligible ? "Yes" : "No"}</span>
       </div>
     </div>
   );
 }
 
-export function EmploymentTab({ employee, dept, desig, manager }: { employee: any; dept: any; desig: any; manager: any }) {
+// The profile overview — ONE container with four sections separated by dividers (Personal
+// Details, Statutory & Bank, Employment, Address & Emergency). Job coordinates (designation,
+// department, work location, manager) live in the LEFT rail, so Employment never repeats them.
+export function ProfileOverview({ employee, desig, showBank }: { employee: any; desig: any; showBank: boolean }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Card>
-        <CardHead icon={Briefcase} title="Position" />
-        <CardContent className="grid grid-cols-2 gap-4">
-          <InfoRow label="Designation" value={desig?.name} />
-          <InfoRow label="Department" value={dept?.name} />
-          <InfoRow label="Work Location" value={employee.workLocation} />
-          <InfoRow label="Manager" value={manager ? `${manager.firstName} ${manager.lastName}` : undefined} />
-          <InfoRow label="Grade/Band" value={desig?.grade} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHead icon={Calendar} title="Timeline" />
-        <CardContent className="grid grid-cols-2 gap-4">
-          <InfoRow label="Join Date" value={employee.joinDate ? format(new Date(employee.joinDate), "MMM d, yyyy") : null} />
-          <InfoRow label="Confirmation Date" value={employee.confirmationDate ? format(new Date(employee.confirmationDate), "MMM d, yyyy") : null} />
-          <InfoRow label="Probation (Days)" value={employee.probationDays?.toString()} />
-          <InfoRow label="Notice Period (Days)" value={employee.noticePeriodDays?.toString()} />
-          <InfoRow label="Employment Type" value={cap(employee.employmentType?.replace("_", " "))} />
-          {employee.lastWorkingDate && (
-            <InfoRow label="Last Working Day" value={format(new Date(employee.lastWorkingDate), "MMM d, yyyy")} />
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHead icon={Shield} title="Statutory" />
-        <CardContent className="grid grid-cols-2 gap-4">
-          <EligibilityRow label="PF Eligible" eligible={!!employee.pfEligible} />
-          <EligibilityRow label="ESI Eligible" eligible={!!employee.esiEligible} />
-        </CardContent>
-      </Card>
-    </div>
+      <div className="space-y-6">
+        <FieldSection icon={User} title="Personal Details">
+          <Field label="Date of Birth" value={fmtDate(employee.dateOfBirth)} />
+          <Field label="Gender" value={cap(employee.gender)} />
+          <Field label="Marital Status" value={cap(employee.maritalStatus)} />
+          <Field label="Blood Group" value={employee.bloodGroup} />
+        </FieldSection>
+        <Divider />
+        <FieldSection icon={Shield} title="Statutory & Bank">
+          <Field label="PAN Number" value={employee.panNumber} />
+          <Field label="Aadhaar (Masked)" value={employee.aadhaarMasked} />
+          <Field label="UAN" value={employee.uan} />
+          <Eligibility label="PF Eligible" eligible={!!employee.pfEligible} />
+          <Eligibility label="ESI Eligible" eligible={!!employee.esiEligible} />
+          {showBank && <Field label="Bank Name" value={employee.bankName} />}
+          {showBank && <Field label="Account (Masked)" value={employee.bankAccountMasked} />}
+          {showBank && <Field label="IFSC Code" value={employee.ifscCode} />}
+        </FieldSection>
+        <Divider />
+        <FieldSection icon={Briefcase} title="Employment">
+          <Field label="Employment Type" value={cap(employee.employmentType?.replace("_", " "))} />
+          <Field label="Grade/Band" value={desig?.grade} />
+          <Field label="Join Date" value={fmtDate(employee.joinDate)} />
+          <Field label="Confirmation Date" value={fmtDate(employee.confirmationDate)} />
+          <Field label="Probation (Days)" value={employee.probationDays?.toString()} />
+          <Field label="Notice Period (Days)" value={employee.noticePeriodDays?.toString()} />
+          {employee.lastWorkingDate && <Field label="Last Working Day" value={fmtDate(employee.lastWorkingDate)} />}
+        </FieldSection>
+        <Divider />
+        <FieldSection icon={MapPin} title="Address & Emergency">
+          <Field label="Current Address" value={employee.currentAddress} wide />
+          <Field label="Permanent Address" value={employee.permanentAddress} wide />
+          <Field label="Emergency Contact" value={employee.emergencyContactName} />
+          <Field label="Relation" value={employee.emergencyContactRelation} />
+          <Field label="Emergency Phone" value={employee.emergencyContactPhone} />
+        </FieldSection>
+      </div>
   );
 }
 

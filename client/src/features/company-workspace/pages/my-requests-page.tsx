@@ -235,7 +235,7 @@ export default function MyRequestsPage() {
         <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
         <button onClick={() => setView("table")} aria-label="Table view" data-testid="view-table" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
       </div>
-      <div className="h-10 w-px flex-shrink-0 bg-foreground/30" />
+      <div className="w-px self-stretch flex-shrink-0 bg-foreground/30" />
       {showPhase && phaseToggle}
       {/* Search — fills available width */}
       <div className="relative flex-1 min-w-0">

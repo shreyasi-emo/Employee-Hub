@@ -28,7 +28,7 @@ export function EmployeesHeader({ count, statusFilter, lastUpdated, canManage, o
         <span className="text-xs text-muted-foreground">Last updated: <span className="font-medium text-[#206295]">{lastUpdated}</span></span>
         {canManage && (
           <div className="flex items-center gap-2">
-            <div className="h-8 w-px bg-border mx-1" />
+            <div className="w-px self-stretch bg-border mx-1" />
             <Button variant="secondary" size="sm" onClick={onInsights} data-testid="button-insights"><BarChart3 className="h-4 w-4 mr-1" /> View Insights</Button>
             <Button variant="secondary" size="sm" onClick={onImport} data-testid="button-import"><Upload className="h-4 w-4 mr-1" /> Import</Button>
             <Button variant="secondary" size="sm" onClick={onJoinersReport} data-testid="button-joiners-report"><Download className="h-4 w-4 mr-1" /> Joiners Report</Button>

@@ -222,7 +222,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
       <div className="flex flex-wrap items-center gap-2 justify-between">
         <div className="flex flex-wrap items-center gap-2">
           {phaseToggle}
-          <div className="h-7 w-px bg-foreground/30 mx-0.5" />
+          <div className="w-px self-stretch bg-foreground/30 mx-0.5" />
           <ViewToggle view={view} onChange={setView} />
           <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
             <SelectTrigger className="h-9 w-[150px] text-xs" data-testid="filter-status"><SelectValue placeholder="Status" /></SelectTrigger>

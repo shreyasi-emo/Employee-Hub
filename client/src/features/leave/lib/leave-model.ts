@@ -6,13 +6,42 @@ export { avatarColor };
 export const parseYmd = (s?: string): Date | undefined => { if (!s) return undefined; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 
 export const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
-  pending: { label: "Pending", bg: "bg-[#FFA962]/20", text: "text-[#FFA962]" },
-  approved: { label: "Approved", bg: "bg-[#4BDCD9]/25", text: "text-[#206295]" },
-  rejected: { label: "Rejected", bg: "bg-[#FF6F62]/20", text: "text-[#FF6F62]" },
-  cancelled: { label: "Cancelled", bg: "bg-[#6A7366]/15", text: "text-[#6A7366]" },
+  // Brand palette only — pending is blue ("awaiting"), never orange.
+  pending: { label: "Pending", bg: "bg-[#206295]/12", text: "text-[#206295]" },
+  approved: { label: "Approved", bg: "bg-[#4BDCD9]/25", text: "text-[#0E7C7B]" },
+  rejected: { label: "Rejected", bg: "bg-[#FF6F62]/20", text: "text-[#C4402F]" },
+  cancelled: { label: "Cancelled", bg: "bg-[#64748B]/15", text: "text-[#64748B]" },
 };
 
 export const statusOf = (status?: string) => statusConfig[status || ""] || statusConfig.pending;
+
+// ===== Brand-safe leave-type colour =====
+// Leave-type `color` comes from the DB and has historically held banned hues (orange, pink,
+// purple, green). This normalises every dot to the brand palette: a colour that's already
+// brand-compliant is respected, anything else is mapped by keyword, with a deterministic
+// brand fallback for unknown types. Use this everywhere instead of `lt.color`.
+const BRAND_LEAVE_COLORS = ["#206295", "#2F80B8", "#425B8D", "#0E7C7B", "#4BDCD9", "#64748B", "#FF6F62", "#C4402F"];
+const BRAND_SET = new Set(BRAND_LEAVE_COLORS.map((c) => c.toLowerCase()));
+const LEAVE_COLOR_BY_KEYWORD: [RegExp, string][] = [
+  [/casual/i, "#206295"],
+  [/comp/i, "#2F80B8"],
+  [/earned|annual|privilege|vacation/i, "#0E7C7B"],
+  [/matern/i, "#FF6F62"],
+  [/patern/i, "#425B8D"],
+  [/sick|medical/i, "#C4402F"],
+  [/loss of pay|unpaid|\blop\b/i, "#64748B"],
+  [/marriage|wedding/i, "#4BDCD9"],
+];
+
+export function leaveTypeColor(lt?: { color?: string | null; name?: string | null; code?: string | null } | null): string {
+  if (!lt) return "#206295";
+  const raw = (lt.color || "").toLowerCase();
+  if (raw && BRAND_SET.has(raw)) return lt.color!;         // already brand-compliant — keep it
+  const hay = `${lt.name || ""} ${lt.code || ""}`;
+  for (const [re, col] of LEAVE_COLOR_BY_KEYWORD) if (re.test(hay)) return col;
+  let h = 0; for (let i = 0; i < hay.length; i++) h = (h * 31 + hay.charCodeAt(i)) >>> 0;
+  return BRAND_LEAVE_COLORS[h % BRAND_LEAVE_COLORS.length];
+}
 
 /** Requested duration in days: half-day is 0.5, otherwise weekdays inclusive
  *  (weekends don't consume leave). */

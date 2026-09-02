@@ -39,6 +39,7 @@ export const roleEnum = pgEnum("role", [
   "hr_ops",
   "office_admin",
   "ceo_approver",
+  "cto",
   "interviewer",
   "logistics",
 ]);
@@ -176,6 +177,7 @@ export const employees = pgTable("employees", {
   dateOfBirth: date("date_of_birth"),
   gender: genderEnum("gender"),
   maritalStatus: maritalStatusEnum("marital_status"),
+  bloodGroup: text("blood_group"),
 
   // Employment
   joinDate: date("join_date").notNull(),
@@ -215,6 +217,11 @@ export const employees = pgTable("employees", {
 
   // Avatar
   avatarUrl: text("avatar_url"),
+
+  // Onboarding / personnel documents, keyed by doc type (pan, aadhaar, photoId, offerLetter,
+  // incrementLetters, relievingLetters, payslips, bankProof, …). Each value is an uploaded file
+  // { fileName, fileType, fileData }. Same shape as candidateDocRequests.files. HR/self only.
+  documents: jsonb("documents"),
 
   userId: varchar("user_id"),
   createdAt: timestamp("created_at").defaultNow(),

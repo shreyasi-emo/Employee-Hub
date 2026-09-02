@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { motion, LayoutGroup } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth, isHR } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +15,44 @@ import { AnnouncementCard } from "../components/announcement-card";
 import { AddAnnouncementDialog } from "../components/add-announcement-dialog";
 import { usePaged } from "@/components/shared/pagination";
 
+// Live column count for the grid (grid-cols-1 / md:2 / xl:3) so we can repack in JS.
+function useGridColumns() {
+  const [cols, setCols] = useState(() => {
+    if (typeof window === "undefined") return 3;
+    if (window.matchMedia("(min-width: 1280px)").matches) return 3;
+    if (window.matchMedia("(min-width: 768px)").matches) return 2;
+    return 1;
+  });
+  useEffect(() => {
+    const xl = window.matchMedia("(min-width: 1280px)");
+    const md = window.matchMedia("(min-width: 768px)");
+    const update = () => setCols(xl.matches ? 3 : md.matches ? 2 : 1);
+    xl.addEventListener("change", update);
+    md.addEventListener("change", update);
+    return () => { xl.removeEventListener("change", update); md.removeEventListener("change", update); };
+  }, []);
+  return cols;
+}
+
+// "Grow in place, neighbor drops": when the expanded card can't fit the rest of its row, pull it
+// back to the last column where its span fits and push the singles it displaces to just after it —
+// so it stays in its row and no vacant cell is left in the middle of the grid.
+function repack<T>(items: T[], expandedIdx: number, span: number, cols: number): T[] {
+  if (expandedIdx < 0 || cols <= 1 || span <= 1) return items;
+  const s = Math.min(span, cols);
+  const col = expandedIdx % cols;        // where it naturally lands in its row (all earlier cards are single)
+  if (col + s <= cols) return items;     // fits without wrapping — leave order alone
+  const bump = col - (cols - s);         // singles in this row to move after the expanded card
+  const out = items.slice();
+  const [exp] = out.splice(expandedIdx, 1);
+  out.splice(expandedIdx - bump, 0, exp);
+  return out;
+}
+
+// Gentle position-only tween for the reflow. Position-only (not size) means framer never scales the
+// card, so text never distorts; a plain easeInOut tween is calmer than a spring (no overshoot/jumping).
+const LAYOUT_TWEEN = { duration: 0.4, ease: "easeInOut" as const };
+
 export default function AnnouncementsPage() {
   const { data: auth } = useAuth();
   const { toast } = useToast();
@@ -21,6 +60,12 @@ export default function AnnouncementsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sort, setSort] = useState("latest");
   const [view, setView] = useState<"list" | "grid">("list");
+  // Grid: one expanded "main character" card. It widens to 2 cols, or the full row if the content
+  // needs more (measured by the card). Opening another card collapses the previous one.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedFull, setExpandedFull] = useState(false);
+  const openCard = (id: string) => { setExpandedId((prev) => (prev === id ? null : id)); setExpandedFull(false); };
+  const cols = useGridColumns();
 
   const { data: announcements = [], isLoading } = useAnnouncements();
   const deleteMutation = useDeleteAnnouncement({ onSuccess: () => toast({ title: "Announcement deleted" }) });
@@ -74,11 +119,48 @@ export default function AnnouncementsPage() {
       ) : sorted.length === 0 ? (
         <AnnouncementsEmpty canManage={canManage} />
       ) : view === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {paged.pageItems.map((ann: any) => (
-            <AnnouncementCard key={ann.id} ann={ann} canManage={canManage} onDelete={(id) => deleteMutation.mutate(id)} author={authorOf(ann.publishedBy)} view="grid" />
-          ))}
-        </div>
+        // items-stretch (default) keeps collapsed cards equal-height; the expanded card widens via
+        // col-span. repack() gives the "grow in place, no vacant cell" sequence, applied as CSS `order`
+        // with the DOM order kept STABLE (reordering the array makes framer lose nodes → cards jump/
+        // overlap). Each item animates with full `layout` (size + position together, so the growing card
+        // and its sliding neighbour never overlap mid-flight); the inner motion.div also has `layout`
+        // so framer counter-scales it and the text never distorts. LayoutGroup measures them as one.
+        (() => {
+          const items = paged.pageItems as any[];
+          const expIdx = expandedId ? items.findIndex((a) => a.id === expandedId) : -1;
+          const span = expandedFull ? cols : 2;
+          const arranged = repack(items, expIdx, span, cols);
+          const orderById = new Map<string, number>(arranged.map((a: any, i: number) => [a.id, i]));
+          return (
+            <LayoutGroup>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {items.map((ann: any) => {
+                  const isExp = expandedId === ann.id;
+                  const spanCls = isExp ? (expandedFull ? "md:col-span-2 xl:col-span-3" : "md:col-span-2") : "";
+                  return (
+                    <motion.div
+                      key={ann.id}
+                      layout
+                      transition={LAYOUT_TWEEN}
+                      style={{ order: orderById.get(ann.id) ?? 0, zIndex: isExp ? 1 : 0 }}
+                      className={`${spanCls} min-w-0`}
+                    >
+                      <motion.div layout transition={LAYOUT_TWEEN} className="h-full">
+                        <AnnouncementCard
+                          ann={ann} canManage={canManage} onDelete={(id) => deleteMutation.mutate(id)}
+                          author={authorOf(ann.publishedBy)} view="grid"
+                          expanded={isExp} full={expandedFull}
+                          onToggle={() => openCard(ann.id)}
+                          onNeedFull={() => setExpandedFull(true)}
+                        />
+                      </motion.div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </LayoutGroup>
+          );
+        })()
       ) : (
         <Card className="border-0">
           <CardContent className="p-0">

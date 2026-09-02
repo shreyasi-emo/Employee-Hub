@@ -86,15 +86,20 @@ export function registerLeaveRoutes(app: Express) {
   app.get("/api/leave-requests", requireAuth, async (req, res) => {
     const { employeeId, status } = req.query;
     const hrRoles = ["super_admin", "hr_admin", "hr_executive"];
-    const managerRoles = ["manager"];
+    // Managers AND executives (CEO/CTO) see the leave of their direct reports. For a manager the
+    // reports are employees; for an exec they're the managers reporting to them — same mechanism.
+    const managerRoles = ["manager", "cto", "ceo_approver"];
 
     if (hrRoles.includes(req.currentUser!.role)) {
       res.json(await storage.getLeaveRequests(employeeId as string, status as string));
     } else if (managerRoles.includes(req.currentUser!.role)) {
       const empId = req.currentUser!.employeeId;
       if (empId) {
+        // Their direct reports' requests (to approve) PLUS their own (for My Requests).
         const teamReqs = await storage.getTeamLeaveRequests(empId);
-        res.json(teamReqs);
+        const ownReqs = await storage.getLeaveRequests(empId, undefined);
+        const seen = new Set(teamReqs.map((r: any) => r.id));
+        res.json([...teamReqs, ...ownReqs.filter((r: any) => !seen.has(r.id))]);
       } else {
         res.json([]);
       }
@@ -163,15 +168,15 @@ export function registerLeaveRoutes(app: Express) {
     if (status === "cancelled" && !isSelf) {
       return res.status(403).json({ error: "Can only cancel own requests" });
     }
-    // Approval/rejection is the employee's direct manager or a Super Admin only.
-    // HR and CEO are notified and can view, but cannot action leave requests.
+    // Approval/rejection is the applicant's direct manager (or the exec they report to — CEO/CTO
+    // approve their reporting managers' leave), or a Super Admin. HR is notified and can view only.
     if (["approved", "rejected"].includes(status)) {
       let canDecide = viewer.role === "super_admin";
-      if (!canDecide && viewer.role === "manager" && viewer.employeeId) {
+      if (!canDecide && ["manager", "cto", "ceo_approver"].includes(viewer.role) && viewer.employeeId) {
         const directReports = await storage.getEmployeesByManager(viewer.employeeId);
         canDecide = directReports.some(e => e.id === leaveReq.employeeId);
       }
-      if (!canDecide) return res.status(403).json({ error: "Only the employee's manager or a Super Admin can decide this request." });
+      if (!canDecide) return res.status(403).json({ error: "Only the applicant's manager/reporting executive or a Super Admin can decide this request." });
       // Don't let an approval push a paid balance negative (create-time guard can be stale).
       if (status === "approved" && !(await storage.isLeaveBalanceSufficient(leaveReq))) {
         return res.status(400).json({ error: "Not enough leave balance to approve this request." });

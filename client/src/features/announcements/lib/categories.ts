@@ -1,6 +1,6 @@
-// Announcement categories — BRAND PALETTE ONLY:
-//   blue #206295 · teal #0E7C7B / #4BDCD9 · coral #FF6F62 / #C4402F · warning #D98324 · neutral slate.
-// (No purple / pink / generic Tailwind hues — those violate the brand guidelines.)
+// Announcement categories — BRAND PALETTE ONLY (no orange on this screen):
+//   blue #206295 · teal #0E7C7B / #4BDCD9 · coral #FF6F62 / #C4402F · neutral slate #64748B.
+// (No purple / pink / orange / generic Tailwind hues — those violate the brand guidelines.)
 import { Megaphone, Users, ScrollText, Calendar, CalendarDays, Gift, AlertTriangle, Tag } from "lucide-react";
 
 const TINT = {
@@ -8,8 +8,7 @@ const TINT = {
   teal: "bg-[#0E7C7B]/15 text-[#0E7C7B]",
   tealL: "bg-[#4BDCD9]/25 text-[#0E7C7B]",
   coral: "bg-[#FF6F62]/20 text-[#C4402F]",
-  amber: "bg-[#D98324]/15 text-[#D98324]",
-  grey: "bg-[#64748B]/15 text-[#64748B]",
+  slate: "bg-[#64748B]/15 text-[#64748B]",
 };
 
 /** Icon + tinted-tile color + one-line description per category — drives the stat cards,
@@ -17,13 +16,13 @@ const TINT = {
 export const categoryMeta: Record<string, { icon: any; tile: string; desc: string }> = {
   general: { icon: Megaphone, tile: TINT.blue, desc: "Company updates" },
   hr: { icon: Users, tile: TINT.teal, desc: "HR related updates" },
-  policy: { icon: ScrollText, tile: TINT.amber, desc: "Policy updates" },
+  policy: { icon: ScrollText, tile: TINT.slate, desc: "Policy updates" },
   holiday: { icon: Calendar, tile: TINT.coral, desc: "Holidays & leave" },
   event: { icon: CalendarDays, tile: TINT.tealL, desc: "Events" },
-  benefits: { icon: Gift, tile: TINT.amber, desc: "Benefits" },
+  benefits: { icon: Gift, tile: TINT.tealL, desc: "Benefits" },
   urgent: { icon: AlertTriangle, tile: TINT.coral, desc: "Urgent notices" },
 };
-export const defaultCatMeta = { icon: Tag, tile: TINT.grey, desc: "Updates" };
+export const defaultCatMeta = { icon: Tag, tile: TINT.slate, desc: "Updates" };
 export const catMeta = (c: string) => categoryMeta[c] || defaultCatMeta;
 
 /** Badge tint = the same brand tint as the category's tile. */

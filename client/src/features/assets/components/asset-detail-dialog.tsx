@@ -46,14 +46,15 @@ export function AssetDetailDialog({ asset, employees, onClose, canEdit }: { asse
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-md w-[calc(100vw-2rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-4 w-4 text-primary" />
             {editing ? "Edit Asset" : asset.name}
           </DialogTitle>
         </DialogHeader>
 
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
         {confirmDelete ? (
           <div className="space-y-4 py-2">
             <div className="flex items-start gap-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
@@ -177,6 +178,7 @@ export function AssetDetailDialog({ asset, employees, onClose, canEdit }: { asse
             )}
           </div>
         )}
+        </div>
       </DialogContent>
     </Dialog>
   );

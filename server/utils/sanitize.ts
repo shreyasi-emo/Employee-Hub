@@ -14,6 +14,19 @@ export function sanitizeEmployeeForRole(
     return rest;
   }
 
+  // A manager sees a fuller — but still non-sensitive — view of their OWN direct reports (phone +
+  // basic personal, for the My Team drawer). Never salary / PAN / Aadhaar / bank.
+  if (viewerRole === "manager" && emp.managerId && emp.managerId === viewerEmployeeId) {
+    return {
+      id: emp.id, employeeCode: emp.employeeCode, firstName: emp.firstName, lastName: emp.lastName,
+      email: emp.email, phone: emp.phone, designationId: emp.designationId, departmentId: emp.departmentId,
+      employmentStatus: emp.employmentStatus, employmentType: emp.employmentType, managerId: emp.managerId,
+      workLocation: emp.workLocation, joinDate: emp.joinDate, profilePhoto: emp.profilePhoto, avatarUrl: emp.avatarUrl,
+      dateOfBirth: emp.dateOfBirth, gender: emp.gender, maritalStatus: emp.maritalStatus, bloodGroup: emp.bloodGroup,
+      userId: emp.userId,
+    };
+  }
+
   return {
     id: emp.id,
     employeeCode: emp.employeeCode,

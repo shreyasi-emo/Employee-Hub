@@ -18,7 +18,8 @@ const DEMO_ACCOUNTS = [
   { role: "HR", name: "Priya Nair", username: "priya.nair" },
   { role: "Finance", name: "Neha Verma", username: "finance@emoenergy.in" },
   { role: "CEO", name: "Rajesh Khanna", username: "ceo@emoenergy.in" },
-  { role: "Manager", name: "Manoj Rao", username: "manager@emoenergy.in" },
+  { role: "CTO", name: "Arjun Sharma", username: "arjun.sharma" },
+  { role: "Manager", name: "Rahul Gupta", username: "rahul.gupta" },
   { role: "Logistics", name: "Leela Nair", username: "logistics@emoenergy.in" },
   { role: "Employee", name: "Sneha Patel", username: "sneha.patel" },
 ];

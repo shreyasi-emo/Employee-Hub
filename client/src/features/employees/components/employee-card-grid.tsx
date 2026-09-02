@@ -2,13 +2,14 @@ import { usePaged, PaginationBar } from "@/components/shared/pagination";
 import { EmployeeCard } from "./employee-ui";
 
 /** Paged card grid for the directory. Owns its own page cursor. */
-export function EmployeeCardGrid({ employees, departments, designations, selectionMode, selected, onToggle }: {
+export function EmployeeCardGrid({ employees, departments, designations, selectionMode, selected, onToggle, onOpen }: {
   employees: any[];
   departments: any[];
   designations: any[];
   selectionMode: boolean;
   selected: Set<string>;
   onToggle: (id: string) => void;
+  onOpen?: (employee: any) => void;
 }) {
   const paged = usePaged(employees);
   return (
@@ -23,6 +24,7 @@ export function EmployeeCardGrid({ employees, departments, designations, selecti
             selectionMode={selectionMode}
             selected={selected.has(emp.id)}
             onToggle={() => onToggle(emp.id)}
+            onOpen={onOpen}
           />
         ))}
       </div>

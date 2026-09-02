@@ -106,7 +106,7 @@ export default function LogisticsPage() {
           <button onClick={() => setView("card")} aria-label="Card view" aria-pressed={view === "card"} data-testid="view-card" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
           <button onClick={() => setView("table")} aria-label="Table view" aria-pressed={view === "table"} data-testid="view-table" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
         </div>
-        <div className="hidden sm:block h-10 w-px flex-shrink-0 bg-foreground/30" />
+        <div className="hidden sm:block w-px self-stretch flex-shrink-0 bg-foreground/30" />
         <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0" data-testid="logistics-phase-toggle">
           {(["active", "done"] as const).map((p) => (
             <button key={p} onClick={() => { setPhase(p); paged.setPage(1); }} aria-pressed={phase === p} data-testid={`logistics-phase-${p}`} className={`px-3 h-full rounded-[10px] text-xs font-medium whitespace-nowrap ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}>

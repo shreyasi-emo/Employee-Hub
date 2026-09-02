@@ -52,8 +52,8 @@ export function StatCard({ title, value, icon: Icon, subtitle, color, href }: {
   color: string;
   href?: string;
 }) {
-  return (
-    <Card className="card-hover border-0" style={CARD_STYLE}>
+  const card = (
+    <Card className={`card-hover border-0 h-full ${href ? "cursor-pointer" : ""}`} style={CARD_STYLE}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1 flex-1">
@@ -67,13 +67,17 @@ export function StatCard({ title, value, icon: Icon, subtitle, color, href }: {
           </div>
         </div>
         {href && (
-          <a href={href} className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
+          <span className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
             View details <ArrowRight className="h-3 w-3" />
-          </a>
+          </span>
         )}
       </CardContent>
     </Card>
   );
+  // Whole card is the click target when it links somewhere.
+  return href
+    ? <a href={href} className="block h-full" data-testid={`statcard-${title.toLowerCase().replace(/\s+/g, "-")}`}>{card}</a>
+    : card;
 }
 
 export function AnnouncementCard({ announcement }: { announcement: any }) {

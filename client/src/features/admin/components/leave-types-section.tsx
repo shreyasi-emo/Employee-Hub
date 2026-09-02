@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
+import { leaveTypeColor } from "../../leave/lib/leave-model";
 
 export function LeaveTypesSection() {
   const { toast } = useToast();
@@ -90,7 +91,7 @@ export function LeaveTypesSection() {
         {leaveTypes.map((lt: any) => (
           <Card key={lt.id}>
             <CardContent className="p-3 flex items-center gap-3">
-              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium text-foreground">{lt.name}</p>

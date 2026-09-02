@@ -11,9 +11,7 @@ import { categoryColors, catMeta, URGENT_TINT } from "../lib/categories";
 
 const fmtDate = (d: any) => `${format(new Date(d), "MMM d, yyyy")} | ${format(new Date(d), "h:mm a")}`;
 
-/** Announcement body with a Read More toggle that appears ONLY when the text is actually
- *  clamped/overflowing. Measures the rendered height against the clamp and re-checks on resize;
- *  clicking expands the full text inline (and back). */
+/** Self-contained Read More toggle (list view): shows only when the text is actually clamped. */
 function ExpandableText({ text, clampLines, testId }: { text: string; clampLines: 2 | 3; testId: string }) {
   const ref = useRef<HTMLParagraphElement>(null);
   const [expanded, setExpanded] = useState(false);
@@ -33,7 +31,7 @@ function ExpandableText({ text, clampLines, testId }: { text: string; clampLines
   const clamp = expanded ? "" : clampLines === 3 ? "line-clamp-3" : "line-clamp-2";
   return (
     <>
-      <p ref={ref} className={`text-sm text-muted-foreground mt-1 whitespace-pre-line leading-relaxed ${clamp}`}>{text}</p>
+      <p ref={ref} className={`text-sm text-muted-foreground whitespace-pre-line leading-relaxed ${clamp}`}>{text}</p>
       {(truncated || expanded) && (
         <button
           type="button"
@@ -79,30 +77,68 @@ function Badges({ ann, isUrgent, isExpired }: { ann: any; isUrgent: boolean; isE
   );
 }
 
-export function AnnouncementCard({ ann, canManage, onDelete, author, view = "list" }: {
+export function AnnouncementCard({ ann, canManage, onDelete, author, view = "list", expanded = false, full = false, onToggle, onNeedFull }: {
   ann: any;
   canManage: boolean;
   onDelete: (id: string) => void;
   author?: string | null;
   view?: "list" | "grid";
+  // Grid: parent-controlled WIDTH expansion. `expanded` = this is the open card; `full` = it needs
+  // the whole row (the 2-col width couldn't fit the text). onNeedFull asks the parent to go full.
+  expanded?: boolean;
+  full?: boolean;
+  onToggle?: () => void;
+  onNeedFull?: () => void;
 }) {
   const meta = catMeta(ann.category);
   const Icon = meta.icon;
   const isUrgent = ann.priority === "urgent";
   const isExpired = ann.expiresAt && new Date(ann.expiresAt) < new Date();
 
+  // Grid: one card is the "main character" — Read More widens it (2 columns, or the whole row if the
+  // text needs more) and neighbours reflow. Collapsed cards share an equal height (grid items-stretch).
+  const bodyRef = useRef<HTMLParagraphElement>(null);
+  const [truncated, setTruncated] = useState(false);
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el || view !== "grid") return;
+    if (!expanded) { setTruncated(el.scrollHeight > el.clientHeight + 1); return; }
+    // Expanded at the 2-column width: if the text still overflows ~3 lines, ask for full width.
+    if (!full && el.scrollHeight > el.clientHeight + 1) onNeedFull?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ann.content, expanded, full, view]);
+
   if (view === "grid") {
+    // The whole card is the Read More toggle when there's anything to expand/collapse.
+    const expandable = truncated || expanded;
     return (
-      <Card className={`card-hover h-full ${isExpired ? "opacity-60" : ""}`} data-testid={`announcement-${ann.id}`}>
+      <Card
+        className={`card-hover h-full flex flex-col transition-all duration-300 ${expandable ? "cursor-pointer" : ""} ${isExpired ? "opacity-60" : ""}`}
+        data-testid={`announcement-${ann.id}`}
+        onClick={expandable ? onToggle : undefined}
+      >
         <CardContent className="p-5 flex flex-col h-full">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 flex-shrink-0">
             <div className={`h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.tile}`}><Icon className="h-6 w-6" /></div>
-            {canManage && <MoreMenu id={ann.id} onDelete={onDelete} />}
+            {/* stop the delete menu from also toggling the card */}
+            <div onClick={(e) => e.stopPropagation()}>{canManage && <MoreMenu id={ann.id} onDelete={onDelete} />}</div>
           </div>
-          <div className="mt-3"><Badges ann={ann} isUrgent={isUrgent} isExpired={isExpired} /></div>
-          <h3 className="font-semibold text-foreground mt-1.5 leading-snug">{ann.title}</h3>
-          <div className="flex-1"><ExpandableText text={ann.content} clampLines={3} testId={`read-more-${ann.id}`} /></div>
-          <div className="mt-3 pt-3 border-t border-border flex flex-col gap-1.5 text-xs text-muted-foreground">
+          <div className="mt-3 flex-shrink-0"><Badges ann={ann} isUrgent={isUrgent} isExpired={isExpired} /></div>
+          <h3 className="font-semibold text-foreground mt-1.5 leading-snug line-clamp-2 flex-shrink-0">{ann.title}</h3>
+          {/* Collapsed and the 2-col state both clamp to 3 lines (2-col simply fits more per line, so
+              no height change); only full width drops the clamp and scrolls if the text is very long. */}
+          <p ref={bodyRef} className={`text-sm text-muted-foreground mt-1 whitespace-pre-line leading-relaxed ${expanded && full ? "max-h-[24rem] overflow-y-auto pr-1" : "line-clamp-3"}`}>{ann.content}</p>
+          {(truncated || expanded) && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
+              className="mt-2 mb-4 flex-shrink-0 self-start inline-flex items-center rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground hover-elevate"
+              data-testid={`read-more-${ann.id}`}
+            >
+              {expanded ? "Show less" : "Read More"}
+            </button>
+          )}
+          <div className="mt-auto pt-3 border-t border-border flex flex-col gap-1.5 text-xs text-muted-foreground flex-shrink-0">
             <span className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5 flex-shrink-0" /> {fmtDate(ann.createdAt)}</span>
             {author && <span className="flex items-center gap-2"><User className="h-3.5 w-3.5 flex-shrink-0" /> {author}</span>}
           </div>
@@ -111,24 +147,30 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
     );
   }
 
-  // List view — a flush row for the divide-y container.
+  // List view — left column = icon + title + date + poster; right column = the message body.
   return (
-    <div className={`p-5 flex items-start gap-4 ${isExpired ? "opacity-60" : ""}`} data-testid={`announcement-${ann.id}`}>
-      <div className={`h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.tile}`}><Icon className="h-6 w-6" /></div>
-
-      <div className="flex-1 min-w-0">
-        <Badges ann={ann} isUrgent={isUrgent} isExpired={isExpired} />
-        <h3 className="font-semibold text-foreground mt-1.5 leading-snug">{ann.title}</h3>
-        <ExpandableText text={ann.content} clampLines={2} testId={`read-more-${ann.id}`} />
+    <div className={`p-5 flex flex-col lg:flex-row items-start gap-4 ${isExpired ? "opacity-60" : ""}`} data-testid={`announcement-${ann.id}`}>
+      {/* LEFT — icon + meta */}
+      <div className="flex items-start gap-3 w-full lg:w-72 lg:flex-shrink-0">
+        <div className={`h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.tile}`}><Icon className="h-5 w-5" /></div>
+        <div className="min-w-0 flex-1">
+          <Badges ann={ann} isUrgent={isUrgent} isExpired={isExpired} />
+          <div className="mt-2.5 space-y-1.5">
+            <span className="flex items-center gap-2 text-xs text-muted-foreground"><Calendar className="h-3.5 w-3.5 flex-shrink-0" /> {fmtDate(ann.createdAt)}</span>
+            {author && <span className="flex items-center gap-2 text-xs text-muted-foreground"><User className="h-3.5 w-3.5 flex-shrink-0" /> {author}</span>}
+          </div>
+        </div>
       </div>
 
       <div className="hidden lg:block w-px self-stretch bg-border" />
 
-      <div className="hidden lg:flex flex-col gap-2.5 w-52 flex-shrink-0 pt-0.5">
-        <span className="flex items-center gap-2 text-xs text-muted-foreground"><Calendar className="h-3.5 w-3.5 flex-shrink-0" /> {fmtDate(ann.createdAt)}</span>
-        {author && <span className="flex items-center gap-2 text-xs text-muted-foreground"><User className="h-3.5 w-3.5 flex-shrink-0" /> {author}</span>}
+      {/* RIGHT — message body */}
+      <div className="flex-1 min-w-0 w-full">
+        <h3 className="font-semibold text-foreground mt-1 leading-snug">{ann.title}</h3>
+        <div className="mt-1">
+        <ExpandableText text={ann.content} clampLines={3} testId={`read-more-${ann.id}`} />
+        </div>
       </div>
-
       {canManage && <MoreMenu id={ann.id} onDelete={onDelete} />}
     </div>
   );

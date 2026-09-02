@@ -59,7 +59,7 @@ export function AttendanceSummaryTable({ reportRows, departments, from, to, onEx
       {/* One-line toolbar: title · separator · search · dept · location */}
       <div className="flex items-center gap-3 flex-wrap">
         <h2 className="text-lg font-bold text-foreground shrink-0">Attendance Summary</h2>
-        <div className="h-10 w-px bg-foreground/30 shrink-0 mx-[7px]" />
+        <div className="w-px self-stretch bg-foreground/30 shrink-0 mx-[7px]" />
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input value={tblSearch} onChange={(e) => setTblSearch(e.target.value)} placeholder="Search by name or code..." className="pl-9" data-testid="input-table-search" />

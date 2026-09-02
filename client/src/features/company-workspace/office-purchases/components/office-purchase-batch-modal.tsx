@@ -23,13 +23,14 @@ export function OfficePurchaseBatchModal({ items, open, onClose }: { items: any[
   const busy = approve.isPending || reject.isPending;
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <DialogTitle className="flex items-center gap-2.5">
             <span className="h-9 w-9 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Layers className="h-5 w-5" /></span>
             Purchase group | {items.length} request{items.length !== 1 ? "s" : ""}
           </DialogTitle>
         </DialogHeader>
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 py-5 space-y-3">
         <div className="flex items-end gap-1"><IndianRupee className="h-7 w-7 text-[#206295] mb-1" /><span className="text-[2rem] leading-none font-bold text-[#206295] tabular-nums">{total.toLocaleString("en-IN")}</span></div>
         <p className="text-xs text-muted-foreground">{requesters.length} requester{requesters.length !== 1 ? "s" : ""}: {requesters.join(", ") || "—"}</p>
         <div className="card-surface rounded-2xl">
@@ -46,7 +47,8 @@ export function OfficePurchaseBatchModal({ items, open, onClose }: { items: any[
           />
         </div>
         <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Decision note (optional)" className="h-9" />
-        <div className="flex gap-2">
+        </div>
+        <div className="flex gap-2 px-6 py-4 border-t border-border flex-shrink-0">
           <Button variant="outline" className="flex-1 text-[#FF6F62] border-[#FF6F62]/40" disabled={busy} onClick={() => reject.mutate()}><X className="h-4 w-4 mr-1.5" /> Reject all</Button>
           <Button className="btn-primary-gradient flex-1" disabled={busy} onClick={() => approve.mutate()}><Check className="h-4 w-4 mr-1.5" /> Approve all</Button>
         </div>

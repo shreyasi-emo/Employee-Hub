@@ -8,9 +8,10 @@ import { OrgAttendanceView } from "../components/org-attendance-view";
 export default function AttendancePage() {
   const { data: auth } = useAuth();
   const user = auth?.user || null;
-  // Org-wide attendance is HR/admin (+ CEO) only. A plain manager is employee-like here —
+  // Org-wide attendance is HR/admin (+ CEO/CTO) only. A plain manager is employee-like here —
   // their team's attendance surfaces through the (team-scoped) approvals feed, not this view.
-  const canSeeAll = hasRole(user, "super_admin", "hr_admin", "hr_executive", "ceo_approver");
+  // HR/admin + execs (CEO/CTO) get both tabs: My Attendance (their own) + Employee Attendance (org).
+  const canSeeAll = hasRole(user, "super_admin", "hr_admin", "hr_executive", "ceo_approver", "cto");
   if (!canSeeAll) return <MyAttendanceView />;
   return (
     <Tabs defaultValue="mine" className="w-full">

@@ -82,8 +82,8 @@ export function ProcurementDetailDialog({ id, open, onClose, context = "owner" }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader>
+      <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <DialogTitle className="flex items-center gap-2 min-w-0 pr-6">
             <span className="h-9 w-9 rounded-xl bg-[#0E7C7B]/10 text-[#0E7C7B] flex items-center justify-center flex-shrink-0"><Package className="h-5 w-5" /></span>
             <span className="truncate">{order.reference}</span>
@@ -91,6 +91,7 @@ export function ProcurementDetailDialog({ id, open, onClose, context = "owner" }
           </DialogTitle>
         </DialogHeader>
 
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 py-5 space-y-4">
         {/* Meta strip */}
         <div className="flex items-stretch rounded-xl border border-border/60 overflow-hidden">
           <div className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2.5">
@@ -170,6 +171,7 @@ export function ProcurementDetailDialog({ id, open, onClose, context = "owner" }
         {isOwner && order.status === "pending_approval" && (
           <Button variant="outline" className="w-full text-[#FF6F62] border-[#FF6F62]/40" disabled={act.isPending} onClick={() => { if (window.confirm("Cancel this request?")) act.mutate({ path: "cancel" }); }}><X className="h-4 w-4 mr-1.5" /> Cancel request</Button>
         )}
+        </div>
       </DialogContent>
     </Dialog>
   );

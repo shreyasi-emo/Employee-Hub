@@ -146,10 +146,10 @@ export function OrgAttendanceView() {
 
       <WfhApprovalsCard />
 
-      {/* Main row — all three cards stretch to a common height (grid items-stretch). Each card is
-          h-full so it fills its cell; nothing is absolutely positioned, so a short card can never
-          overflow onto the table below. */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:items-stretch">
+      {/* Main row — a DEFINITE height so each h-full card gets a definite height and its inner
+          ScrollArea can cap itself. Without this the tallest card (e.g. a long Approvals feed)
+          would drag the chart/donut to a huge height via items-stretch. On mobile it stacks. */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:h-[24rem] lg:auto-rows-fr">
         <div className="lg:col-span-2 min-w-0">
           <HeadcountChartCard
             chartView={chartView} onChartView={setChartView}

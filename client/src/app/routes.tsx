@@ -7,6 +7,7 @@ import LoginPage from "@/features/auth/pages/login-page";
 import DashboardPage from "@/features/dashboard/pages/dashboard-page";
 import EmployeesPage from "@/features/employees/pages/employees-page";
 import EmployeeProfilePage from "@/features/employees/pages/employee-profile-page";
+import MyTeamPage from "@/features/employees/pages/my-team-page";
 import AttendancePage from "@/features/attendance/pages/attendance-page";
 import LeavePage from "@/features/leave/pages/leave-page";
 import HolidaysPage from "@/features/holidays/pages/holidays-page";
@@ -62,6 +63,7 @@ export function AppRoutes() {
       <Route path="/" component={() => <Redirect to="/dashboard" />} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
       <Route path="/employees" component={() => <ProtectedRoute component={EmployeesPage} />} />
+      <Route path="/my-team" component={() => <ProtectedRoute component={MyTeamPage} />} />
       <Route path="/employees/:id" component={() => <ProtectedRoute component={EmployeeProfilePage} />} />
       <Route path="/attendance" component={() => <ProtectedRoute component={AttendancePage} />} />
       <Route path="/leave" component={() => <ProtectedRoute component={LeavePage} />} />

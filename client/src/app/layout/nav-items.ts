@@ -23,7 +23,9 @@ export interface NavItem {
 // routes.tsx too). Backend is untouched — this only trims the UI surface.
 export const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "hr_admin", "hr_executive", "manager"] },
+  { title: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "hr_admin", "hr_executive"] },
+  // A manager is scoped to their own team — direct reports only, no org-wide directory or dept filter.
+  { title: "My Team", href: "/my-team", icon: Users, roles: ["manager"] },
   { title: "My Profile", href: "/employees/me", icon: Users, roles: ["employee", "recruiter", "interviewer"] },
   { title: "Attendance", href: "/attendance", icon: Clock },
   { title: "Leave", href: "/leave", icon: Plane },

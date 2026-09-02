@@ -54,11 +54,11 @@ export function AssignShiftDialog({ open, onOpenChange, employees, shifts }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-md w-[calc(100vw-2rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <DialogTitle>Assign Shift</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -126,16 +126,16 @@ export function AssignShiftDialog({ open, onOpenChange, employees, shifts }: {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={mutation.isPending || !form.shiftId || !form.effectiveFrom}
-              data-testid="button-submit-assignment"
-            >
-              {mutation.isPending ? "Assigning..." : "Assign Shift"}
-            </Button>
-          </div>
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-border flex-shrink-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={mutation.isPending || !form.shiftId || !form.effectiveFrom}
+            data-testid="button-submit-assignment"
+          >
+            {mutation.isPending ? "Assigning..." : "Assign Shift"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
