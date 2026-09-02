@@ -8,8 +8,9 @@ import { teamRankAgainst } from "../lib/my-attendance-model";
 import { fetchAttendanceStreak } from "../api/attendance.api";
 import { EmpAvatar } from "./attendance-ui";
 
-const STREAK_VERB: Record<string, string> = { leave: "on leave", wfh: "on WFH", on_duty: "on duty", half_day: "on half-days", absent: "absent", present: "in office" };
-const streakLabel = (s: { status: string; days: number }) => `${s.days} day${s.days > 1 ? "s" : ""}${STREAK_VERB[s.status] ? ` ${STREAK_VERB[s.status]}` : ""}`;
+const STREAK_VERB: Record<string, string> = { leave: "on leave", wfh: "on WFH", on_duty: "on duty", half_day: "on half-day" };
+// Forward-looking: how many upcoming working days they'll STILL be in this state (0 = don't show).
+const streakLabel = (s: { status: string; days: number }) => `${s.days} day${s.days > 1 ? "s" : ""} left${STREAK_VERB[s.status] ? ` ${STREAK_VERB[s.status]}` : ""}`;
 
 function dayStatusMeta(s: string) {
   const found = STATES.find((x) => x.key === s);
@@ -24,18 +25,22 @@ function dayStatusMeta(s: string) {
 export function TodaysAttendanceCard({ todayList, myEmp }: { todayList: any[]; myEmp: any }) {
   const [todaySearch, setTodaySearch] = useState("");
   const [todayFilter, setTodayFilter] = useState<string>("all");
+  const [scope, setScope] = useState<"team" | "all">("team"); // Teammates (default) vs All employees
   const [streakMap, setStreakMap] = useState<Record<string, { status: string; days: number }>>({});
   const [hoveredEmp, setHoveredEmp] = useState<string | null>(null);
 
   const teamRank = teamRankAgainst(myEmp);
+  const isTeammate = (e: any) => !!myEmp && teamRank(e) <= 1; // you + peers/manager/reports
+  const teamCount = useMemo(() => (todayList as any[]).filter(isTeammate).length, [todayList, myEmp]);
   const todayRows = useMemo(() => {
     const q = todaySearch.trim().toLowerCase();
     return (todayList as any[])
+      .filter((e) => scope === "all" || !myEmp || isTeammate(e))
       .filter((e) => todayFilter === "all" || e.status === todayFilter)
       .filter((e) => !q || `${e.firstName} ${e.lastName} ${e.employeeCode || ""}`.toLowerCase().includes(q))
       .sort((a, b) => { const r = teamRank(a) - teamRank(b); return r !== 0 ? r : `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayList, todaySearch, todayFilter, myEmp]);
+  }, [todayList, todaySearch, todayFilter, scope, myEmp]);
 
   const loadStreak = async (id: string) => {
     setHoveredEmp(id);
@@ -55,9 +60,30 @@ export function TodaysAttendanceCard({ todayList, myEmp }: { todayList: any[]; m
           </SelectContent>
         </Select>
       </div>
+      {myEmp && (
+        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-[#206295]/10 border border-[#206295]/15 mb-3" role="tablist">
+          {([["team", "Teammates", teamCount], ["all", "All", (todayList as any[]).length]] as const).map(([val, label, count]) => {
+            const active = scope === val;
+            return (
+              <button
+                key={val}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setScope(val as "team" | "all")}
+                className={`flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-semibold transition-colors ${active ? "btn-primary-gradient text-white shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                data-testid={`today-scope-${val}`}
+              >
+                {label}
+                <span className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${active ? "bg-white/25 text-white" : "bg-foreground/10 text-muted-foreground"}`}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="relative mb-3">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input value={todaySearch} onChange={(e) => setTodaySearch(e.target.value)} placeholder="Search teammates…" className="pl-9 h-9" data-testid="input-today-search" />
+        <Input value={todaySearch} onChange={(e) => setTodaySearch(e.target.value)} placeholder="Search people…" className="pl-9 h-9" data-testid="input-today-search" />
       </div>
       {todayRows.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4">No one matches.</p>

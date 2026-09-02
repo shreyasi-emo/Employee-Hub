@@ -239,18 +239,19 @@ export function registerAttendanceRoutes(app: Express) {
     res.json(list);
   });
 
-  // Consecutive-days streak ending today for one employee's *current* status (skips weekends/holidays
-  // without breaking the run). Used on hover in the Today's Attendance list.
+  // FORWARD span for one employee's *current* status: how many upcoming working days they'll STILL be
+  // in today's state (skips weekends/holidays). Used on hover in the Today's Attendance list — e.g.
+  // "3 days left on leave". Only ranged states (leave/WFH/on-duty/half-day); else days = 0 (hidden).
   app.get("/api/attendance/streak", requireAuth, async (req, res) => {
-    // Others' streaks only for HR/admin; everyone else (incl. managers) sees their own.
+    // Others' spans only for HR/admin/exec; everyone else (incl. managers) sees their own.
     const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive", "ceo_approver", "cto");
     const empId = (privileged && req.query.employeeId) ? (req.query.employeeId as string) : req.currentUser!.employeeId;
     if (!empId) return res.status(400).json({ error: "employeeId required" });
     const pad = (n: number) => String(n).padStart(2, "0");
     const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     const now = new Date();
-    const start = new Date(now); start.setDate(start.getDate() - 90);
-    const fromStr = fmt(start), toStr = fmt(now);
+    const end = new Date(now); end.setDate(end.getDate() + 90);
+    const fromStr = fmt(now), toStr = fmt(end);
 
     const emp = await storage.getEmployee(empId);
     const records = visibleAttendance(await storage.getAttendanceInRange(fromStr, toStr)).filter((r: any) => r.employeeId === empId);
@@ -261,7 +262,7 @@ export function registerAttendanceRoutes(app: Express) {
       leaveMap.set(ld.date, ld.status);
     }
     const holSet = new Set<string>();
-    for (const yr of Array.from(new Set([start.getFullYear(), now.getFullYear()]))) {
+    for (const yr of Array.from(new Set([now.getFullYear(), end.getFullYear()]))) {
       (await storage.getHolidays(yr) as any[]).forEach((h) => holSet.add(h.date));
     }
     const joinStr = emp?.joinDate ? String(emp.joinDate).slice(0, 10) : null;
@@ -273,17 +274,22 @@ export function registerAttendanceRoutes(app: Express) {
       return recMap.get(ds) || leaveMap.get(ds) || "present";
     };
     const todayStatus = statusOn(now);
+    // Count forward only for ranged states — present/absent have no future certainty.
+    const RANGED = new Set(["leave", "wfh", "on_duty", "half_day"]);
     let days = 0;
-    const cur = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    let guard = 0;
-    while (guard++ < 120) {
-      const st = statusOn(cur);
-      if (st === "weekend" || st === "holiday") { cur.setDate(cur.getDate() - 1); continue; } // skip non-working days
-      if (!st || st !== todayStatus) break;
-      days++;
-      cur.setDate(cur.getDate() - 1);
+    let until: string | null = null;
+    if (todayStatus && RANGED.has(todayStatus)) {
+      const cur = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let guard = 0;
+      while (guard++ < 120) {
+        const st = statusOn(cur);
+        if (st === "weekend" || st === "holiday") { cur.setDate(cur.getDate() + 1); continue; } // skip non-working days
+        if (!st || st !== todayStatus) break;
+        days++; until = fmt(cur);
+        cur.setDate(cur.getDate() + 1);
+      }
     }
-    res.json({ status: todayStatus, days });
+    res.json({ status: todayStatus, days, until });
   });
 
   // Unified approvals feed for the Employee-Attendance screen: Leave + WFH requests as a single
