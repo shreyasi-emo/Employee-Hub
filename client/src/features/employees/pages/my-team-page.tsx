@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Search, ArrowUpRight } from "lucide-react";
-import { EMP_STATUSES } from "../lib/employee-constants";
+import { Users, Search, ArrowUpRight, Building2, MapPin } from "lucide-react";
+import { EMP_STATUSES, statusColors } from "../lib/employee-constants";
 import { avatarColor, initials } from "../lib/employee-helpers";
 import { useAllEmployees, useDepartments, useDesignations } from "../api/employees.api";
 import { EmployeeCardGrid } from "../components/employee-card-grid";
@@ -53,37 +53,50 @@ export default function MyTeamPage() {
         </p>
       </div>
 
-      {/* YOU — the manager's own card */}
+      {/* YOU — the manager's own card, built to the app's record-card pattern (same as the request /
+          approval cards): avatar → identity (name + You/status badges + designation) → primary divider
+          → labeled stat columns (Department / Location / Team size) → My Profile action. */}
       {me && (
-        <Card className="border-0">
-          <CardContent className="p-5 flex items-center gap-4 flex-wrap">
-            <Avatar className="h-16 w-16 flex-shrink-0">
-              {me.avatarUrl && <AvatarImage src={me.avatarUrl} />}
-              <AvatarFallback className="text-xl font-bold" style={{ backgroundColor: `${c}26`, color: c }}>{initials(me.firstName, me.lastName)}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-foreground truncate">{me.firstName} {me.lastName}</h2>
-                <Badge className="bg-[#206295]/15 text-[#206295]">You</Badge>
-              </div>
-              <p className="text-sm text-foreground/80 truncate mt-0.5">
-                {myDesig || ""}
-                {myDesig && myDept && <span className="mx-1.5 text-muted-foreground">|</span>}
-                {myDept || ""}
-              </p>
-              {me.email && <p className="text-xs text-muted-foreground mt-1 truncate">{me.email}</p>}
+        <div>
+          <h2 className="text-sm font-semibold text-foreground mb-2">Manager</h2>
+          <div className="card-surface card-hover rounded-2xl px-4 py-3.5 flex items-center gap-4" data-testid="my-team-you-card">
+          <Avatar className="h-11 w-11 flex-shrink-0">
+            {me.avatarUrl && <AvatarImage src={me.avatarUrl} />}
+            <AvatarFallback className="text-sm font-bold" style={{ backgroundColor: `${c}26`, color: c }}>{initials(me.firstName, me.lastName)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1 pr-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[15px] font-bold text-foreground truncate">{me.firstName} {me.lastName}</span>
+              <Badge className="text-[10px] bg-[#206295]/15 text-[#206295]">You</Badge>
+              <Badge className={`text-[10px] ${statusColors[me.employmentStatus] || statusColors.inactive}`}>{me.employmentStatus?.replace("_", " ")}</Badge>
             </div>
-            <div className="flex items-center gap-6 flex-shrink-0">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-[#206295] leading-none">{activeReports.length}</p>
-                <p className="text-[11px] text-muted-foreground mt-1">Team size</p>
-              </div>
-              <Button variant="secondary" size="sm" asChild data-testid="link-my-profile">
-                <a href="/employees/me">My Profile <ArrowUpRight className="h-3.5 w-3.5 ml-1" /></a>
-              </Button>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{myDesig || "Manager"}</p>
+          </div>
+          <div className="self-center w-[1.4px] h-11 rounded-full bg-foreground/25 flex-shrink-0 hidden md:block" />
+          <div className="hidden md:flex items-stretch gap-5 flex-shrink-0">
+            <div className="w-[150px]">
+              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-[10px] leading-none uppercase tracking-wide text-muted-foreground mt-0.5">Department</p>
+              <p className="text-xs text-foreground mt-1 truncate">{myDept || "—"}</p>
             </div>
-          </CardContent>
-        </Card>
+            <Separator orientation="vertical" className="h-11 flex-shrink-0" />
+            <div className="w-[140px]">
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-[10px] leading-none uppercase tracking-wide text-muted-foreground mt-0.5">Location</p>
+              <p className="text-xs text-foreground mt-1 truncate">{me.workLocation || "—"}</p>
+            </div>
+            <Separator orientation="vertical" className="h-11 flex-shrink-0" />
+            <div className="w-[80px]">
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-[10px] leading-none uppercase tracking-wide text-muted-foreground mt-0.5">Team size</p>
+              <p className="text-xs text-foreground mt-1 font-bold">{activeReports.length}</p>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" asChild data-testid="link-my-profile" className="flex-shrink-0">
+            <a href="/employees/me">My Profile <ArrowUpRight className="h-3.5 w-3.5 ml-1" /></a>
+          </Button>
+          </div>
+        </div>
       )}
 
       {/* Search + status filter */}
