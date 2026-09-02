@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { CheckCircle2, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSaveLeaveType } from "../api/leave.api";
+import { leaveTypeColor } from "../lib/leave-model";
 
 /** One leave type: read-only summary, or the company-wide editable form. */
 function PolicyCard({ lt, editing }: { lt: any; editing: boolean }) {
@@ -45,7 +46,7 @@ function PolicyCard({ lt, editing }: { lt: any; editing: boolean }) {
       <Card className="border-0"><CardContent className="p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />
             <span className="text-sm font-medium text-foreground truncate">{lt.name}</span>
             <Badge className={`text-[10px] ${lt.isPaid ? "bg-[#4BDCD9]/25 text-[#206295]" : "bg-[#6A7366]/15 text-[#6A7366]"}`}>{lt.isPaid ? "Paid" : "Unpaid"}</Badge>
           </div>
@@ -65,7 +66,7 @@ function PolicyCard({ lt, editing }: { lt: any; editing: boolean }) {
   return (
     <Card className="border-0"><CardContent className="p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />
         <Input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} className="h-9 flex-1" />
         <span className="text-xs text-muted-foreground flex-shrink-0">{lt.code}</span>
       </div>

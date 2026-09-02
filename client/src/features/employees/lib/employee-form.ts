@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const emptyForm = {
-  firstName: "", lastName: "", email: "", phone: "", dateOfBirth: "", gender: "", maritalStatus: "",
+  firstName: "", lastName: "", email: "", phone: "", dateOfBirth: "", gender: "", maritalStatus: "", bloodGroup: "",
   joinDate: new Date().toISOString().split("T")[0], confirmationDate: "", employmentType: "full_time", employmentStatus: "active",
   departmentId: "", designationId: "", managerId: "", workLocation: "", noticePeriodDays: "", probationDays: "", systemRole: "employee",
   panNumber: "", aadhaarMasked: "", uan: "", pfEligible: true, esiEligible: false,
@@ -11,7 +11,7 @@ export const emptyForm = {
 
 export const formSchema = z.object({
   firstName: z.string().min(1, "Required"), lastName: z.string().min(1, "Required"), email: z.string().email("Valid email required"),
-  phone: z.string().optional(), dateOfBirth: z.string().optional(), gender: z.string().optional(), maritalStatus: z.string().optional(),
+  phone: z.string().optional(), dateOfBirth: z.string().optional(), gender: z.string().optional(), maritalStatus: z.string().optional(), bloodGroup: z.string().optional(),
   joinDate: z.string().min(1, "Required"), confirmationDate: z.string().optional(), employmentType: z.string(), employmentStatus: z.string(),
   departmentId: z.string().optional(), designationId: z.string().optional(), managerId: z.string().optional(), workLocation: z.string().optional(), systemRole: z.string().optional(),
   noticePeriodDays: z.string().optional(), probationDays: z.string().optional(),

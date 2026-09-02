@@ -101,7 +101,7 @@ export function CalendarCard({ holidayDates, upcomingHolidays, employees, readOn
   }
 
   return (
-    <Card className="border-0 lg:h-[25rem] lg:col-span-2 flex flex-col" style={CARD_STYLE}>
+    <Card className="border-0 lg:h-[27rem] lg:col-span-2 flex flex-col" style={CARD_STYLE}>
       <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
         <CardTitle className="text-base font-semibold">Calendar</CardTitle>
         {!readOnly && (

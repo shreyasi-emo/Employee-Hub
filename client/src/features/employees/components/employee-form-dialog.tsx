@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth, isAdmin } from "@/lib/auth";
@@ -11,9 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
 import { DateInput } from "@/components/shared/datetime-field";
-import { CheckCircle2, User, Briefcase, CreditCard, MapPin } from "lucide-react";
+import { CheckCircle2, User, Briefcase, CreditCard, MapPin, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { EMP_TYPES, EMP_STATUSES, GENDERS, SYSTEM_ROLES, MARITAL } from "../lib/employee-constants";
+import { FileUpload } from "@/components/shared/file-upload";
+import { EMP_TYPES, EMP_STATUSES, GENDERS, SYSTEM_ROLES, MARITAL, EMPLOYEE_DOC_GROUPS } from "../lib/employee-constants";
 import {
   emptyForm, formSchema, formValuesFor, cleanPayload, makeDeptCode,
   loadLocations, saveLocations, type EmployeeFormValues,
@@ -47,6 +48,9 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
   const roleOptions = SYSTEM_ROLES.filter((r) => r.value !== "super_admin" || viewerRole === "super_admin");
   const isEdit = !!employee;
   const [created, setCreated] = useState<{ name: string; email: string } | null>(null);
+  // Personnel documents (kept outside react-hook-form; merged into the payload on submit).
+  const [docs, setDocs] = useState<Record<string, any>>(() => employee?.documents || {});
+  useEffect(() => { if (open) setDocs(employee?.documents || {}); }, [open, employee]);
   const [customLocations, setCustomLocations] = useState<string[]>(() => loadLocations());
   const locations = Array.from(new Set([...knownLocations, ...customLocations]));
 
@@ -92,10 +96,11 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{isEdit ? "Edit Employee" : "Add New Employee"}</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((d) => mutation.mutate(cleanPayload(d)))} className="space-y-5">
+          <form onSubmit={form.handleSubmit((d) => mutation.mutate({ ...cleanPayload(d), documents: docs }))} className="flex flex-col flex-1 min-h-0">
+            <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border"><DialogTitle>{isEdit ? "Edit Employee" : "Add New Employee"}</DialogTitle></DialogHeader>
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
             <Section icon={User} title="Personal">
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={form.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name *</FormLabel>{T({ ...field })}<FormMessage /></FormItem>)} />
@@ -109,6 +114,9 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
                 <FormField control={form.control} name="dateOfBirth" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><DateInput value={field.value} onChange={field.onChange} /></FormItem>)} />
                 <FormField control={form.control} name="gender" render={({ field }) => (<FormItem><FormLabel>Gender</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger></FormControl><SelectContent>{GENDERS.map((g) => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                 <FormField control={form.control} name="maritalStatus" render={({ field }) => (<FormItem><FormLabel>Marital Status</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger></FormControl><SelectContent>{MARITAL.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <FormField control={form.control} name="bloodGroup" render={({ field }) => (<FormItem><FormLabel>Blood Group</FormLabel>{T({ ...field, placeholder: "e.g. O+" })}</FormItem>)} />
               </div>
             </Section>
 
@@ -175,7 +183,27 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
               </div>
             </Section>
 
-            <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Separator />
+
+            <Section icon={FileText} title="Documents">
+              <p className="text-[11px] text-muted-foreground -mt-1">Onboarding / personnel documents. Use this for manual entry of past employees or when a document changes.</p>
+              {EMPLOYEE_DOC_GROUPS.map((g) => (
+                <div key={g.group} className="space-y-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{g.group}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {g.docs.map((d) => (
+                      <div key={d.key}>
+                        <label className="text-[13px] mb-1.5 block text-foreground">{d.label}</label>
+                        <FileUpload value={docs[d.key] || null} onChange={(v) => setDocs((prev) => ({ ...prev, [d.key]: v }))} label={`Upload ${d.label}`} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </Section>
+
+            </div>
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-border flex-shrink-0">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-employee">
                 {mutation.isPending ? "Saving…" : isEdit ? "Save Changes" : "Create Employee"}

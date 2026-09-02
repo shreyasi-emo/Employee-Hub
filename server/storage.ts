@@ -221,7 +221,7 @@ export const storage = {
   // ====== ATTENDANCE ======
   async getAttendanceRecords(employeeId: string, month: number, year: number) {
     const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-    const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
+    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(new Date(year, month, 0).getDate()).padStart(2, "0")}`;
     return db.select().from(attendanceRecords)
       .where(and(
         eq(attendanceRecords.employeeId, employeeId),
@@ -234,7 +234,10 @@ export const storage = {
   // All attendance records for a month (across employees) — for org-wide summaries
   async getMonthlyAttendance(month: number, year: number) {
     const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-    const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
+    // Real last day of the month — a hardcoded "-31" produces an invalid date (e.g. 2026-09-31)
+    // for 30-day / February months and makes Postgres reject the query.
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     return db.select().from(attendanceRecords)
       .where(and(
         gte(attendanceRecords.date, startDate),
@@ -283,7 +286,7 @@ export const storage = {
 
   async getAllAttendanceForMonth(month: number, year: number) {
     const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-    const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
+    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(new Date(year, month, 0).getDate()).padStart(2, "0")}`;
     return db.select().from(attendanceRecords)
       .where(and(gte(attendanceRecords.date, startDate), lte(attendanceRecords.date, endDate)));
   },

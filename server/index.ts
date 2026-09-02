@@ -76,6 +76,18 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// API responses must never be cached by the browser/proxies — they carry per-user, per-session
+// data (e.g. the sanitized directory), and a stale HTTP-cached GET can survive page reloads and
+// show yesterday's data. Force revalidation on every /api call.
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

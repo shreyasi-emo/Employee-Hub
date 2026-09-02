@@ -29,7 +29,7 @@ export function VehiclesHeader({ isHrAdmin, mode, onMode, pendingRentalCount, on
               <button onClick={() => onMode("requests")} className={`px-3 h-full rounded-[10px] text-xs font-medium ${mode === "requests" ? "btn-primary-gradient text-white" : "text-foreground/70"}`} data-testid="mode-requests">Rental Requests{pendingRentalCount ? ` (${pendingRentalCount})` : ""}</button>
             </div>
             {/* Divider between the primary mode toggle and the secondary action buttons */}
-            <Separator orientation="vertical" className="h-8 self-center bg-border mx-1" />
+            <Separator orientation="vertical" className="self-stretch bg-border mx-1" />
             <Button variant="outline" size="sm" className="h-10" onClick={onTrackUsage} data-testid="track-usage"><BarChart3 className="h-4 w-4 mr-1.5" /> Track Usage</Button>
             <Button variant="outline" size="sm" className="h-10" onClick={onManageVehicles} data-testid="manage-vehicle"><Settings className="h-4 w-4 mr-1.5" /> Manage Vehicles</Button>
           </>

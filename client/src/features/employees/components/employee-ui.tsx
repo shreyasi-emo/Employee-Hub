@@ -15,15 +15,17 @@ import { avatarColor, initials } from "../lib/employee-helpers";
 
 /** Directory card. Clicking opens the profile, or toggles selection in select mode.
  *  Pass `event` (see lib/employee-helpers todayEvent) to show a celebration banner. */
-export function EmployeeCard({ employee, departments, designations, selectionMode, selected, onToggle, event }: {
+export function EmployeeCard({ employee, departments, designations, selectionMode, selected, onToggle, event, onOpen }: {
   employee: any; departments: any[]; designations: any[]; selectionMode: boolean; selected: boolean; onToggle: () => void;
   event?: { label: string; tint: string; icon: any } | null;
+  /** When provided, clicking the card calls this instead of navigating to the full profile page. */
+  onOpen?: (employee: any) => void;
 }) {
   const [, navigate] = useLocation();
   const desig = designations.find((d) => d.id === employee.designationId);
   const detail = "text-xs text-muted-foreground flex items-center gap-1.5";
   const c = avatarColor(employee.id);
-  const onCardClick = () => (selectionMode ? onToggle() : navigate(`/employees/${employee.id}`));
+  const onCardClick = () => (selectionMode ? onToggle() : onOpen ? onOpen(employee) : navigate(`/employees/${employee.id}`));
   return (
     <Card
       className={`border-0 card-hover cursor-pointer overflow-hidden ${selected ? "ring-2 ring-primary" : ""}`}

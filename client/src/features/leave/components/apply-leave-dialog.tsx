@@ -8,7 +8,7 @@ import { DateField } from "@/components/shared/datetime-field";
 import { Calendar, Info } from "lucide-react";
 import { format, startOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { parseYmd, requestedDays } from "../lib/leave-model";
+import { parseYmd, requestedDays, leaveTypeColor } from "../lib/leave-model";
 import { clampEnd, ymd } from "@/lib/date-range";
 import { useApplyLeave } from "../api/leave.api";
 
@@ -49,7 +49,7 @@ export function ApplyLeaveDialog({ open, onOpenChange, employeeId, leaveTypes, l
                   return (
                     <SelectItem key={lt.id} value={lt.id}>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: lt.color }} />
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: leaveTypeColor(lt) }} />
                         <span>{lt.name}</span>
                         {avail > 0 && <span className="text-xs text-muted-foreground">({avail}d avail.)</span>}
                       </div>

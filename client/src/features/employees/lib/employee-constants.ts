@@ -16,6 +16,35 @@ export const EMP_STATUSES = [
 
 export const GENDERS = [{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }];
 
+// Personnel documents — mirrors the pre-onboarding candidate collection (candidate-doc-form),
+// grouped for the profile "Docs" panel and the employee form's upload section.
+export const EMPLOYEE_DOC_GROUPS: { group: string; docs: { key: string; label: string }[] }[] = [
+  {
+    group: "Identity",
+    docs: [
+      { key: "pan", label: "PAN Card" },
+      { key: "aadhaar", label: "Aadhaar Card" },
+      { key: "photoId", label: "Passport / DL / Voter ID" },
+    ],
+  },
+  {
+    group: "Bank",
+    docs: [{ key: "bankProof", label: "Passbook / Cancelled Cheque" }],
+  },
+  {
+    group: "Previous Employment",
+    docs: [
+      { key: "offerLetter", label: "Offer Letter" },
+      { key: "incrementLetters", label: "Increment Letter(s)" },
+      { key: "relievingLetters", label: "Relieving Letter(s)" },
+      { key: "payslips", label: "Payslips (last 3 months)" },
+    ],
+  },
+];
+
+export const EMPLOYEE_DOC_TYPES = EMPLOYEE_DOC_GROUPS.flatMap((g) => g.docs);
+export const docLabel = (key: string) => EMPLOYEE_DOC_TYPES.find((d) => d.key === key)?.label || key;
+
 export const SYSTEM_ROLES = [
   { value: "employee", label: "Employee" },
   { value: "manager", label: "Manager" },
@@ -26,6 +55,7 @@ export const SYSTEM_ROLES = [
   { value: "interviewer", label: "Interviewer" },
   { value: "finance", label: "Finance" },
   { value: "ceo_approver", label: "CEO Approver" },
+  { value: "cto", label: "CTO" },
   { value: "logistics", label: "Logistics" },
   { value: "super_admin", label: "Super Admin" },
 ];

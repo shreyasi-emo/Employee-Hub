@@ -3,7 +3,7 @@ import { apiRequest, getQueryFn } from "./queryClient";
 
 export type UserRole =
   | "super_admin" | "hr_admin" | "hr_executive" | "finance" | "manager" | "employee"
-  | "recruiter" | "hr_ops" | "office_admin" | "ceo_approver" | "interviewer" | "logistics";
+  | "recruiter" | "hr_ops" | "office_admin" | "ceo_approver" | "cto" | "interviewer" | "logistics";
 
 export interface CurrentUser {
   id: string;
@@ -42,7 +42,7 @@ export interface AuthState {
 //    To bring it back: add it here and to ROLE_OPTIONS in features/employees/lib/employee-constants.
 export const ALL_ROLES: UserRole[] = [
   "super_admin", "hr_admin", "hr_executive", "finance", "manager", "employee",
-  "recruiter", "hr_ops", "ceo_approver", "interviewer", "logistics",
+  "recruiter", "hr_ops", "ceo_approver", "cto", "interviewer", "logistics",
 ];
 
 export function useAuth() {
@@ -103,6 +103,12 @@ export function isCEOApprover(user: CurrentUser | null): boolean {
   return hasRole(user, "super_admin", "ceo_approver");
 }
 
+/** Executive tier: CEO + CTO. They never apply for leave, approve their reporting managers'
+ *  leave, and have company-wide people/attendance read. NOT administrators. */
+export function isExecutive(user: CurrentUser | null): boolean {
+  return hasRole(user, "ceo_approver", "cto");
+}
+
 export function getRoleBadgeColor(role: UserRole): string {
   // Brand palette only (mirrors lib/status.ts): blue = leadership, teal = HR/ops,
   // coral = finance, grey = everyone else. Labels carry the finer distinction.
@@ -113,6 +119,7 @@ export function getRoleBadgeColor(role: UserRole): string {
   const colors: Record<string, string> = {
     super_admin: TEAL,
     ceo_approver: TEAL,
+    cto: BLUE,
     hr_admin: BLUE,
     hr_executive: BLUE,
     hr_ops: BLUE,
@@ -138,6 +145,7 @@ export function getRoleLabel(role: UserRole): string {
     recruiter: "Recruiter",
     office_admin: "Office Admin",
     ceo_approver: "CEO / Approver",
+    cto: "CTO",
     interviewer: "Interviewer",
     logistics: "Logistics",
     employee: "Employee",

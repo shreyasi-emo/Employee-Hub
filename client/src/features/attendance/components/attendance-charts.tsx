@@ -57,9 +57,14 @@ export function HeadcountChartCard({
           ))}
         </div>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 pb-4">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={graphData} barCategoryGap="14%">
+      <CardContent className="flex-1 min-h-0 pb-4 overflow-hidden">
+        {/* Absolute-positioned chart: Recharts' ResponsiveContainer measures a flex parent
+            unreliably and can render taller than its box; pinning it to inset-0 stops it
+            from ever overflowing onto the content below. */}
+        <div className="relative h-full w-full">
+          <div className="absolute inset-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={graphData} barCategoryGap="14%">
             <defs>
               {STATES.map((s) => (
                 <linearGradient key={s.key} id={`grad-${s.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -89,8 +94,10 @@ export function HeadcountChartCard({
                 <Bar key={s.key} dataKey={s.key} name={s.label} stackId="a" fill={`url(#grad-${s.key})`} stroke="rgba(255,255,255,0.5)" strokeWidth={1} radius={[12, 12, 12, 12]} maxBarSize={48} />
               ))
             )}
-          </BarChart>
-        </ResponsiveContainer>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

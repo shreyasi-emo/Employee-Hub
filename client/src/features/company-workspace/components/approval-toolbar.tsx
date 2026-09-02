@@ -7,7 +7,7 @@ import { Search, MousePointerClick, CheckSquare } from "lucide-react";
 
 // RULE: every vertical separator in a toolbar is the full control height (h-9) so it reads as a real
 // divider between the search and the controls — never hand-roll a shorter one.
-const TB_SEP = "h-9 flex-shrink-0";
+const TB_SEP = "self-stretch flex-shrink-0";
 
 // Shared header row for every approval surface (reimbursement / office / procurement / travel) so they
 // all read identically — only the filter/sort content differs. Layout: search (leftmost) · filters · sort

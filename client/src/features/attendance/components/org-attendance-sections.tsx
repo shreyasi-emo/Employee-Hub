@@ -40,7 +40,7 @@ export function OrgAttendanceHeader({
         )}
 
         {/* Separator between the date filter and the action buttons */}
-        <div className="h-10 w-px bg-border mx-1" />
+        <div className="w-px self-stretch bg-border mx-1" />
         <Button variant="secondary" size="sm" onClick={onReport} data-testid="button-report-attendance">
           <Download className="h-4 w-4 mr-1" /> Report
         </Button>

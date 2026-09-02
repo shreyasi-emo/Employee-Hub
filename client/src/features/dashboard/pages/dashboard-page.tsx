@@ -1,13 +1,14 @@
 import { CARD_STYLE, ATT_COLORS } from "../lib/dashboard-visuals";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth, isHR, isManager, getRoleLabel } from "@/lib/auth";
+import { useAuth, isHR, isManager, isExecutive, getRoleLabel } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, Plane, Calendar, ArrowRight, UserCheck, ClipboardList, ShoppingCart, Car, CalendarDays, Route, Home, Hash, Briefcase, Mail, ArrowUpRight } from "lucide-react";
+import { Users, Plane, Calendar, ArrowRight, UserCheck, ClipboardList, ShoppingCart, Car, CalendarDays, Route, Home, Hash, Briefcase, Mail, ArrowUpRight, PartyPopper } from "lucide-react";
+import { todayEvent } from "@/features/employees/lib/employee-helpers";
 import { ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format } from "date-fns";
 import { Stats } from "../types";
@@ -28,7 +29,7 @@ export default function DashboardPage() {
 
   // Company-wide totals — only fetched for the HR/admin layout, so a plain manager's
   // browser never receives org-wide numbers (the stats grid is hidden for them anyway).
-  const { data: stats, isLoading: statsLoading } = useQuery<Stats>({ queryKey: ["/api/dashboard/stats"], enabled: isHR(user!) });
+  const { data: stats, isLoading: statsLoading } = useQuery<Stats>({ queryKey: ["/api/dashboard/stats"], enabled: isHR(user!) || isExecutive(user!) });
   const { data: announcements = [], isLoading: annLoading } = useQuery<any[]>({ queryKey: ["/api/announcements"] });
   const { data: leaveRequests = [] } = useQuery<any[]>({ queryKey: ["/api/leave-requests"] });
   const { data: employees = [] } = useQuery<any[]>({
@@ -51,12 +52,20 @@ export default function DashboardPage() {
   const { data: departments = [] } = useQuery<any[]>({ queryKey: ["/api/departments"], enabled: !!user });
   const { data: designations = [] } = useQuery<any[]>({ queryKey: ["/api/designations"], enabled: !!user });
   const { data: allBookings = [] } = useQuery<any[]>({ queryKey: ["/api/vehicles/bookings"], enabled: !!user, retry: false });
+  // Executives see a company-wide attendance snapshot (they have no personal attendance of their own).
+  const { data: orgMonthAtt = [] } = useQuery<any[]>({
+    queryKey: [`/api/attendance/month?month=${currentMonth}&year=${currentYear}`],
+    enabled: isExecutive(user!),
+  });
 
   // Service-request counts + calendar data for the admin dashboard layout.
   // A plain `manager` gets the employee layout (isHR covers every HR/admin role but
   // manager), with a Pending Leave Approvals card in place of My Pending Requests.
   const showAdminLayout = isHR(user!);
   const isTeamManager = user?.role === "manager";
+  // Executives (CEO/CTO): company-overview stats + approvals, but no personal leave/attendance
+  // self-service (they never apply for leave or clock attendance).
+  const isExec = isExecutive(user!);
   const { data: requestSummary } = useQuery<any>({
     queryKey: ["/api/my-requests/summary"],
     enabled: !!user,
@@ -138,6 +147,35 @@ export default function DashboardPage() {
   const attSegments = attLegend.filter((s) => s.value > 0);
   const attendancePct = workingDays ? Math.round(((officePresent + wfhDays + onDutyDays + 0.5 * halfDays) / workingDays) * 100) : 0;
 
+  // Today's celebrations — birthdays + work anniversaries (replaces the Regularizations stat).
+  const celebrations = (employees as any[]).map((e) => todayEvent(e)).filter((ev) => ev && ev.kind !== "farewell") as any[];
+  const bdayCount = celebrations.filter((ev) => ev.kind === "birthday").length;
+  const annivCount = celebrations.filter((ev) => ev.kind === "anniversary").length;
+  const celebrationCaption = (() => {
+    const parts: string[] = [];
+    if (bdayCount) parts.push(`${bdayCount} birthday${bdayCount > 1 ? "s" : ""}`);
+    if (annivCount) parts.push(`${annivCount} ${annivCount > 1 ? "anniversaries" : "anniversary"}`);
+    return parts.length ? parts.join(", ") : "None today";
+  })();
+
+  // Company-wide attendance snapshot for TODAY (executives). Present-by-default: every active
+  // employee with no exception record today counts as office-present — mirrors the personal donut.
+  const orgTodayCount = (s: string) => (orgMonthAtt as any[]).filter((a) => a.date === todayStr && a.status === s).length;
+  const orgActiveTotal = stats?.totalEmployees || 0;
+  const orgWfh = orgTodayCount("wfh"), orgOnDuty = orgTodayCount("on_duty"), orgLeaveN = orgTodayCount("leave"), orgAbsent = orgTodayCount("absent"), orgHalf = orgTodayCount("half_day");
+  const orgOffice = Math.max(0, orgActiveTotal - orgWfh - orgOnDuty - orgLeaveN - orgAbsent - orgHalf);
+  const orgPresentTotal = orgOffice + orgWfh + orgOnDuty;
+  const orgLegend = [
+    { key: "present", name: "Present (Office)", value: orgOffice },
+    { key: "wfh", name: "WFH", value: orgWfh },
+    { key: "on_duty", name: "On Duty", value: orgOnDuty },
+    { key: "half_day", name: "Half Day", value: orgHalf },
+    { key: "leave", name: "On Leave", value: orgLeaveN },
+    { key: "absent", name: "Absent", value: orgAbsent },
+  ].map((s) => ({ ...s, color: ATT_COLORS[s.key] })).sort((a, b) => b.value - a.value);
+  const orgSegments = orgLegend.filter((s) => s.value > 0);
+  const orgPct = orgActiveTotal ? Math.round(((orgOffice + orgWfh + orgOnDuty + 0.5 * orgHalf) / orgActiveTotal) * 100) : 0;
+
   const pendingLeaveRequests = leaveRequests.filter((r: any) => r.status === "pending");
   const myPendingCount = pendingLeaveRequests.length + (requestSummary?.purchases?.pending ?? 0) + (requestSummary?.travels?.pending ?? 0);
   const totalLeaveBalance = myLeaveBalances.reduce((a: number, b: any) => a + parseFloat(b.closingBalance || "0"), 0);
@@ -197,7 +235,7 @@ export default function DashboardPage() {
               </a>
             </Button>
           )}
-          {emp && !showAdminLayout && (
+          {emp && !showAdminLayout && !isExec && (
             <>
               <Button variant="outline" size="sm" asChild data-testid="button-mark-on-duty">
                 <a href="/attendance?action=on-duty"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</a>
@@ -205,20 +243,22 @@ export default function DashboardPage() {
               <Button variant="outline" size="sm" asChild data-testid="button-apply-wfh">
                 <a href="/attendance?action=wfh"><Home className="h-4 w-4 mr-1.5" /> Apply WFH</a>
               </Button>
-              <div className="w-px h-6 bg-border self-center mx-0.5" aria-hidden="true" />
+              <div className="w-px self-stretch bg-border mx-0.5" aria-hidden="true" />
             </>
           )}
-          <Button variant="outline" size="sm" asChild data-testid="button-apply-leave">
-            <a href="/leave?action=apply">
-              <Plane className="h-4 w-4 mr-1.5" />
-              Apply Leave
-            </a>
-          </Button>
+          {!isExec && (
+            <Button variant="outline" size="sm" asChild data-testid="button-apply-leave">
+              <a href="/leave?action=apply">
+                <Plane className="h-4 w-4 mr-1.5" />
+                Apply Leave
+              </a>
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Stats Grid — company-wide overview, HR/admin only. */}
-      {showAdminLayout && (
+      {/* Stats Grid — company-wide overview (HR/admin + execs). */}
+      {(showAdminLayout || isExec) && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statsLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
@@ -232,7 +272,7 @@ export default function DashboardPage() {
                 icon={Users}
                 subtitle="Total headcount"
                 color="bg-[#206295]/15 text-[#206295]"
-                href="/employees"
+                href={isHR(user!) ? "/employees" : undefined}
               />
               <StatCard
                 title="Present Today"
@@ -251,12 +291,11 @@ export default function DashboardPage() {
                 href="/leave"
               />
               <StatCard
-                title="Regularizations"
-                value={stats?.pendingRegularizations || 0}
-                icon={ClipboardList}
-                subtitle="Pending approval"
+                title="Today's Celebrations"
+                value={celebrations.length}
+                icon={PartyPopper}
+                subtitle={celebrationCaption}
                 color="bg-[#4BDCD9]/25 text-[#206295]"
-                href="/attendance"
               />
             </>
           )}
@@ -265,7 +304,7 @@ export default function DashboardPage() {
 
       {/* Personal row — profile snapshot (merged) + the two non-attendance stats.
           Attendance now lives in the donut below, so no repetitive present/absence cards. */}
-      {emp && !showAdminLayout && (
+      {emp && !showAdminLayout && !isExec && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Profile snapshot — spans the first two card slots */}
           <Card className="border-0 col-span-2" style={CARD_STYLE}>
@@ -350,7 +389,7 @@ export default function DashboardPage() {
               icon={ClipboardList}
               subtitle="From your team"
               color="bg-[#206295]/15 text-[#206295]"
-              href="/leave"
+              href="/leave?tab=team-leaves"
             />
           ) : (
             <StatCard
@@ -397,11 +436,65 @@ export default function DashboardPage() {
           </Card>
         );
 
+        if (isExec) {
+          // Execs: company attendance snapshot + Calendar + Announcements. Their reporting managers'
+          // leave approvals show in the dedicated card below; no personal self-service cards.
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              <Card className="border-0 lg:h-[27rem] flex flex-col" style={CARD_STYLE}>
+                <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
+                  <CardTitle className="text-base font-semibold">Company Attendance</CardTitle>
+                  <span className="text-xs text-muted-foreground">Today</span>
+                </CardHeader>
+                <CardContent className="px-5 pb-4 flex-1 min-h-0 flex flex-col">
+                  {orgActiveTotal === 0 ? (
+                    <div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">No employee data</p></div>
+                  ) : (
+                    <>
+                      <div className="relative h-[147px] w-[147px] mx-auto flex-shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={orgSegments} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={67} innerRadius={39} paddingAngle={3} cornerRadius={5} stroke="none">
+                              {orgSegments.map((s) => <Cell key={s.key} fill={s.color} />)}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                          <span className="text-2xl font-bold text-foreground leading-none tabular-nums">{orgPct}<span className="text-[0.7em] align-baseline">%</span></span>
+                          <span className="text-[10px] text-muted-foreground mt-0.5">present</span>
+                        </div>
+                      </div>
+                      <p className="text-center text-xs text-muted-foreground mt-2">
+                        <span className="font-semibold text-foreground">{orgPresentTotal}</span> of {orgActiveTotal} present today
+                      </p>
+                      <Separator className="my-3" />
+                      <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
+                        {orgLegend.map((s) => (
+                          <div key={s.key} className={`flex items-center gap-2 text-xs ${s.value === 0 ? "opacity-45" : ""}`}>
+                            <span className="w-2.5 h-2.5 rounded-[3px] flex-shrink-0" style={{ background: s.color }} />
+                            <span className="text-foreground/80 truncate flex-1">{s.name}</span>
+                            <span className="font-semibold text-foreground tabular-nums">{s.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <Button variant="secondary" size="sm" asChild className="w-full mt-3 rounded-[12px] flex-shrink-0">
+                    <a href="/attendance" data-testid="link-view-attendance"><CalendarDays className="h-3.5 w-3.5 mr-1.5" /> View full attendance</a>
+                  </Button>
+                </CardContent>
+              </Card>
+              <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={employees} readOnly bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
+              <div className="lg:h-[27rem]">{announcementsPanel}</div>
+            </div>
+          );
+        }
+
         if (showAdminLayout) {
           return (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* LEFT — Pending Service Requests (bento card, below 1st overview card) */}
-              <Card className="border-0 lg:h-[25rem] flex flex-col" style={CARD_STYLE}>
+              <Card className="border-0 lg:h-[27rem] flex flex-col" style={CARD_STYLE}>
                 <CardHeader className="pt-4 pb-2">
                   <CardTitle className="text-base font-semibold">Pending Service Requests</CardTitle>
                 </CardHeader>
@@ -428,7 +521,7 @@ export default function DashboardPage() {
               <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={employees} bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
 
               {/* RIGHT — Announcements (below 4th overview card) */}
-              <div className="lg:h-[25rem]">{announcementsPanel}</div>
+              <div className="lg:h-[27rem]">{announcementsPanel}</div>
             </div>
           );
         }
@@ -436,7 +529,7 @@ export default function DashboardPage() {
         return (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             {/* LEFT — My Attendance donut + quick access to the attendance page */}
-            <Card className="border-0 lg:h-[25rem] flex flex-col" style={CARD_STYLE}>
+            <Card className="border-0 lg:h-[27rem] flex flex-col" style={CARD_STYLE}>
               <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
                 <CardTitle className="text-base font-semibold">My Attendance</CardTitle>
               </CardHeader>
@@ -445,16 +538,16 @@ export default function DashboardPage() {
                   <div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">No working days yet this month</p></div>
                 ) : (
                   <>
-                    <div className="relative h-32 w-32 mx-auto flex-shrink-0">
+                    <div className="relative h-[147px] w-[147px] mx-auto flex-shrink-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={attSegments} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={58} innerRadius={34} paddingAngle={3} cornerRadius={5} stroke="none">
+                          <Pie data={attSegments} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={67} innerRadius={39} paddingAngle={3} cornerRadius={5} stroke="none">
                             {attSegments.map((s) => <Cell key={s.key} fill={s.color} />)}
                           </Pie>
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-2xl font-bold text-foreground leading-none tabular-nums">{attendancePct}%</span>
+                        <span className="text-2xl font-bold text-foreground leading-none tabular-nums">{attendancePct}<span className="text-[0.7em] align-baseline">%</span></span>
                         <span className="text-[10px] text-muted-foreground mt-0.5">attendance</span>
                       </div>
                     </div>
@@ -483,13 +576,13 @@ export default function DashboardPage() {
             <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={[]} readOnly bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
 
             {/* RIGHT — Announcements */}
-            <div className="lg:h-[25rem]">{announcementsPanel}</div>
+            <div className="lg:h-[27rem]">{announcementsPanel}</div>
           </div>
         );
       })()}
 
       {/* Pending approvals for managers/HR */}
-      {(isHR(user!) || isManager(user!)) && pendingLeaveRequests.length > 0 && (
+      {(isHR(user!) || isManager(user!) || isExec) && pendingLeaveRequests.length > 0 && (
         <Card className="border-0" style={CARD_STYLE}>
           <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
             <CardTitle className="text-base font-semibold">Pending Leave Requests</CardTitle>

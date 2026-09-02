@@ -58,11 +58,11 @@ export function GoalDialog({ open, onClose, cycleId, goal, employees }: {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-lg w-[calc(100vw-2rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <DialogTitle>{isEdit ? "Edit Goal" : "New Goal"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
           {canAssignToOthers && !isEdit && (
             <div>
               <Label>Assign To</Label>
@@ -134,7 +134,7 @@ export function GoalDialog({ open, onClose, cycleId, goal, employees }: {
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t border-border flex-shrink-0">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={mutation.isPending || !form.title} data-testid="button-save-goal">
             {mutation.isPending ? "Saving..." : isEdit ? "Update Goal" : "Create Goal"}

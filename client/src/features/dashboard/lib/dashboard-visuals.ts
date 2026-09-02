@@ -28,8 +28,9 @@ export const calClassNames = {
   head_cell: "text-muted-foreground flex-1 font-normal text-[0.75rem]",
   tbody: "flex-1 flex flex-col",
   row: "flex w-full flex-1",
-  cell: "flex-1 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-  day: "inline-flex items-center justify-center h-full w-full p-0 font-normal rounded-[12px] hover-elevate aria-selected:opacity-100",
+  cell: "flex-1 flex items-center justify-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+  day: "inline-flex items-center justify-center h-9 w-9 p-0 font-normal rounded-[12px] hover-elevate aria-selected:opacity-100",
+  day_today: "bg-[#206295]/15 text-[#206295] font-semibold",
 };
 
 export const HOLIDAY_COLOR = "#FF6F62";

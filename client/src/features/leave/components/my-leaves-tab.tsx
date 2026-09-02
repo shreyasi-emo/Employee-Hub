@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/shared/data-table";
 import { Plane, Clock, Search, CheckCircle2, XCircle } from "lucide-react";
 import { format } from "date-fns";
-import { statusOf, canCancel, findCasualLeaveType } from "../lib/leave-model";
+import { statusOf, canCancel, findCasualLeaveType, leaveTypeColor } from "../lib/leave-model";
 import { StatCard } from "./leave-ui";
 
 /** The employee's own requests: four stat cards, filters, and the table.
@@ -87,7 +87,7 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
         ) : (
           <DataTable
             columns={[
-              { key: "type", header: "Leave Type", render: (r: any) => { const lt = leaveTypes.find((l: any) => l.id === r.leaveTypeId); return <span className="flex items-center gap-1.5 text-foreground"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: lt?.color || "#206295" }} />{lt?.name || "—"}</span>; } },
+              { key: "type", header: "Leave Type", render: (r: any) => { const lt = leaveTypes.find((l: any) => l.id === r.leaveTypeId); return <span className="flex items-center gap-1.5 text-foreground"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />{lt?.name || "—"}</span>; } },
               { key: "dates", header: "Dates", cellClassName: "text-muted-foreground", render: (r: any) => <>{format(new Date(r.startDate), "MMM d")}{r.startDate !== r.endDate ? ` – ${format(new Date(r.endDate), "MMM d, yyyy")}` : `, ${format(new Date(r.startDate), "yyyy")}`}</> },
               { key: "days", header: "Days", cellClassName: "text-muted-foreground", render: (r: any) => `${r.totalDays}d` },
               { key: "reason", header: "Reason", cellClassName: "text-muted-foreground max-w-[16rem] truncate", render: (r: any) => r.reason || "—" },
