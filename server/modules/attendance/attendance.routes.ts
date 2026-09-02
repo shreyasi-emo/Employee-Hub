@@ -243,9 +243,9 @@ export function registerAttendanceRoutes(app: Express) {
   // in today's state (skips weekends/holidays). Used on hover in the Today's Attendance list — e.g.
   // "3 days left on leave". Only ranged states (leave/WFH/on-duty/half-day); else days = 0 (hidden).
   app.get("/api/attendance/streak", requireAuth, async (req, res) => {
-    // Others' spans only for HR/admin/exec; everyone else (incl. managers) sees their own.
-    const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive", "ceo_approver", "cto");
-    const empId = (privileged && req.query.employeeId) ? (req.query.employeeId as string) : req.currentUser!.employeeId;
+    // The Today's Attendance card (who's in/out + for how long) is visible to every signed-in user,
+    // so the forward span is too — anyone may look up any employee's current-status span.
+    const empId = (req.query.employeeId as string) || req.currentUser!.employeeId;
     if (!empId) return res.status(400).json({ error: "employeeId required" });
     const pad = (n: number) => String(n).padStart(2, "0");
     const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
