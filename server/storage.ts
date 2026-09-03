@@ -2,25 +2,21 @@ import { db } from "./db";
 import { eq, and, desc, sql, gte, lte, like, or, isNull, asc } from "drizzle-orm";
 import {
   users, employees, departments, designations,
-  salaryStructures, attendanceRecords, regularizationRequests,
+  attendanceRecords, regularizationRequests,
   leaveTypes, leaveBalances, leaveLedger, leaveRequests,
-  holidays, payrollRuns, payslips, statutoryConfig,
-  documents, announcements, assets, auditLogs,
-  ratingScales, performanceCycles, goals, goalProgressUpdates, reviews, calibrationSessions,
-  notifications, shifts, shiftAssignments, employmentHistory,
-  onboardingTemplates, onboardingTasks, onboardingInstances, onboardingTaskItems,
+  holidays,
+  documents, announcements, auditLogs,
+  notifications, employmentHistory,
   movementLocations, logisticsMovements, movementEvents, logisticsRequests,
   companyVehicles, vehicleBookings, reimbursements, officePurchases, procurementRequests, tripRequests,
   zohoConfig, zohoSyncJobs, requests as requestsTable, requestComments,
-  ceoApprovalNotes, referenceDocs,
+  referenceDocs,
 
   approvalWorkflows, approvalSteps, approvalRequests, approvalDecisions,
-  recruitmentAgencies, pipelineStages, jobRequisitions, candidates, applications, applicationTimeline, candidateDocRequests,
-  interviews, interviewFeedback, offers, vendors, purchaseRequests, travelRequests, travelBookings,
-  workspacePayments, adminTickets, adminTicketComments, hrTasks,
+  vendors, purchaseRequests, travelRequests, travelBookings,
+  workspacePayments, adminTickets, adminTicketComments,
   type User, type InsertUser, type Employee, type InsertEmployee,
   type Department, type InsertDepartment, type Designation, type InsertDesignation,
-  type SalaryStructure, type InsertSalaryStructure,
   type AttendanceRecord, type InsertAttendance,
   type RegularizationRequest, type InsertRegularization,
   type LeaveType, type InsertLeaveType,
@@ -28,20 +24,10 @@ import {
   type LeaveLedgerEntry, type InsertLeaveLedger,
   type LeaveRequest, type InsertLeaveRequest,
   type Holiday, type InsertHoliday,
-  type PayrollRun, type InsertPayrollRun,
-  type Payslip, type InsertPayslip,
   type Announcement, type InsertAnnouncement,
-  type Asset, type InsertAsset,
   type AuditLog,
-  type RatingScale, type InsertRatingScale,
-  type PerformanceCycle, type InsertPerformanceCycle,
-  type Goal, type InsertGoal,
-  type GoalProgressUpdate, type InsertGoalProgress,
-  type Review, type InsertReview,
-  type CalibrationSession, type InsertCalibration,
-  type InsertNotification, type InsertShift, type InsertShiftAssignment,
-  type InsertEmploymentHistory, type InsertOnboardingTemplate, type InsertOnboardingTask,
-  type InsertOnboardingInstance, type InsertOnboardingTaskItem,
+  type InsertNotification,
+  type InsertEmploymentHistory,
 } from "@shared/schema";
 
 // Default annual leave balances granted to every employee (by leave-type code).
@@ -214,31 +200,6 @@ export const storage = {
     if (!max) return "EMO001";
     const num = parseInt(max.replace("EMO", "")) + 1;
     return `EMO${String(num).padStart(3, "0")}`;
-  },
-
-  // ====== SALARY STRUCTURES ======
-  async getSalaryStructures(employeeId: string) {
-    return db.select().from(salaryStructures)
-      .where(eq(salaryStructures.employeeId, employeeId))
-      .orderBy(desc(salaryStructures.effectiveFrom));
-  },
-
-  async getCurrentSalaryStructure(employeeId: string, asOfDate?: string) {
-    const date = asOfDate || new Date().toISOString().split("T")[0];
-    const [s] = await db.select().from(salaryStructures)
-      .where(and(
-        eq(salaryStructures.employeeId, employeeId),
-        lte(salaryStructures.effectiveFrom, date),
-        or(isNull(salaryStructures.effectiveTo), gte(salaryStructures.effectiveTo, date))
-      ))
-      .orderBy(desc(salaryStructures.effectiveFrom))
-      .limit(1);
-    return s;
-  },
-
-  async createSalaryStructure(data: InsertSalaryStructure) {
-    const [s] = await db.insert(salaryStructures).values(data).returning();
-    return s;
   },
 
   // ====== ATTENDANCE ======
@@ -524,86 +485,6 @@ export const storage = {
     await db.delete(holidays).where(eq(holidays.id, id));
   },
 
-  // ====== PAYROLL ======
-  async getPayrollRuns() {
-    return db.select().from(payrollRuns).orderBy(desc(payrollRuns.year), desc(payrollRuns.month));
-  },
-
-  async getPayrollRun(id: string) {
-    const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, id));
-    return run;
-  },
-
-  async getPayrollRunByMonth(month: number, year: number) {
-    const [run] = await db.select().from(payrollRuns)
-      .where(and(eq(payrollRuns.month, month), eq(payrollRuns.year, year)));
-    return run;
-  },
-
-  async createPayrollRun(data: InsertPayrollRun) {
-    const [run] = await db.insert(payrollRuns).values(data).returning();
-    return run;
-  },
-
-  async updatePayrollRun(id: string, data: Partial<typeof payrollRuns.$inferInsert>) {
-    const [run] = await db.update(payrollRuns)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(payrollRuns.id, id))
-      .returning();
-    return run;
-  },
-
-  async getPayslips(payrollRunId: string) {
-    return db.select().from(payslips).where(eq(payslips.payrollRunId, payrollRunId));
-  },
-
-  async getEmployeePayslips(employeeId: string) {
-    return db.select().from(payslips)
-      .where(eq(payslips.employeeId, employeeId))
-      .orderBy(desc(payslips.year), desc(payslips.month));
-  },
-
-  async getPayslip(id: string) {
-    const [slip] = await db.select().from(payslips).where(eq(payslips.id, id));
-    return slip;
-  },
-
-  async createPayslip(data: InsertPayslip) {
-    const [slip] = await db.insert(payslips).values(data).returning();
-    return slip;
-  },
-
-  async updatePayslip(id: string, data: Partial<InsertPayslip>) {
-    const [slip] = await db.update(payslips)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(payslips.id, id))
-      .returning();
-    return slip;
-  },
-
-  async deletePayslipsByRunId(payrollRunId: string) {
-    await db.delete(payslips).where(eq(payslips.payrollRunId, payrollRunId));
-  },
-
-  // ====== STATUTORY CONFIG ======
-  async getStatutoryConfig() {
-    return db.select().from(statutoryConfig);
-  },
-
-  async getStatutoryValue(key: string) {
-    const [cfg] = await db.select().from(statutoryConfig).where(eq(statutoryConfig.key, key));
-    return cfg?.value;
-  },
-
-  async setStatutoryConfig(key: string, value: string, description?: string) {
-    const existing = await db.select().from(statutoryConfig).where(eq(statutoryConfig.key, key));
-    if (existing.length) {
-      await db.update(statutoryConfig).set({ value, updatedAt: new Date() }).where(eq(statutoryConfig.key, key));
-    } else {
-      await db.insert(statutoryConfig).values({ key, value, description });
-    }
-  },
-
   // ====== ANNOUNCEMENTS ======
   async getAnnouncements() {
     return db.select().from(announcements).where(eq(announcements.isActive, true)).orderBy(desc(announcements.createdAt));
@@ -621,28 +502,6 @@ export const storage = {
 
   async deleteAnnouncement(id: string) {
     await db.delete(announcements).where(eq(announcements.id, id));
-  },
-
-  // ====== ASSETS ======
-  async getAssets(employeeId?: string) {
-    if (employeeId) {
-      return db.select().from(assets).where(eq(assets.assignedTo, employeeId)).orderBy(assets.name);
-    }
-    return db.select().from(assets).orderBy(assets.name);
-  },
-
-  async createAsset(data: InsertAsset) {
-    const [a] = await db.insert(assets).values(data).returning();
-    return a;
-  },
-
-  async updateAsset(id: string, data: Partial<InsertAsset>) {
-    const [a] = await db.update(assets).set(data).where(eq(assets.id, id)).returning();
-    return a;
-  },
-
-  async deleteAsset(id: string) {
-    await db.delete(assets).where(eq(assets.id, id));
   },
 
   // ====== NOTIFICATIONS ======
@@ -698,62 +557,6 @@ export const storage = {
     return Number(r?.count ?? 0);
   },
 
-  // ====== SHIFTS ======
-  async getShifts() {
-    return db.select().from(shifts).orderBy(asc(shifts.name));
-  },
-
-  async getShift(id: string) {
-    const [s] = await db.select().from(shifts).where(eq(shifts.id, id));
-    return s;
-  },
-
-  async createShift(data: InsertShift) {
-    const [s] = await db.insert(shifts).values(data).returning();
-    return s;
-  },
-
-  async updateShift(id: string, data: Partial<InsertShift>) {
-    const [s] = await db.update(shifts).set(data).where(eq(shifts.id, id)).returning();
-    return s;
-  },
-
-  async deleteShift(id: string) {
-    await db.delete(shifts).where(eq(shifts.id, id));
-  },
-
-  async getShiftAssignments(employeeId?: string) {
-    if (employeeId) {
-      return db.select().from(shiftAssignments)
-        .where(eq(shiftAssignments.employeeId, employeeId))
-        .orderBy(desc(shiftAssignments.effectiveFrom));
-    }
-    return db.select().from(shiftAssignments).orderBy(desc(shiftAssignments.effectiveFrom));
-  },
-
-  async createShiftAssignment(data: InsertShiftAssignment) {
-    const [a] = await db.insert(shiftAssignments).values(data).returning();
-    return a;
-  },
-
-  async deleteShiftAssignment(id: string) {
-    await db.delete(shiftAssignments).where(eq(shiftAssignments.id, id));
-  },
-
-  async getEmployeeShiftForDate(employeeId: string, date: string) {
-    const assignments = await db.select().from(shiftAssignments)
-      .where(and(
-        eq(shiftAssignments.employeeId, employeeId),
-        lte(shiftAssignments.effectiveFrom, date),
-        or(isNull(shiftAssignments.effectiveTo), gte(shiftAssignments.effectiveTo, date))
-      ))
-      .orderBy(desc(shiftAssignments.effectiveFrom))
-      .limit(1);
-    if (!assignments.length) return null;
-    const [shift] = await db.select().from(shifts).where(eq(shifts.id, assignments[0].shiftId));
-    return shift || null;
-  },
-
   // ====== EMPLOYMENT HISTORY ======
   async getEmploymentHistory(employeeId: string) {
     return db.select().from(employmentHistory)
@@ -764,76 +567,6 @@ export const storage = {
   async addEmploymentHistory(data: InsertEmploymentHistory) {
     const [h] = await db.insert(employmentHistory).values(data).returning();
     return h;
-  },
-
-  // ====== ONBOARDING ======
-  async getOnboardingTemplates() {
-    return db.select().from(onboardingTemplates).orderBy(asc(onboardingTemplates.name));
-  },
-
-  async getOnboardingTemplate(id: string) {
-    const [t] = await db.select().from(onboardingTemplates).where(eq(onboardingTemplates.id, id));
-    return t;
-  },
-
-  async getDefaultOnboardingTemplate() {
-    const [t] = await db.select().from(onboardingTemplates).where(eq(onboardingTemplates.isDefault, true));
-    return t || null;
-  },
-
-  async createOnboardingTemplate(data: InsertOnboardingTemplate) {
-    const [t] = await db.insert(onboardingTemplates).values(data).returning();
-    return t;
-  },
-
-  async updateOnboardingTemplate(id: string, data: Partial<InsertOnboardingTemplate>) {
-    const [t] = await db.update(onboardingTemplates).set(data).where(eq(onboardingTemplates.id, id)).returning();
-    return t;
-  },
-
-  async getOnboardingTasks(templateId: string) {
-    return db.select().from(onboardingTasks)
-      .where(eq(onboardingTasks.templateId, templateId))
-      .orderBy(asc(onboardingTasks.sortOrder));
-  },
-
-  async createOnboardingTask(data: InsertOnboardingTask) {
-    const [t] = await db.insert(onboardingTasks).values(data).returning();
-    return t;
-  },
-
-  async updateOnboardingTask(id: string, data: Partial<InsertOnboardingTask>) {
-    const [t] = await db.update(onboardingTasks).set(data).where(eq(onboardingTasks.id, id)).returning();
-    return t;
-  },
-
-  async deleteOnboardingTask(id: string) {
-    await db.delete(onboardingTasks).where(eq(onboardingTasks.id, id));
-  },
-
-  async getOnboardingInstances(employeeId?: string) {
-    if (employeeId) {
-      return db.select().from(onboardingInstances)
-        .where(eq(onboardingInstances.employeeId, employeeId))
-        .orderBy(desc(onboardingInstances.startedAt));
-    }
-    return db.select().from(onboardingInstances).orderBy(desc(onboardingInstances.startedAt));
-  },
-
-  async createOnboardingInstance(data: InsertOnboardingInstance) {
-    const [i] = await db.insert(onboardingInstances).values(data).returning();
-    return i;
-  },
-
-  async getOnboardingTaskItems(instanceId: string) {
-    return db.select().from(onboardingTaskItems)
-      .where(eq(onboardingTaskItems.instanceId, instanceId))
-      .orderBy(asc(onboardingTaskItems.createdAt));
-  },
-
-  async updateOnboardingTaskItem(id: string, data: Partial<InsertOnboardingTaskItem>) {
-    const [i] = await db.update(onboardingTaskItems).set(data).where(eq(onboardingTaskItems.id, id)).returning();
-    return i;
   },
 
   // ====== AUDIT LOGS ======
@@ -860,133 +593,6 @@ export const storage = {
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(auditLogs.createdAt))
       .limit(limit);
-  },
-
-  // ====== PERFORMANCE: RATING SCALES ======
-  async getRatingScales() {
-    return db.select().from(ratingScales).orderBy(desc(ratingScales.createdAt));
-  },
-
-  async getRatingScale(id: string) {
-    const [s] = await db.select().from(ratingScales).where(eq(ratingScales.id, id));
-    return s;
-  },
-
-  async createRatingScale(data: InsertRatingScale) {
-    const [s] = await db.insert(ratingScales).values(data).returning();
-    return s;
-  },
-
-  async updateRatingScale(id: string, data: Partial<InsertRatingScale>) {
-    const [s] = await db.update(ratingScales).set(data).where(eq(ratingScales.id, id)).returning();
-    return s;
-  },
-
-  // ====== PERFORMANCE: CYCLES ======
-  async getPerformanceCycles() {
-    return db.select().from(performanceCycles).orderBy(desc(performanceCycles.createdAt));
-  },
-
-  async getPerformanceCycle(id: string) {
-    const [c] = await db.select().from(performanceCycles).where(eq(performanceCycles.id, id));
-    return c;
-  },
-
-  async createPerformanceCycle(data: InsertPerformanceCycle) {
-    const [c] = await db.insert(performanceCycles).values(data).returning();
-    return c;
-  },
-
-  async updatePerformanceCycle(id: string, data: Partial<InsertPerformanceCycle>) {
-    const [c] = await db.update(performanceCycles).set({ ...data, updatedAt: new Date() }).where(eq(performanceCycles.id, id)).returning();
-    return c;
-  },
-
-  // ====== PERFORMANCE: GOALS ======
-  async getGoals(cycleId?: string, employeeId?: string) {
-    const conditions = [];
-    if (cycleId) conditions.push(eq(goals.cycleId, cycleId));
-    if (employeeId) conditions.push(eq(goals.employeeId, employeeId));
-    return db.select().from(goals)
-      .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(goals.createdAt));
-  },
-
-  async getGoal(id: string) {
-    const [g] = await db.select().from(goals).where(eq(goals.id, id));
-    return g;
-  },
-
-  async createGoal(data: InsertGoal) {
-    const [g] = await db.insert(goals).values(data).returning();
-    return g;
-  },
-
-  async updateGoal(id: string, data: Partial<InsertGoal & { approvedAt?: Date }>) {
-    const [g] = await db.update(goals).set({ ...data, updatedAt: new Date() }).where(eq(goals.id, id)).returning();
-    return g;
-  },
-
-  async deleteGoal(id: string) {
-    await db.delete(goals).where(eq(goals.id, id));
-  },
-
-  async getGoalProgressUpdates(goalId: string) {
-    return db.select().from(goalProgressUpdates)
-      .where(eq(goalProgressUpdates.goalId, goalId))
-      .orderBy(desc(goalProgressUpdates.createdAt));
-  },
-
-  async addGoalProgress(data: InsertGoalProgress) {
-    const [p] = await db.insert(goalProgressUpdates).values(data).returning();
-    return p;
-  },
-
-  // ====== PERFORMANCE: REVIEWS ======
-  async getReview(cycleId: string, employeeId: string) {
-    const [r] = await db.select().from(reviews)
-      .where(and(eq(reviews.cycleId, cycleId), eq(reviews.employeeId, employeeId)));
-    return r;
-  },
-
-  async getReviewsByCycle(cycleId: string) {
-    return db.select().from(reviews).where(eq(reviews.cycleId, cycleId));
-  },
-
-  async upsertReview(cycleId: string, employeeId: string, data: Partial<InsertReview>) {
-    const existing = await this.getReview(cycleId, employeeId);
-    if (existing) {
-      const newVersion = existing.version + 1;
-      const revisions = (existing.revisions as any[] || []);
-      revisions.push({ version: existing.version, snapshot: { selfReview: existing.selfReview, managerReview: existing.managerReview, status: existing.status }, at: new Date() });
-      const [r] = await db.update(reviews)
-        .set({ ...data, version: newVersion, revisions, updatedAt: new Date() })
-        .where(eq(reviews.id, existing.id))
-        .returning();
-      return r;
-    }
-    const [r] = await db.insert(reviews).values({ cycleId, employeeId, ...data }).returning();
-    return r;
-  },
-
-  // ====== PERFORMANCE: CALIBRATION ======
-  async getCalibrationSessions(cycleId: string) {
-    return db.select().from(calibrationSessions).where(eq(calibrationSessions.cycleId, cycleId));
-  },
-
-  async getCalibrationSession(id: string) {
-    const [s] = await db.select().from(calibrationSessions).where(eq(calibrationSessions.id, id));
-    return s;
-  },
-
-  async createCalibrationSession(data: InsertCalibration) {
-    const [s] = await db.insert(calibrationSessions).values(data).returning();
-    return s;
-  },
-
-  async updateCalibrationSession(id: string, data: Partial<InsertCalibration & { lockedAt?: Date; lockedBy?: string }>) {
-    const [s] = await db.update(calibrationSessions).set({ ...data, updatedAt: new Date() }).where(eq(calibrationSessions.id, id)).returning();
-    return s;
   },
 
   // ====== APPROVAL ENGINE ======
@@ -1030,241 +636,6 @@ export const storage = {
 
   async getApprovalDecisions(approvalRequestId: string) {
     return db.select().from(approvalDecisions).where(eq(approvalDecisions.approvalRequestId, approvalRequestId)).orderBy(approvalDecisions.decidedAt);
-  },
-
-  // ====== RECRUITMENT AGENCIES ======
-  async getRecruitmentAgencies() {
-    return db.select().from(recruitmentAgencies).orderBy(recruitmentAgencies.name);
-  },
-  async createRecruitmentAgency(data: any) {
-    const [a] = await db.insert(recruitmentAgencies).values(data).returning();
-    return a;
-  },
-  async updateRecruitmentAgency(id: string, data: any) {
-    const [a] = await db.update(recruitmentAgencies).set(data).where(eq(recruitmentAgencies.id, id)).returning();
-    return a;
-  },
-
-  // ====== PIPELINE STAGES ======
-  async getPipelineStages() {
-    return db.select().from(pipelineStages).where(eq(pipelineStages.isActive, true)).orderBy(pipelineStages.stageOrder);
-  },
-
-  // ====== JOB REQUISITIONS ======
-  async getJobRequisitions(status?: string) {
-    if (status) return db.select().from(jobRequisitions).where(eq(jobRequisitions.status, status)).orderBy(desc(jobRequisitions.createdAt));
-    return db.select().from(jobRequisitions).orderBy(desc(jobRequisitions.createdAt));
-  },
-  async getJobRequisition(id: string) {
-    const [r] = await db.select().from(jobRequisitions).where(eq(jobRequisitions.id, id));
-    return r;
-  },
-  async createJobRequisition(data: any) {
-    const [r] = await db.insert(jobRequisitions).values(data).returning();
-    return r;
-  },
-  async updateJobRequisition(id: string, data: any) {
-    const [r] = await db.update(jobRequisitions).set({ ...data, updatedAt: new Date() }).where(eq(jobRequisitions.id, id)).returning();
-    return r;
-  },
-
-  // ====== CANDIDATES ======
-  async getCandidates(search?: string) {
-    if (search) {
-      return db.select().from(candidates).where(or(like(candidates.name, `%${search}%`), like(candidates.email, `%${search}%`))).orderBy(desc(candidates.createdAt));
-    }
-    return db.select().from(candidates).orderBy(desc(candidates.createdAt));
-  },
-  async getCandidate(id: string) {
-    const [c] = await db.select().from(candidates).where(eq(candidates.id, id));
-    return c;
-  },
-  async createCandidate(data: any) {
-    const [c] = await db.insert(candidates).values(data).returning();
-    return c;
-  },
-  async updateCandidate(id: string, data: any) {
-    const [c] = await db.update(candidates).set({ ...data, updatedAt: new Date() }).where(eq(candidates.id, id)).returning();
-    return c;
-  },
-  // ----- Candidate document collection (pre-onboarding) -----
-  async createDocRequest(data: { candidateId: string; token: string; position?: string | null; department?: string | null }) {
-    const [r] = await db.insert(candidateDocRequests).values(data).returning();
-    return r;
-  },
-  async getDocRequestByToken(token: string) {
-    const rows = await db
-      .select({ r: candidateDocRequests, name: candidates.name, email: candidates.email, phone: candidates.phone })
-      .from(candidateDocRequests)
-      .leftJoin(candidates, eq(candidates.id, candidateDocRequests.candidateId))
-      .where(eq(candidateDocRequests.token, token));
-    if (!rows.length) return undefined;
-    const { r, name, email, phone } = rows[0];
-    return { ...r, candidateName: name, candidateEmail: email, candidatePhone: phone };
-  },
-  async listDocRequests() {
-    const rows = await db
-      .select({ r: candidateDocRequests, name: candidates.name, email: candidates.email })
-      .from(candidateDocRequests)
-      .leftJoin(candidates, eq(candidates.id, candidateDocRequests.candidateId))
-      .orderBy(desc(candidateDocRequests.createdAt));
-    return rows.map(({ r, name, email }) => ({ ...r, candidateName: name, candidateEmail: email }));
-  },
-  async submitDocRequest(token: string, data: { formData: any; files: any }) {
-    const [r] = await db.update(candidateDocRequests)
-      .set({ status: "submitted", submittedAt: new Date(), formData: data.formData, files: data.files, updatedAt: new Date() })
-      .where(eq(candidateDocRequests.token, token)).returning();
-    return r;
-  },
-  async getDocRequest(id: string) {
-    const rows = await db
-      .select({ r: candidateDocRequests, name: candidates.name, email: candidates.email, phone: candidates.phone })
-      .from(candidateDocRequests)
-      .leftJoin(candidates, eq(candidates.id, candidateDocRequests.candidateId))
-      .where(eq(candidateDocRequests.id, id));
-    if (!rows.length) return undefined;
-    const { r, name, email, phone } = rows[0];
-    return { ...r, candidateName: name, candidateEmail: email, candidatePhone: phone };
-  },
-  async updateDocRequest(id: string, data: any) {
-    const [r] = await db.update(candidateDocRequests).set({ ...data, updatedAt: new Date() }).where(eq(candidateDocRequests.id, id)).returning();
-    return r;
-  },
-  // Convert a submitted candidate into an employee: assign a code, create the record, move the docs.
-  async onboardCandidateDocRequest(id: string, actorId: string) {
-    const [req] = await db.select().from(candidateDocRequests).where(eq(candidateDocRequests.id, id));
-    if (!req) throw new Error("Request not found.");
-    if (req.status === "onboarded") throw new Error("This candidate is already onboarded.");
-    if (req.status !== "submitted") throw new Error("The candidate hasn't submitted their documents yet.");
-    if (!req.joinDate) throw new Error("Enter the date of joining first.");
-    if (!req.offerLetter) throw new Error("Upload the signed offer letter first.");
-    const [cand] = await db.select().from(candidates).where(eq(candidates.id, req.candidateId));
-    if (!cand) throw new Error("Candidate not found.");
-
-    const code = await this.getNextEmployeeCode();
-    const fd: any = req.formData || {};
-    const files: any = req.files || {};
-    const parts = String(cand.name || "").trim().split(/\s+/);
-    const firstName = parts[0] || cand.name || "Employee";
-    const lastName = parts.slice(1).join(" ") || "";
-    const maskAcct = (a: string) => (a && a.length > 4 ? `${"X".repeat(a.length - 4)}${a.slice(-4)}` : a || null);
-
-    const [emp] = await db.insert(employees).values({
-      employeeCode: code,
-      firstName, lastName,
-      email: cand.email,
-      phone: cand.phone || null,
-      joinDate: req.joinDate as any,
-      currentAddress: fd.currentAddress || null,
-      permanentAddress: fd.permanentAddress || null,
-      emergencyContactPhone: fd.emergencyPhone || null,
-      emergencyContactRelation: fd.emergencyRelation || null,
-      ifscCode: fd.ifsc || null,
-      bankAccountMasked: fd.accountNumber ? maskAcct(fd.accountNumber) : null,
-    } as any).returning();
-
-    // Move the collected documents into the employee document store.
-    const docDefs: [string, string, any][] = [
-      ["PAN Card", "identity", files.pan],
-      ["Aadhaar Card", "identity", files.aadhaar],
-      ["Photo ID (Passport / DL / Voter ID)", "identity", files.photoId],
-      ["Previous Offer Letter", "employment", files.offerLetter],
-      ["Increment Letter(s)", "employment", files.incrementLetters],
-      ["Relieving Letter(s)", "employment", files.relievingLetters],
-      ["Payslips (last 3 months)", "employment", files.payslips],
-      ["Bank Passbook / Cancelled Cheque", "bank", files.bankProof],
-      ["Signed Offer Letter", "offer", req.offerLetter],
-    ];
-    for (const [name, category, f] of docDefs) {
-      if (f && f.fileData) {
-        await db.insert(documents).values({
-          employeeId: emp.id, name, category,
-          fileUrl: f.fileData, mimeType: f.fileType || null, uploadedBy: actorId, isPublic: false,
-        } as any);
-      }
-    }
-
-    await db.update(candidates).set({ linkedEmployeeId: emp.id, updatedAt: new Date() }).where(eq(candidates.id, cand.id));
-    await db.update(candidateDocRequests).set({ status: "onboarded", employeeId: emp.id, employeeCode: code, updatedAt: new Date() }).where(eq(candidateDocRequests.id, id));
-    return { employee: emp, employeeCode: code };
-  },
-
-  // ====== APPLICATIONS ======
-  async getApplications(requisitionId?: string, candidateId?: string) {
-    const conds: any[] = [];
-    if (requisitionId) conds.push(eq(applications.requisitionId, requisitionId));
-    if (candidateId) conds.push(eq(applications.candidateId, candidateId));
-    if (conds.length > 0) return db.select().from(applications).where(and(...conds)).orderBy(desc(applications.createdAt));
-    return db.select().from(applications).orderBy(desc(applications.createdAt));
-  },
-  async getApplication(id: string) {
-    const [a] = await db.select().from(applications).where(eq(applications.id, id));
-    return a;
-  },
-  async createApplication(data: any) {
-    const [a] = await db.insert(applications).values(data).returning();
-    return a;
-  },
-  async updateApplication(id: string, data: any) {
-    const [a] = await db.update(applications).set({ ...data, updatedAt: new Date(), lastActivityAt: new Date() }).where(eq(applications.id, id)).returning();
-    return a;
-  },
-
-  async addApplicationTimeline(data: { applicationId: string; actorUserId?: string; action: string; comment?: string; metadata?: any }) {
-    const [e] = await db.insert(applicationTimeline).values(data).returning();
-    return e;
-  },
-  async getApplicationTimeline(applicationId: string) {
-    return db.select().from(applicationTimeline).where(eq(applicationTimeline.applicationId, applicationId)).orderBy(desc(applicationTimeline.createdAt));
-  },
-
-  // ====== INTERVIEWS ======
-  async getInterviews(applicationId?: string) {
-    if (applicationId) return db.select().from(interviews).where(eq(interviews.applicationId, applicationId)).orderBy(interviews.scheduledStart);
-    return db.select().from(interviews).orderBy(desc(interviews.scheduledStart));
-  },
-  async getInterview(id: string) {
-    const [i] = await db.select().from(interviews).where(eq(interviews.id, id));
-    return i;
-  },
-  async createInterview(data: any) {
-    const [i] = await db.insert(interviews).values(data).returning();
-    return i;
-  },
-  async updateInterview(id: string, data: any) {
-    const [i] = await db.update(interviews).set(data).where(eq(interviews.id, id)).returning();
-    return i;
-  },
-
-  async createInterviewFeedback(data: any) {
-    const [f] = await db.insert(interviewFeedback).values(data).returning();
-    return f;
-  },
-  async getInterviewFeedback(interviewId: string) {
-    return db.select().from(interviewFeedback).where(eq(interviewFeedback.interviewId, interviewId));
-  },
-  async updateInterviewFeedback(id: string, data: any) {
-    const [f] = await db.update(interviewFeedback).set(data).where(eq(interviewFeedback.id, id)).returning();
-    return f;
-  },
-
-  // ====== OFFERS ======
-  async getOffers(applicationId?: string, status?: string) {
-    if (applicationId) return db.select().from(offers).where(eq(offers.applicationId, applicationId)).orderBy(desc(offers.createdAt));
-    if (status) return db.select().from(offers).where(eq(offers.status, status)).orderBy(desc(offers.createdAt));
-    return db.select().from(offers).orderBy(desc(offers.createdAt));
-  },
-  async getOffer(id: string) {
-    const [o] = await db.select().from(offers).where(eq(offers.id, id));
-    return o;
-  },
-  async createOffer(data: any) {
-    const [o] = await db.insert(offers).values(data).returning();
-    return o;
-  },
-  async updateOffer(id: string, data: any) {
-    const [o] = await db.update(offers).set({ ...data, updatedAt: new Date() }).where(eq(offers.id, id)).returning();
-    return o;
   },
 
   // ====== VENDORS ======
@@ -1402,26 +773,6 @@ export const storage = {
 
   async getEmployeesByManager(managerId: string) {
     return db.select().from(employees).where(eq(employees.managerId, managerId));
-  },
-
-  // ====== HR TASKS ======
-  async getHrTasks(assignedTo?: string, status?: string) {
-    const conds: any[] = [];
-    if (assignedTo) conds.push(eq(hrTasks.assignedTo, assignedTo));
-    if (status && status !== "all") conds.push(eq(hrTasks.status, status));
-    if (conds.length > 0) return db.select().from(hrTasks).where(and(...conds)).orderBy(desc(hrTasks.createdAt));
-    return db.select().from(hrTasks).orderBy(desc(hrTasks.createdAt));
-  },
-  async createHrTask(data: any) {
-    const [t] = await db.insert(hrTasks).values(data).returning();
-    return t;
-  },
-  async updateHrTask(id: string, data: any) {
-    const [t] = await db.update(hrTasks).set({ ...data, updatedAt: new Date() }).where(eq(hrTasks.id, id)).returning();
-    return t;
-  },
-  async deleteHrTask(id: string) {
-    await db.delete(hrTasks).where(eq(hrTasks.id, id));
   },
 
   // ====== STATS ======
@@ -1752,38 +1103,6 @@ export const storage = {
   },
   async addRequestComment(data: any) {
     const [r] = await db.insert(requestComments).values(data).returning();
-    return r;
-  },
-
-  // =========================================================================
-  // v2 — CEO APPROVAL NOTES
-  // =========================================================================
-  async listCeoApprovalNotes(status?: string) {
-    if (status) {
-      return db.select().from(ceoApprovalNotes).where(eq(ceoApprovalNotes.status, status)).orderBy(desc(ceoApprovalNotes.createdAt));
-    }
-    return db.select().from(ceoApprovalNotes).orderBy(desc(ceoApprovalNotes.createdAt));
-  },
-  async getCeoApprovalNote(id: string) {
-    const [r] = await db.select().from(ceoApprovalNotes).where(eq(ceoApprovalNotes.id, id));
-    return r;
-  },
-  async createCeoApprovalNote(data: any) {
-    const ref = await genRef("APR", ceoApprovalNotes);
-    const [r] = await db.insert(ceoApprovalNotes).values({ ...data, reference: ref }).returning();
-    return r;
-  },
-  async decideCeoApprovalNote(id: string, decidedById: string, status: "approved" | "rejected", decisionNote?: string) {
-    const [r] = await db.update(ceoApprovalNotes).set({
-      status, decidedById, decisionNote, decidedAt: new Date(),
-    }).where(eq(ceoApprovalNotes.id, id)).returning();
-    // Cascade decision to linked requests
-    if (r && Array.isArray(r.linkedRequestIds)) {
-      const newStatus = status === "approved" ? "approved" : "rejected";
-      for (const rid of r.linkedRequestIds as string[]) {
-        await db.update(requestsTable).set({ status: newStatus, updatedAt: new Date() }).where(eq(requestsTable.id, rid));
-      }
-    }
     return r;
   },
 

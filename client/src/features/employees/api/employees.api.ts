@@ -22,23 +22,11 @@ export const useDesignations = () => useQuery<any[]>({ queryKey: ["/api/designat
 export const useEmployee = (empId: string | undefined) =>
   useQuery<any>({ queryKey: [`/api/employees/${empId}`], enabled: !!empId });
 
-export const useEmployeeSalary = (empId: string | undefined, enabled: boolean) =>
-  useQuery<any[]>({ queryKey: [`/api/employees/${empId}/salary`], enabled: !!empId && enabled });
-
-export const useEmployeePayslips = (empId: string | undefined) =>
-  useQuery<any[]>({ queryKey: [`/api/payslips/employee/${empId}`], enabled: !!empId });
-
-export const useEmployeeAssets = (empId: string | undefined) =>
-  useQuery<any[]>({ queryKey: [`/api/assets?employeeId=${empId}`], enabled: !!empId });
-
 export const useEmployeeAuditLogs = (empId: string | undefined, enabled: boolean) =>
   useQuery<any[]>({ queryKey: [`/api/audit-logs?entityType=employee&entityId=${empId}`], enabled: !!empId && enabled });
 
 export const useEmployeeHistory = (empId: string) =>
   useQuery<any[]>({ queryKey: [`/api/employees/${empId}/history`], enabled: !!empId });
-
-export const useEmployeeGoals = (empId: string) =>
-  useQuery<any[]>({ queryKey: [`/api/performance/goals?employeeId=${empId}`], enabled: !!empId });
 
 // ---- writes ----
 
@@ -70,15 +58,6 @@ export function useUpdateEmploymentStatus(empId: string | undefined, opts: { onS
       qc.invalidateQueries({ queryKey: ["/api/employees"] });
       opts.onSuccess?.();
     },
-  });
-}
-
-export function useAddSalaryStructure(employeeId: string, opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: any) => apiRequest("POST", `/api/employees/${employeeId}/salary`, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/salary`] }); opts.onSuccess?.(); },
-    onError: opts.onError,
   });
 }
 

@@ -13,15 +13,6 @@ import { log, hashToken } from "../../shared/audit";
 import { getDaysInMonth, countWeekends } from "../../shared/date-utils";
 import { sanitizeEmployeeForRole } from "../../utils/sanitize";
 import { googleStart, googleCallback, logout as googleLogout } from "../../google-auth";
-import {
-  insertEmployeeSchema, insertDepartmentSchema, insertDesignationSchema,
-  insertSalaryStructureSchema, insertAttendanceSchema, insertRegularizationSchema,
-  insertLeaveTypeSchema, insertLeaveRequestSchema, insertHolidaySchema,
-  insertPayrollRunSchema, insertAnnouncementSchema, insertAssetSchema,
-  insertRatingScaleSchema, insertPerformanceCycleSchema, insertGoalSchema,
-  insertGoalProgressSchema, insertReviewSchema, insertCalibrationSchema,
-  insertShiftSchema, insertShiftAssignmentSchema, insertOnboardingTemplateSchema, insertOnboardingTaskSchema,
-} from "@shared/schema";
 
 export function registerWorkspaceApprovalsRoutes(app: Express) {
   // ===== APPROVAL ENGINE =====
@@ -36,8 +27,6 @@ export function registerWorkspaceApprovalsRoutes(app: Express) {
       try {
         if (a.entityType === "travel_request") entityDetails = await storage.getTravelRequest(a.entityId);
         else if (a.entityType === "purchase_request") entityDetails = await storage.getPurchaseRequest(a.entityId);
-        else if (a.entityType === "requisition") entityDetails = await storage.getJobRequisition(a.entityId);
-        else if (a.entityType === "offer") entityDetails = await storage.getOffer(a.entityId);
         else if (a.entityType === "payment") {
           const pays = await storage.getWorkspacePayments();
           entityDetails = (pays as any[]).find((p: any) => p.id === a.entityId) || null;
@@ -80,11 +69,7 @@ export function registerWorkspaceApprovalsRoutes(app: Express) {
 
     // Update entity status based on decision
     const { entityType, entityId } = approvalReq;
-    if (entityType === "requisition") {
-      await storage.updateJobRequisition(entityId, { status: decision === "approved" ? "approved" : decision === "rejected" ? "rejected" : "draft" });
-    } else if (entityType === "offer") {
-      await storage.updateOffer(entityId, { status: decision === "approved" ? "approved" : decision === "rejected" ? "rejected" : "draft" });
-    } else if (entityType === "purchase_request") {
+    if (entityType === "purchase_request") {
       await storage.updatePurchaseRequest(entityId, { status: decision === "approved" ? "approved" : decision === "rejected" ? "rejected" : "draft" });
     } else if (entityType === "travel_request") {
       await storage.updateTravelRequest(entityId, { status: decision === "approved" ? "approved" : decision === "rejected" ? "rejected" : "draft" });
@@ -112,10 +97,7 @@ export function registerWorkspaceApprovalsRoutes(app: Express) {
         let recipientRoles: string[] = [];
         let actionLink = "/workspace/office";
 
-        if (entityType === "requisition" || entityType === "offer") {
-          recipientRoles = ["hr_admin", "recruiter", "super_admin"];
-          actionLink = "/workspace/ats";
-        } else if (entityType === "purchase_request" || entityType === "travel_request" || entityType === "payment") {
+        if (entityType === "purchase_request" || entityType === "travel_request" || entityType === "payment") {
           recipientRoles = ["hr_admin", "office_admin", "super_admin"];
           actionLink = "/workspace/office";
         }
@@ -142,6 +124,4 @@ export function registerWorkspaceApprovalsRoutes(app: Express) {
     const decisions = await storage.getApprovalDecisions(req_.id);
     res.json({ ...req_, decisions });
   });
-
-  // ===== RECRUITMENT AGENCIES =====
 }

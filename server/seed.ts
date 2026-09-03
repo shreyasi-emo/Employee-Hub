@@ -3,7 +3,7 @@ import { storage, DEFAULT_LEAVE_BALANCES } from "./storage";
 import { hashPassword } from "./shared/auth";
 import {
   users, employees, departments, designations, leaveTypes,
-  leaveBalances, holidays, statutoryConfig, announcements, assets, payrollRuns, payslips,
+  leaveBalances, holidays, announcements,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
@@ -308,33 +308,6 @@ export async function seed() {
     await db.update(employees).set({ userId: user.id }).where(eq(employees.id, emp.id));
   }
 
-  // Salary structures
-  const salaryData = [
-    { empId: emp1[0].id, basic: 120000, hra: 48000, special: 32000, ctc: 2400000 },
-    { empId: emp2[0].id, basic: 80000, hra: 32000, special: 20000, ctc: 1560000 },
-    { empId: emp3[0].id, basic: 90000, hra: 36000, special: 24000, ctc: 1800000 },
-    { empId: emp4[0].id, basic: 55000, hra: 22000, special: 13000, ctc: 1080000 },
-    { empId: emp5[0].id, basic: 110000, hra: 44000, special: 26000, ctc: 2160000 },
-    { empId: emp6[0].id, basic: 40000, hra: 16000, special: 9000, ctc: 780000 },
-    { empId: emp7[0].id, basic: 85000, hra: 34000, special: 21000, ctc: 1680000 },
-    { empId: emp8[0].id, basic: 50000, hra: 20000, special: 12000, ctc: 984000 },
-  ];
-
-  for (const s of salaryData) {
-    await storage.createSalaryStructure({
-      employeeId: s.empId,
-      effectiveFrom: "2024-01-01",
-      basicSalary: String(s.basic),
-      hra: String(s.hra),
-      specialAllowance: String(s.special),
-      conveyanceAllowance: "1600",
-      medicalAllowance: "1250",
-      otherAllowances: "0",
-      ctc: String(s.ctc),
-      notes: "Annual revision 2024",
-    });
-  }
-
   // Leave types
   await db.insert(leaveTypes).values([
     { name: "Casual Leave", code: "CL", color: "#3B82F6", isPaid: true, isCarryForward: false, maxDaysPerYear: 12, requiresApproval: true, description: "For casual/personal needs" },
@@ -440,13 +413,13 @@ export async function seed() {
   await db.insert(announcements).values([
     {
       title: "Welcome to EMO HRIS!",
-      content: "We are excited to launch our new HR Information System. You can now manage your attendance, leave requests, and view your payslips all in one place. Please reach out to HR if you need any assistance.",
+      content: "We are excited to launch our new HR Information System. You can now manage your attendance and leave requests all in one place. Please reach out to HR if you need any assistance.",
       category: "general",
       isActive: true,
     },
     {
-      title: "Q4 2024 Performance Reviews",
-      content: "Annual performance reviews for Q4 2024 will begin from January 15th. Managers are requested to complete self-appraisals by January 10th. HR will share detailed guidelines shortly.",
+      title: "Holiday Calendar Published",
+      content: "The company holiday calendar for the year is now available in the portal. Please plan your leaves accordingly and reach out to HR for any clarifications.",
       category: "hr",
       isActive: true,
     },
@@ -456,33 +429,6 @@ export async function seed() {
       category: "policy",
       isActive: true,
     },
-  ]);
-
-  // Statutory config
-  const configs = [
-    { key: "pf_employee_rate", value: "0.12", description: "PF Employee contribution rate (12%)" },
-    { key: "pf_employer_rate", value: "0.12", description: "PF Employer contribution rate (12%)" },
-    { key: "pf_ceiling", value: "15000", description: "PF wage ceiling (INR 15,000)" },
-    { key: "esi_employee_rate", value: "0.0075", description: "ESI Employee rate (0.75%)" },
-    { key: "esi_employer_rate", value: "0.0325", description: "ESI Employer rate (3.25%)" },
-    { key: "esi_ceiling", value: "21000", description: "ESI gross salary ceiling (INR 21,000)" },
-    { key: "pt_maharashtra_threshold", value: "10000", description: "PT threshold for Maharashtra (INR 10,000)" },
-    { key: "pt_maharashtra_amount", value: "200", description: "PT amount for Maharashtra (INR 200/month)" },
-    { key: "gratuity_rate", value: "0.0481", description: "Gratuity rate (4.81% of basic)" },
-  ];
-
-  for (const cfg of configs) {
-    await storage.setStatutoryConfig(cfg.key, cfg.value, cfg.description);
-  }
-
-  // Assets
-  await db.insert(assets).values([
-    { assetCode: "ASSET001", name: "MacBook Pro 14\"", category: "laptop", serialNumber: "FVFXX1234YZ", assignedTo: emp1[0].id, assignedDate: "2022-01-15", condition: "excellent" },
-    { assetCode: "ASSET002", name: "iPhone 14 Pro", category: "phone", serialNumber: "DNPXX5678AB", assignedTo: emp1[0].id, assignedDate: "2022-06-01", condition: "good" },
-    { assetCode: "ASSET003", name: "Dell Inspiron 15", category: "laptop", serialNumber: "DELLXX9012CD", assignedTo: emp3[0].id, assignedDate: "2021-03-20", condition: "good" },
-    { assetCode: "ASSET004", name: "Access Card #1042", category: "access_card", serialNumber: "AC1042", assignedTo: emp4[0].id, assignedDate: "2022-01-12", condition: "good" },
-    { assetCode: "ASSET005", name: "HP EliteBook 840", category: "laptop", serialNumber: "HPXX3456EF", assignedTo: emp5[0].id, assignedDate: "2020-01-05", condition: "good" },
-    { assetCode: "ASSET006", name: "ThinkPad T14", category: "laptop", serialNumber: "LNVXX7890GH", assignedTo: emp2[0].id, assignedDate: "2020-06-10", condition: "excellent" },
   ]);
 
   // Seed some attendance for current month
@@ -508,63 +454,6 @@ export async function seed() {
         source: "manual",
       });
     }
-  }
-
-  // Seed a payroll run for last month
-  const lastMonth = new Date();
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
-  const lmMonth = lastMonth.getMonth() + 1;
-  const lmYear = lastMonth.getFullYear();
-
-  const payrollRun = await storage.createPayrollRun({
-    month: lmMonth, year: lmYear, status: "locked", createdBy: superAdminUser.id,
-    totalEmployees: 8,
-    totalGross: "631100",
-    totalDeductions: "68142",
-    totalNetPay: "562958",
-  });
-
-  await db.update(payrollRuns).set({ lockedAt: new Date(), lockedBy: superAdminUser.id }).where(eq(payrollRuns.id, payrollRun.id));
-
-  // Sample payslips
-  const payslipData = [
-    { empId: emp1[0].id, basic: 120000, hra: 48000, special: 32000, gross: 203850, net: 180850, pf: 14400, pt: 200 },
-    { empId: emp2[0].id, basic: 80000, hra: 32000, special: 20000, gross: 134850, net: 119450, pf: 9600, pt: 200 },
-    { empId: emp3[0].id, basic: 90000, hra: 36000, special: 24000, gross: 153850, net: 136450, pf: 10800, pt: 200 },
-    { empId: emp4[0].id, basic: 55000, hra: 22000, special: 13000, gross: 93850, net: 80762, pf: 6600, pt: 200, esi: 704 },
-    { empId: emp5[0].id, basic: 110000, hra: 44000, special: 26000, gross: 183850, net: 162850, pf: 13200, pt: 200 },
-  ];
-
-  for (const pd of payslipData) {
-    await db.insert(payslips).values({
-      payrollRunId: payrollRun.id,
-      employeeId: pd.empId,
-      month: lmMonth,
-      year: lmYear,
-      totalWorkingDays: 22,
-      presentDays: "21",
-      lopDays: "0",
-      basicSalary: String(pd.basic),
-      hra: String(pd.hra),
-      specialAllowance: String(pd.special),
-      conveyanceAllowance: "1600",
-      medicalAllowance: "1250",
-      otherAllowances: "0",
-      bonus: "0",
-      grossSalary: String(pd.gross),
-      pfEmployee: String(pd.pf),
-      pfEmployer: String(pd.pf),
-      esiEmployee: String(pd.esi || 0),
-      esiEmployer: String((pd.esi || 0) * (3.25 / 0.75)),
-      professionalTax: String(pd.pt),
-      tds: "0",
-      loanRecovery: "0",
-      otherDeductions: "0",
-      lopDeduction: "0",
-      totalDeductions: String(pd.pf + (pd.esi || 0) + pd.pt),
-      netPay: String(pd.net),
-      adjustments: [],
-    });
   }
 
   // Single shared company vehicle for the /vehicles hybrid booking flow.

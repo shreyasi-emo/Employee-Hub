@@ -13,15 +13,7 @@ import { log, hashToken } from "../../shared/audit";
 import { getDaysInMonth, countWeekends } from "../../shared/date-utils";
 import { sanitizeEmployeeForRole } from "../../utils/sanitize";
 import { googleStart, googleCallback, logout as googleLogout } from "../../google-auth";
-import {
-  insertEmployeeSchema, insertDepartmentSchema, insertDesignationSchema,
-  insertSalaryStructureSchema, insertAttendanceSchema, insertRegularizationSchema,
-  insertLeaveTypeSchema, insertLeaveRequestSchema, insertHolidaySchema,
-  insertPayrollRunSchema, insertAnnouncementSchema, insertAssetSchema,
-  insertRatingScaleSchema, insertPerformanceCycleSchema, insertGoalSchema,
-  insertGoalProgressSchema, insertReviewSchema, insertCalibrationSchema,
-  insertShiftSchema, insertShiftAssignmentSchema, insertOnboardingTemplateSchema, insertOnboardingTaskSchema,
-} from "@shared/schema";
+import { insertEmployeeSchema, insertDepartmentSchema } from "@shared/schema";
 
 export function registerEmployeeRoutes(app: Express) {
   app.get("/api/employees/me", requireAuth, async (req, res) => {
@@ -278,26 +270,6 @@ export function registerEmployeeRoutes(app: Express) {
       }
     }
     res.json(emp);
-  });
-
-  // ===== SALARY STRUCTURES =====
-  app.get("/api/employees/:id/salary", requireAuth, async (req, res) => {
-    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "finance"];
-    if (!allowedRoles.includes(req.currentUser!.role) && req.currentUser!.employeeId !== req.params.id) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-    await log(req, "VIEW_SALARY", "salary_structure", req.params.id);
-    res.json(await storage.getSalaryStructures(req.params.id));
-  });
-
-  app.post("/api/employees/:id/salary", requireAuth, requireAdmin, async (req, res) => {
-    const { reason, ...data } = req.body;
-    if (!reason) return res.status(400).json({ error: "Reason required for salary changes" });
-    const parsed = insertSalaryStructureSchema.safeParse({ ...data, employeeId: req.params.id });
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const salary = await storage.createSalaryStructure({ ...parsed.data, createdBy: req.currentUser!.id });
-    await log(req, "UPDATE_SALARY", "salary_structure", salary.id, null, salary, reason);
-    res.json(salary);
   });
 
   // ===== ATTENDANCE =====

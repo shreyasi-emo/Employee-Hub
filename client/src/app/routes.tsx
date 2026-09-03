@@ -14,7 +14,6 @@ import HolidaysPage from "@/features/holidays/pages/holidays-page";
 import AnnouncementsPage from "@/features/announcements/pages/announcements-page";
 import AdminPage from "@/features/admin/pages/admin-page";
 import InviteAcceptPage from "@/features/auth/pages/invite-accept-page";
-import CandidateDocForm from "@/features/onboarding/pages/candidate-doc-form";
 import CompanyWorkspacePage from "@/features/company-workspace/pages/company-workspace-page";
 import MyApprovalsPage from "@/features/company-workspace/pages/my-approvals-page";
 import ReimbursementReviewPage from "@/features/company-workspace/reimbursements/pages/reimbursement-review-page";
@@ -22,7 +21,6 @@ import MyRequestsPage from "@/features/company-workspace/pages/my-requests-page"
 import TeamRequestsPage from "@/features/company-workspace/pages/team-requests-page";
 import LogisticsPage from "@/features/logistics/pages/logistics-page";
 import RequestsPage from "@/features/company-workspace/pages/requests-page";
-import ApprovalNotesPage from "@/features/admin/pages/approval-notes-page";
 import VehiclesPage from "@/features/vehicles/pages/vehicles-page";
 import ResourcesPage from "@/features/resources/pages/resources-page";
 import ReimbursementsPage from "@/features/company-workspace/reimbursements/pages/reimbursements-page";
@@ -47,7 +45,7 @@ export function AppRoutes() {
   const { data: auth, isLoading } = useAuth();
   const [location] = useLocation();
 
-  if (isLoading && location !== "/login" && !location.startsWith("/onboard")) {
+  if (isLoading && location !== "/login") {
     return <AppBootSplash />;
   }
 
@@ -56,7 +54,6 @@ export function AppRoutes() {
       <Route path="/login" component={LoginPage} />
       <Route path="/invite/:token" component={() => <InviteAcceptPage mode="invite" />} />
       <Route path="/reset-password/:token" component={() => <InviteAcceptPage mode="reset" />} />
-      <Route path="/onboard/:token" component={CandidateDocForm} />
       <Route path="/" component={() => <Redirect to="/dashboard" />} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
       <Route path="/employees" component={() => <ProtectedRoute component={EmployeesPage} />} />

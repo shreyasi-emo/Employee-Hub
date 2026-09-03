@@ -13,15 +13,7 @@ import { log, hashToken } from "../../shared/audit";
 import { getDaysInMonth, countWeekends } from "../../shared/date-utils";
 import { sanitizeEmployeeForRole } from "../../utils/sanitize";
 import { googleStart, googleCallback, logout as googleLogout } from "../../google-auth";
-import {
-  insertEmployeeSchema, insertDepartmentSchema, insertDesignationSchema,
-  insertSalaryStructureSchema, insertAttendanceSchema, insertRegularizationSchema,
-  insertLeaveTypeSchema, insertLeaveRequestSchema, insertHolidaySchema,
-  insertPayrollRunSchema, insertAnnouncementSchema, insertAssetSchema,
-  insertRatingScaleSchema, insertPerformanceCycleSchema, insertGoalSchema,
-  insertGoalProgressSchema, insertReviewSchema, insertCalibrationSchema,
-  insertShiftSchema, insertShiftAssignmentSchema, insertOnboardingTemplateSchema, insertOnboardingTaskSchema,
-} from "@shared/schema";
+import { insertAttendanceSchema, insertRegularizationSchema } from "@shared/schema";
 
 // A rejected WFH request is "not happening" — the UI hides it and it must NOT occupy the day
 // (otherwise it blocks an approved-leave overlay from showing). Drop these from attendance payloads.

@@ -16,8 +16,7 @@ export const EMP_STATUSES = [
 
 export const GENDERS = [{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }];
 
-// Personnel documents — mirrors the pre-onboarding candidate collection (candidate-doc-form),
-// grouped for the profile "Docs" panel and the employee form's upload section.
+// Personnel documents — grouped for the profile "Docs" panel and the employee form's upload section.
 export const EMPLOYEE_DOC_GROUPS: { group: string; docs: { key: string; label: string }[] }[] = [
   {
     group: "Identity",

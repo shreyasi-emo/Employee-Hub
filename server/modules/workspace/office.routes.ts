@@ -13,15 +13,6 @@ import { log, hashToken } from "../../shared/audit";
 import { getDaysInMonth, countWeekends } from "../../shared/date-utils";
 import { sanitizeEmployeeForRole } from "../../utils/sanitize";
 import { googleStart, googleCallback, logout as googleLogout } from "../../google-auth";
-import {
-  insertEmployeeSchema, insertDepartmentSchema, insertDesignationSchema,
-  insertSalaryStructureSchema, insertAttendanceSchema, insertRegularizationSchema,
-  insertLeaveTypeSchema, insertLeaveRequestSchema, insertHolidaySchema,
-  insertPayrollRunSchema, insertAnnouncementSchema, insertAssetSchema,
-  insertRatingScaleSchema, insertPerformanceCycleSchema, insertGoalSchema,
-  insertGoalProgressSchema, insertReviewSchema, insertCalibrationSchema,
-  insertShiftSchema, insertShiftAssignmentSchema, insertOnboardingTemplateSchema, insertOnboardingTaskSchema,
-} from "@shared/schema";
 
 export function registerWorkspaceOfficeRoutes(app: Express) {
   app.get("/api/workspace/vendors", requireAuth, requireWorkspace, async (req, res) => {

@@ -10,12 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiRequest } from "@/lib/queryClient";
 import { Building2 } from "lucide-react";
 
-// Demo accounts — one per role. Selecting one fills the username; the tester
-// enters the shared demo password (set via SEED_PASSWORD when the DB was seeded).
-// No passwords are stored here — they must never ship in the client bundle.
+// Demo accounts — one per role. Picking one signs you straight in (dev login).
+// This is temporary scaffolding; production will use Google SSO.
 const DEMO_ACCOUNTS = [
   { role: "Super Admin", name: "Super Admin", username: "superadmin" },
-  { role: "HR", name: "Priya Nair", username: "priya.nair" },
+  { role: "HR Admin", name: "Priya Nair", username: "priya.nair" },
+  { role: "HR Executive", name: "Ananya Reddy", username: "ananya.reddy" },
   { role: "Finance", name: "Neha Verma", username: "finance@emoenergy.in" },
   { role: "CEO", name: "Rajesh Khanna", username: "ceo@emoenergy.in" },
   { role: "CTO", name: "Arjun Sharma", username: "arjun.sharma" },
@@ -33,27 +33,30 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function pickProfile(username: string) {
-    // Fill the username only; the tester types the shared demo password.
-    setProfile(username);
-    setEmail(username);
-    setError("");
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function signIn(username: string, pass: string) {
     setError("");
     setLoading(true);
     try {
-      // Real credential login — works in production (unlike the dev-login bypass).
-      await apiRequest("POST", "/api/auth/login", { username: email, password });
+      await apiRequest("POST", "/api/auth/dev-login", { email: username, password: pass });
       await qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
       navigate("/dashboard");
     } catch (err: any) {
-      setError(err?.message || "Sign in failed. Check your username and password.");
-    } finally {
+      setError(err?.message || 'Sign in failed. Use the password "password".');
       setLoading(false);
     }
+  }
+
+  // One-click: picking a demo account fills the fields and signs in immediately.
+  function pickProfile(username: string) {
+    setProfile(username);
+    setEmail(username);
+    setPassword("password");
+    signIn(username, "password");
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    signIn(email, password);
   }
 
   return (
@@ -70,18 +73,18 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Demo-account quick login (internal testing). */}
+          {/* One-click demo login — pick a role to sign in. */}
           <div className="space-y-2 rounded-[16px] border border-dashed border-border p-3">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Demo accounts</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Quick login</Label>
             <Select value={profile} onValueChange={pickProfile}>
-              <SelectTrigger data-testid="select-dev-profile"><SelectValue placeholder="Select a role…" /></SelectTrigger>
+              <SelectTrigger data-testid="select-dev-profile"><SelectValue placeholder="Pick a role to sign in…" /></SelectTrigger>
               <SelectContent>
                 {DEMO_ACCOUNTS.map((p) => (
                   <SelectItem key={p.username} value={p.username}>{p.role} — {p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-muted-foreground">Fills the username — enter the demo password, then Sign In.</p>
+            <p className="text-[11px] text-muted-foreground">Signs in instantly as the selected role.</p>
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -122,8 +125,8 @@ export default function LoginPage() {
           </form>
 
           <p className="text-xs text-muted-foreground text-center">
-            Internal testing sign-in. Pick a demo account above, or enter your
-            username and password.
+            Development sign-in. Pick a role above, or use the seeded username with the password{" "}
+            <span className="font-mono">password</span>.
           </p>
         </CardContent>
       </Card>
