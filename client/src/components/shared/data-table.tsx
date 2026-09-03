@@ -35,6 +35,15 @@ type DataTableProps<T> = {
   /** Rows per page before paginating. Default 15. Set `paginate={false}` for callers that page externally. */
   pageSize?: number;
   paginate?: boolean;
+  /** Optional expandable-row drawer. When `isExpanded(row)` is true, a full-width row
+   *  is rendered beneath it holding `renderExpanded(row)`. Pair with `onRowClick` to toggle. */
+  renderExpanded?: (row: T, index: number) => React.ReactNode;
+  isExpanded?: (row: T) => boolean;
+  /** Prepend a left "S.No." column numbering rows across pages. */
+  showSerial?: boolean;
+  /** Use `table-fixed` so column widths obey headClassName/cellClassName exactly —
+   *  needed when several sibling tables must line up column-for-column. */
+  fixedLayout?: boolean;
 };
 
 const alignClass = (a?: string) => (a === "right" ? "text-right" : a === "center" ? "text-center" : "text-left");
@@ -52,9 +61,14 @@ export function DataTable<T>({
   testIdPrefix = "row",
   pageSize = TABLE_PAGE_SIZE,
   paginate = true,
+  renderExpanded,
+  isExpanded,
+  showSerial,
+  fixedLayout,
 }: DataTableProps<T>) {
   // A touch more breathing room on the outer edges of the table.
-  const edgePad = (i: number) => cn(i === 0 && "pl-6", i === columns.length - 1 && "pr-5");
+  const edgePad = (i: number) => cn(i === 0 && !showSerial && "pl-6", i === columns.length - 1 && "pr-5");
+  const fullSpan = columns.length + (showSerial ? 1 : 0);
 
   // Built-in pagination: 15 rows/page. Auto-hidden when everything fits on one page.
   const [page, setPage] = React.useState(1);
@@ -69,9 +83,10 @@ export function DataTable<T>({
   return (
     <div className={className}>
     <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
+      <table className={cn("w-full text-sm border-collapse", fixedLayout && "table-fixed")}>
         <thead>
           <tr className="text-left text-[13px] text-muted-foreground">
+            {showSerial && <th className="p-3 pl-6 pr-2 font-semibold whitespace-nowrap text-left w-14" data-testid="th-serial">S.No.</th>}
             {columns.map((c, i) => {
               const sortable = !!(c.sortable && onSortChange);
               return (
@@ -99,32 +114,45 @@ export function DataTable<T>({
         <tbody className="list-divider">
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-10 text-center text-sm text-muted-foreground">{emptyText}</td>
+              <td colSpan={fullSpan} className="px-6 py-10 text-center text-sm text-muted-foreground">{emptyText}</td>
             </tr>
           ) : (
-            view.map((row, ri) => (
-              <tr
-                key={getRowKey(row, ri)}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={cn("hover-elevate", onRowClick && "cursor-pointer", rowClassName?.(row))}
-                data-testid={`${testIdPrefix}-${getRowKey(row, ri)}`}
-              >
-                {columns.map((c, i) => (
-                  <td
-                    key={c.key}
-                    className={cn(
-                      "p-3 whitespace-nowrap",
-                      edgePad(i),
-                      alignClass(c.align),
-                      c.align === "right" && "tabular-nums",
-                      c.cellClassName,
-                    )}
+            view.map((row, ri) => {
+              const rowKey = getRowKey(row, ri);
+              const expanded = !!(renderExpanded && isExpanded?.(row));
+              return (
+                <React.Fragment key={rowKey}>
+                  <tr
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={cn("hover-elevate", onRowClick && "cursor-pointer", expanded && "bg-muted/20", rowClassName?.(row))}
+                    data-testid={`${testIdPrefix}-${rowKey}`}
                   >
-                    {c.render ? c.render(row, ri) : (row as any)[c.key]}
-                  </td>
-                ))}
-              </tr>
-            ))
+                    {showSerial && <td className="p-3 pl-6 pr-2 whitespace-nowrap text-xs text-muted-foreground tabular-nums w-14 align-top">{firstShown + ri}</td>}
+                    {columns.map((c, i) => (
+                      <td
+                        key={c.key}
+                        className={cn(
+                          "p-3 whitespace-nowrap",
+                          edgePad(i),
+                          alignClass(c.align),
+                          c.align === "right" && "tabular-nums",
+                          c.cellClassName,
+                        )}
+                      >
+                        {c.render ? c.render(row, ri) : (row as any)[c.key]}
+                      </td>
+                    ))}
+                  </tr>
+                  {expanded && (
+                    <tr className="bg-muted/20" data-testid={`${testIdPrefix}-${rowKey}-expanded`}>
+                      <td colSpan={fullSpan} className="px-6 pt-0 pb-2.5">
+                        {renderExpanded!(row, ri)}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })
           )}
         </tbody>
       </table>

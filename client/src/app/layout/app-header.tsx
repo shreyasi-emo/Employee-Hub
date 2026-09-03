@@ -74,11 +74,6 @@ export function AppHeader() {
                 <Receipt className="h-4 w-4 mr-2" /> My Payslips
               </a>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a href="/settings" data-testid="link-settings">
-                <Settings className="h-4 w-4 mr-2" /> Settings
-              </a>
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => logout.mutate()} data-testid="button-logout" className="text-destructive">
               <LogOut className="h-4 w-4 mr-2" /> Sign Out

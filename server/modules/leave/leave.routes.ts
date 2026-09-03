@@ -38,6 +38,10 @@ export function registerLeaveRoutes(app: Express) {
     res.json(await storage.updateLeaveType(req.params.id, req.body));
   });
 
+  app.delete("/api/leave-types/:id", requireAuth, requireHR, async (req, res) => {
+    res.json(await storage.deleteLeaveType(req.params.id));
+  });
+
   // ===== LEAVE BALANCES =====
   app.get("/api/leave-balances", requireAuth, async (req, res) => {
     const { employeeId, year } = req.query;

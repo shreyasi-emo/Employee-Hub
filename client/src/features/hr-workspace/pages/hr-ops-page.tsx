@@ -324,11 +324,6 @@ export default function HRopsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">Purchase Requests — Place Order</h3>
-                <Link href="/workspace/office">
-                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" data-testid="link-office-purchase">
-                    Go to Office <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </Link>
               </div>
               {(approvedPurchases as any[]).map((p: any) => (
                 <div key={p.id} data-testid={`card-approved-purchase-${p.id}`} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
@@ -346,11 +341,6 @@ export default function HRopsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">Travel Requests — Book & Assign</h3>
-                <Link href="/workspace/office">
-                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" data-testid="link-office-travel">
-                    Go to Office <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </Link>
               </div>
               {(approvedTravel as any[]).map((t: any) => (
                 <div key={t.id} data-testid={`card-approved-travel-${t.id}`} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
@@ -369,11 +359,6 @@ export default function HRopsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">Payments — Process</h3>
-                <Link href="/workspace/office">
-                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" data-testid="link-office-payments">
-                    Go to Office <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </Link>
               </div>
               {(approvedPayments as any[]).map((p: any) => (
                 <div key={p.id} data-testid={`card-approved-payment-${p.id}`} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">

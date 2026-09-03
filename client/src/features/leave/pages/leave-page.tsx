@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Calendar, FileText } from "lucide-react";
 import { reqYear, yearOptions } from "../lib/leave-model";
 import {
-  useLeaveRequests, useLeaveTypes, useLeaveBalances, useLeaveLedger, useUpdateLeaveStatus,
+  useLeaveRequests, useLeaveTypes, useLeaveBalances, useLeaveLedger, useUpdateLeaveStatus, useEndLeaveRequest,
 } from "../api/leave.api";
 import { LeaveRequestsTable } from "../components/leave-ui";
 import { MyLeavesTab } from "../components/my-leaves-tab";
@@ -51,6 +51,10 @@ export default function LeavePage() {
   const updateLeave = useUpdateLeaveStatus({
     onSuccess: () => toast({ title: "Leave request updated" }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+  const endLeave = useEndLeaveRequest({
+    onSuccess: () => toast({ title: "Leave ended", description: "Remaining days returned to your balance." }),
+    onError: (e: any) => toast({ title: "Couldn't end leave", description: e.message, variant: "destructive" }),
   });
 
   const years = yearOptions(currentYear);
@@ -107,7 +111,8 @@ export default function LeavePage() {
           selectedYear={selectedYear}
           isLoading={lrLoading}
           onApply={() => setShowApply(true)}
-          onCancelRequest={(id) => updateLeave.mutate({ id, status: "cancelled" })}
+          onCancelRequest={(id) => { if (window.confirm("Cancel this leave request? Any deducted balance is restored.")) updateLeave.mutate({ id, status: "cancelled" }); }}
+          onEndRequest={(id) => { if (window.confirm("End this leave from today? The remaining days are returned to your balance.")) endLeave.mutate(id); }}
         />
       )}
 
@@ -147,7 +152,7 @@ export default function LeavePage() {
       )}
 
       <ApplyLeaveDialog open={showApply} onOpenChange={setShowApply} employeeId={emp?.id} leaveTypes={leaveTypes} leaveBalances={leaveBalances} />
-      <LeavePolicyDialog open={showPolicy} onOpenChange={setShowPolicy} leaveTypes={leaveTypes} canEdit={user?.role === "super_admin"} />
+      <LeavePolicyDialog open={showPolicy} onOpenChange={setShowPolicy} leaveTypes={leaveTypes} />
     </div>
   );
 }

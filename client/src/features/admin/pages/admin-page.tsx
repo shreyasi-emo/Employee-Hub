@@ -1,9 +1,8 @@
 import { useAuth, isHR, isAdmin } from "@/lib/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Users, Shield } from "lucide-react";
+import { Shield } from "lucide-react";
 import { DepartmentSection } from "../components/department-section";
 import { DesignationSection } from "../components/designation-section";
-import { StatutorySection } from "../components/statutory-section";
 import { LeaveTypesSection } from "../components/leave-types-section";
 import { UsersSection } from "../components/users-section";
 
@@ -34,10 +33,7 @@ export default function AdminPage() {
           <TabsTrigger value="designations" data-testid="tab-designations">Designations</TabsTrigger>
           <TabsTrigger value="leave-types" data-testid="tab-leave-types">Leave Types</TabsTrigger>
           {isAdmin(user!) && (
-            <>
-              <TabsTrigger value="statutory" data-testid="tab-statutory">Statutory Config</TabsTrigger>
-              <TabsTrigger value="users" data-testid="tab-users">Users & Access</TabsTrigger>
-            </>
+            <TabsTrigger value="users" data-testid="tab-users">Users & Access</TabsTrigger>
           )}
         </TabsList>
 
@@ -51,14 +47,9 @@ export default function AdminPage() {
           <LeaveTypesSection />
         </TabsContent>
         {isAdmin(user!) && (
-          <>
-            <TabsContent value="statutory" className="mt-4">
-              <StatutorySection />
-            </TabsContent>
-            <TabsContent value="users" className="mt-4">
-              <UsersSection />
-            </TabsContent>
-          </>
+          <TabsContent value="users" className="mt-4">
+            <UsersSection />
+          </TabsContent>
         )}
       </Tabs>
     </div>

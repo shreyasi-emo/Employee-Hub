@@ -54,12 +54,18 @@ export function useUpdateLeaveStatus(opts: { onSuccess?: () => void; onError?: (
   });
 }
 
-/** Company-wide leave-type policy edit (super admin only). */
-export function useSaveLeaveType(leaveTypeId: string, opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
+/** End an approved leave early from today (employee back early). Trims the remaining days and
+ *  restores balance server-side; refreshes leave + the attendance calendar. */
+export function useEndLeaveRequest(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: any) => apiRequest("PUT", `/api/leave-types/${leaveTypeId}`, payload),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/leave-types"] }); opts.onSuccess?.(); },
+    mutationFn: (id: string) => apiRequest("POST", `/api/leave-requests/${id}/end`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/leave-requests"] });
+      qc.invalidateQueries({ queryKey: ["/api/leave-balances"] });
+      qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/attendance") });
+      opts.onSuccess?.();
+    },
     onError: opts.onError,
   });
 }

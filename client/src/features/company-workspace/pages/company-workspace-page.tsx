@@ -108,6 +108,7 @@ export default function CompanyWorkspacePage() {
               ]}
               rows={recent}
               getRowKey={(r: any) => `${r.type}-${r.id}`}
+              showSerial
               onRowClick={(r: any) => setDetail(r)}
               testIdPrefix="activity"
             />

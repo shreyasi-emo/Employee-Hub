@@ -133,6 +133,20 @@ export const storage = {
     return dept;
   },
 
+  async deleteDepartment(id: string) {
+    await db.delete(departments).where(eq(departments.id, id));
+  },
+
+  async countEmployeesInDepartment(id: string) {
+    const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(employees).where(eq(employees.departmentId, id));
+    return r?.n ?? 0;
+  },
+
+  async countDesignationsInDepartment(id: string) {
+    const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(designations).where(eq(designations.departmentId, id));
+    return r?.n ?? 0;
+  },
+
   // ====== DESIGNATIONS ======
   async getDesignations() {
     return db.select().from(designations).orderBy(designations.name);
@@ -141,6 +155,15 @@ export const storage = {
   async createDesignation(data: InsertDesignation) {
     const [d] = await db.insert(designations).values(data).returning();
     return d;
+  },
+
+  async deleteDesignation(id: string) {
+    await db.delete(designations).where(eq(designations.id, id));
+  },
+
+  async countEmployeesWithDesignation(id: string) {
+    const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(employees).where(eq(employees.designationId, id));
+    return r?.n ?? 0;
   },
 
   // ====== EMPLOYEES ======
@@ -326,6 +349,13 @@ export const storage = {
 
   async updateLeaveType(id: string, data: Partial<InsertLeaveType>) {
     const [lt] = await db.update(leaveTypes).set(data).where(eq(leaveTypes.id, id)).returning();
+    return lt;
+  },
+
+  async deleteLeaveType(id: string) {
+    // Soft-delete: balances & requests reference this type, so we deactivate
+    // (getLeaveTypes already filters to active) rather than orphaning history.
+    const [lt] = await db.update(leaveTypes).set({ isActive: false }).where(eq(leaveTypes.id, id)).returning();
     return lt;
   },
 

@@ -22,7 +22,6 @@ const DEV_PROFILES = [
   { role: "Finance", name: "Neha Verma", username: "finance@emoenergy.in" },
   { role: "CEO Approver", name: "Rajesh Khanna", username: "ceo@emoenergy.in" },
   { role: "CTO", name: "Arjun Sharma", username: "arjun.sharma" },
-  { role: "Office Admin", name: "Pooja Iyer", username: "officeadmin@emoenergy.in" },
   { role: "Manager", name: "Rahul Gupta", username: "rahul.gupta" },
   { role: "Employee", name: "Sneha Patel", username: "sneha.patel" },
 ];

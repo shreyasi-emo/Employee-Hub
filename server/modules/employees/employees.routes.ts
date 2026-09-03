@@ -79,6 +79,22 @@ export function registerEmployeeRoutes(app: Express) {
     res.json(dept);
   });
 
+  app.delete("/api/departments/:id", requireAuth, requireHR, async (req, res) => {
+    const emp = await storage.countEmployeesInDepartment(req.params.id);
+    const des = await storage.countDesignationsInDepartment(req.params.id);
+    if (emp > 0 || des > 0) {
+      const parts = [
+        emp > 0 ? `${emp} employee${emp === 1 ? "" : "s"}` : "",
+        des > 0 ? `${des} designation${des === 1 ? "" : "s"}` : "",
+      ].filter(Boolean).join(" and ");
+      return res.status(409).json({ error: `Can't delete — ${parts} still assigned to this department.` });
+    }
+    const old = await storage.getDepartment(req.params.id);
+    await storage.deleteDepartment(req.params.id);
+    await log(req, "DELETE_DEPARTMENT", "department", req.params.id, old, null);
+    res.json({ success: true });
+  });
+
   // ===== DESIGNATIONS =====
   app.get("/api/designations", requireAuth, async (req, res) => {
     res.json(await storage.getDesignations());
@@ -87,6 +103,16 @@ export function registerEmployeeRoutes(app: Express) {
   app.post("/api/designations", requireAuth, requireHR, async (req, res) => {
     const d = await storage.createDesignation(req.body);
     res.json(d);
+  });
+
+  app.delete("/api/designations/:id", requireAuth, requireHR, async (req, res) => {
+    const emp = await storage.countEmployeesWithDesignation(req.params.id);
+    if (emp > 0) {
+      return res.status(409).json({ error: `Can't delete — ${emp} employee${emp === 1 ? "" : "s"} still hold this designation.` });
+    }
+    await storage.deleteDesignation(req.params.id);
+    await log(req, "DELETE_DESIGNATION", "designation", req.params.id, null, null);
+    res.json({ success: true });
   });
 
   // ===== EMPLOYEES =====
