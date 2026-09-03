@@ -54,8 +54,10 @@ export function ProfileDocsCard({ documents, canManage = false, onSave }: {
       </CardHeader>
       <CardContent className="px-3 pb-3 flex-1 min-h-0">
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,application/pdf" className="hidden" onChange={onFile} />
-        <ScrollArea className="h-full">
-          <div className="space-y-3 pr-1">
+        {/* Plain overflow-y-auto (not ScrollArea): Radix wraps content in a display:table that sizes
+            to the widest row, defeating truncate and pushing the Add button past the card edge. */}
+        <div className="h-full overflow-y-auto pr-1">
+          <div className="space-y-3">
             {DOC_GROUPS.map((g) => (
               <div key={g.group} className="space-y-1.5">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80 px-0.5">{g.group}</p>
@@ -106,7 +108,7 @@ export function ProfileDocsCard({ documents, canManage = false, onSave }: {
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );
