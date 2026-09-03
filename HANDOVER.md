@@ -26,7 +26,7 @@ Announcements · Company Workspace (requests & approvals: office purchases, proc
 reimbursements, tickets) · Logistics · Vehicles · Resources · Admin Settings (departments,
 designations, leave types, users & access).
 
-## Not done from our end — to be implemented
+## Not done from my end — to be implemented
 - **Google SSO** — sign-in is currently temporary username/password (quick-login). Replace with Google SSO.
 - **Email notifications** — outbound email for leave / WFH / approval events is not wired (in-app notifications already fire; add the email layer).
 
