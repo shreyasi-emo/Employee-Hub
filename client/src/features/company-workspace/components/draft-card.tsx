@@ -13,9 +13,9 @@ export function DraftCard({ draft, onEdit, onDelete, onSubmit, submitting }: { d
   return (
     <Card className="border-0 hover-elevate" data-testid={`draft-${draft.id}`}>
       <CardContent className="p-[17px]">
-        <div className="flex items-stretch gap-0">
+        <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-0">
           {/* Identity */}
-          <div className="flex-1 min-w-0 flex items-start gap-3 pr-5">
+          <div className="flex-1 min-w-0 flex items-start gap-3 lg:pr-5">
             <div className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0 mt-1">
               <Icon className="h-4 w-4" />
             </div>
@@ -27,7 +27,7 @@ export function DraftCard({ draft, onEdit, onDelete, onSubmit, submitting }: { d
 
           {colDivider}
           {/* Category */}
-          <div className="w-[176px] flex-shrink-0 px-5 flex flex-col justify-end">
+          <div className="w-full lg:w-[176px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
             <Icon className="h-4 w-4 text-muted-foreground" />
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Category</p>
             <p className="text-sm font-semibold text-foreground mt-1.5">{meta.label}</p>
@@ -35,7 +35,7 @@ export function DraftCard({ draft, onEdit, onDelete, onSubmit, submitting }: { d
 
           {colDivider}
           {/* Saved on */}
-          <div className="w-[176px] flex-shrink-0 px-5 flex flex-col justify-end">
+          <div className="w-full lg:w-[176px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
             <CalendarClock className="h-4 w-4 text-muted-foreground" />
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Saved On</p>
             <p className="text-sm font-semibold text-foreground mt-1.5">{formatDate(new Date(draft.savedAt).toISOString())}</p>
@@ -43,7 +43,7 @@ export function DraftCard({ draft, onEdit, onDelete, onSubmit, submitting }: { d
 
           {colDivider}
           {/* Amount */}
-          <div className="w-[188px] flex-shrink-0 px-5 flex flex-col justify-end items-end text-right">
+          <div className="w-full lg:w-[188px] flex-shrink-0 lg:px-5 flex flex-col justify-end items-start lg:items-end text-left lg:text-right">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">Amount</p>
             {amt > 0
               ? <p className="text-2xl font-bold text-[#206295] tracking-tight tabular-nums mt-1.5"><span className="font-semibold mr-0.5">₹</span>{amt.toLocaleString("en-IN")}</p>

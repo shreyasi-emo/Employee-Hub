@@ -60,4 +60,5 @@ export function Timeline({ steps, cancelled }: { steps: any[]; cancelled?: boole
   );
 }
 
-export const colDivider = <div className="w-px self-stretch bg-foreground/15 flex-shrink-0" />;
+// Vertical rule between the stat columns — hidden on mobile where the columns stack.
+export const colDivider = <div className="hidden lg:block w-px self-stretch bg-foreground/15 flex-shrink-0" />;

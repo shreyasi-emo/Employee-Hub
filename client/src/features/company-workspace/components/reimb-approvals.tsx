@@ -240,7 +240,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
                 </div>
               )}
 
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6">
                 {allowBulk && selectionMode && (
                   <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
                     <Checkbox checked={sel.has(r.id)} onCheckedChange={() => toggle(r.id)} data-testid={`select-reimb-${r.id}`} />
@@ -248,7 +248,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
                 )}
 
                 {/* Identity — reading flow: reference → amount → employee */}
-                <div className="flex-1 min-w-0 pr-6">
+                <div className="flex-1 min-w-0 lg:pr-6">
                   {/* 1 · Reference (heading) */}
                   <div className="flex items-center gap-2">
                     <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
@@ -281,10 +281,10 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
                 </div>
 
                 {/* Primary divider — longer, darker & thicker than the inner separators */}
-                <div className="self-center w-[1.4px] h-24 rounded-full bg-foreground/30 flex-shrink-0" />
+                <div className="hidden lg:block self-center w-[1.4px] h-24 rounded-full bg-foreground/30 flex-shrink-0" />
 
                 {/* Meta group — icon top-right, teal label, bolder value; items divided by separators */}
-                <div className="flex items-stretch gap-6 flex-shrink-0">
+                <div className="flex flex-wrap lg:flex-nowrap items-stretch gap-x-6 gap-y-3 lg:gap-6 flex-shrink-0">
                   <div className="w-[112px] flex-shrink-0">
                     <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
                     {(() => { const si = reimbSubmittedInfo(r); return si.resubmitted ? (
@@ -297,13 +297,13 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
                     ); })()}
                     <p className="text-sm font-semibold text-foreground mt-1">{(() => { const si = reimbSubmittedInfo(r); return si.date ? format(new Date(si.date), "dd MMM yyyy") : "—"; })()}</p>
                   </div>
-                  <Separator orientation="vertical" className="h-14" />
+                  <Separator orientation="vertical" className="h-14 hidden lg:block" />
                   <div className="w-[150px] flex-shrink-0">
                     <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                     <p className="text-[12px] uppercase tracking-wide text-muted-foreground mt-1">Department</p>
                     <p className="text-sm font-semibold text-foreground mt-1 truncate max-w-[150px]">{r.department || "—"}</p>
                   </div>
-                  <Separator orientation="vertical" className="h-14" />
+                  <Separator orientation="vertical" className="h-14 hidden lg:block" />
                   <div className="w-[88px] flex-shrink-0">
                     <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                     <p className="text-[12px] uppercase tracking-wide text-muted-foreground mt-1">Priority</p>
@@ -313,7 +313,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
 
                 {!selectionMode && (
                   <>
-                    <Separator orientation="vertical" className="h-16" />
+                    <Separator orientation="vertical" className="h-16 hidden lg:block" />
                     {/* View action */}
                     <div className="flex-shrink-0 pr-2" onClick={(e) => e.stopPropagation()}>
                       <Button size="sm" variant="ghost" className="h-10 w-[108px] btn-glass text-[#206295] hover:text-[#206295]" onClick={() => openDetail(r)} data-testid={`view-reimb-${r.id}`}>
