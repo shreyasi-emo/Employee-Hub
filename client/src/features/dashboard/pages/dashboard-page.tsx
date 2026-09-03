@@ -7,12 +7,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, Plane, Calendar, ArrowRight, UserCheck, ClipboardList, ShoppingCart, Car, CalendarDays, Route, Home, Hash, Briefcase, Mail, ArrowUpRight, PartyPopper } from "lucide-react";
+import { Users, Plane, Calendar, ArrowRight, UserCheck, ClipboardList, CalendarDays, Route, Home, Hash, Briefcase, Mail, ArrowUpRight, PartyPopper } from "lucide-react";
 import { todayEvent } from "@/features/employees/lib/employee-helpers";
 import { ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format } from "date-fns";
 import { Stats } from "../types";
-import { StatCard, AnnouncementCard, LeaveRequestCard, ServiceRequestRow } from "../components/dashboard-ui";
+import { StatCard, AnnouncementCard } from "../components/dashboard-ui";
 import { CalendarCard } from "../components/calendar-card";
 import { QuickActionsRow } from "../components/quick-actions-row";
 import { MeetTheTeamCard } from "../components/meet-the-team-card";
@@ -36,7 +36,6 @@ export default function DashboardPage() {
     queryKey: ["/api/employees"],
     enabled: !!user, // used by the "Meet the Team" directory (sanitized list) + admin panels
   });
-  const { data: leaveTypes = [] } = useQuery<any[]>({ queryKey: ["/api/leave-types"] });
   const { data: myAttendance = [] } = useQuery<any[]>({
     queryKey: emp ? [`/api/attendance?employeeId=${emp.id}&month=${currentMonth}&year=${currentYear}`] : [],
     enabled: !!emp,
@@ -67,26 +66,10 @@ export default function DashboardPage() {
     queryKey: ["/api/my-requests/summary"],
     enabled: !!user,
   });
-  // /api/team-requests returns an object: { purchases, travels, tickets, teamMembers }
-  const { data: teamRequests } = useQuery<any>({
-    queryKey: ["/api/team-requests"],
-    enabled: showAdminLayout,
-    retry: false,
-  });
   const { data: holidays = [] } = useQuery<any[]>({
     queryKey: [`/api/holidays?year=${currentYear}`],
     enabled: !!user,
   });
-
-  const purchasePending = requestSummary?.purchases?.pending ?? 0;
-  const travelPending = requestSummary?.travels?.pending ?? 0;
-  const teamPending = [
-    ...(teamRequests?.purchases ?? []),
-    ...(teamRequests?.travels ?? []),
-    ...(teamRequests?.tickets ?? []),
-  ].filter(
-    (r: any) => !["fulfilled", "rejected", "closed", "completed", "cancelled", "done", "resolved"].includes(r.status)
-  ).length;
 
   const holidayDates = holidays
     .map((h: any) => (h.date ? new Date(h.date) : null))
@@ -490,35 +473,9 @@ export default function DashboardPage() {
         if (showAdminLayout) {
           return (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              {/* LEFT — Pending Service Requests (bento card, below 1st overview card) */}
-              <Card className="border-0 lg:h-[27rem] flex flex-col" style={CARD_STYLE}>
-                <CardHeader className="pt-4 pb-2">
-                  <CardTitle className="text-base font-semibold">Pending Service Requests</CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 pb-3 flex-1 flex flex-col gap-4">
-                  <ServiceRequestRow
-                    icon={ShoppingCart} label="Purchase Requests" count={purchasePending}
-                    href="/my-requests?tab=purchases"
-                    color="bg-[#206295]/15 text-[#206295]"
-                  />
-                  <ServiceRequestRow
-                    icon={Car} label="Travel Requests" count={travelPending}
-                    href="/my-requests?tab=travels"
-                    color="bg-[#4BDCD9]/25 text-[#206295]"
-                  />
-                  <ServiceRequestRow
-                    icon={Users} label="Team Requests" count={teamPending}
-                    href="/team-requests"
-                    color="bg-[#206295]/15 text-[#206295]"
-                  />
-                </CardContent>
-              </Card>
-
-              {/* CENTER — Calendar (below 2nd & 3rd overview cards) */}
+              {/* Calendar (left half) + Announcements (right half) */}
               <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={employees} bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
-
-              {/* RIGHT — Announcements (below 4th overview card) */}
-              <div className="lg:h-[27rem]">{announcementsPanel}</div>
+              <div className="lg:col-span-2 lg:h-[27rem]">{announcementsPanel}</div>
             </div>
           );
         }
@@ -577,30 +534,6 @@ export default function DashboardPage() {
           </div>
         );
       })()}
-
-      {/* Pending approvals for managers/HR */}
-      {(isHR(user!) || isManager(user!) || isExec) && pendingLeaveRequests.length > 0 && (
-        <Card className="border-0" style={CARD_STYLE}>
-          <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
-            <CardTitle className="text-base font-semibold">Pending Leave Requests</CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-xs h-auto min-h-0 py-1">
-              <a href="/leave">View all <ArrowRight className="h-3 w-3 ml-1" /></a>
-            </Button>
-          </CardHeader>
-          <CardContent className="px-5 pb-2">
-            <div className="list-divider">
-              {pendingLeaveRequests.slice(0, 5).map((req: any) => (
-                <LeaveRequestCard
-                  key={req.id}
-                  request={req}
-                  employees={employees}
-                  leaveTypes={leaveTypes}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Meet the Team (3/4) + Recent Activity (1/4) — equal height */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
