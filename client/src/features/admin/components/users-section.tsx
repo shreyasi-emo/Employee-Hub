@@ -56,6 +56,10 @@ export function UsersSection() {
 
   const columns: DataTableColumn<any>[] = [
     {
+      key: "empno", header: "Emp No.", headClassName: "w-24",
+      render: (u) => <span className="text-xs text-muted-foreground tabular-nums">{u.emp?.employeeCode || "—"}</span>,
+    },
+    {
       key: "user", header: "User",
       render: (u) => (
         <div className="flex items-center gap-2.5 min-w-0">
@@ -118,7 +122,7 @@ export function UsersSection() {
       </div>
 
       <Card className="border-0"><CardContent className="p-0">
-        <DataTable columns={columns} rows={rows} getRowKey={(u) => u.id} showSerial emptyText="No users match those filters." testIdPrefix="user-row" />
+        <DataTable columns={columns} rows={rows} getRowKey={(u) => u.id} emptyText="No users match those filters." testIdPrefix="user-row" />
       </CardContent></Card>
     </div>
   );

@@ -127,12 +127,12 @@ export function DataTable<T>({
                     className={cn("hover-elevate", onRowClick && "cursor-pointer", expanded && "bg-muted/20", rowClassName?.(row))}
                     data-testid={`${testIdPrefix}-${rowKey}`}
                   >
-                    {showSerial && <td className="p-3 pl-6 pr-2 whitespace-nowrap text-xs text-muted-foreground tabular-nums w-14 align-top">{firstShown + ri}</td>}
+                    {showSerial && <td className="p-3 pl-6 pr-2 whitespace-nowrap text-xs text-muted-foreground tabular-nums w-14 align-middle">{firstShown + ri}</td>}
                     {columns.map((c, i) => (
                       <td
                         key={c.key}
                         className={cn(
-                          "p-3 whitespace-nowrap",
+                          "p-3 whitespace-nowrap align-middle",
                           edgePad(i),
                           alignClass(c.align),
                           c.align === "right" && "tabular-nums",
