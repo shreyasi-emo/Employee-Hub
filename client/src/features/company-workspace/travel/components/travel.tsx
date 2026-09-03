@@ -307,7 +307,17 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
                   <div className="relative"><MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" /><Input value={details.to ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, to: e.target.value }))} placeholder="e.g. Mysuru" className="h-9 pl-8" data-testid="transport-to" /></div>
                 </div>
               </div>
-              <div className="space-y-1"><Label className="text-[11px]">Date &amp; time</Label><Input type="datetime-local" value={details.dateTime ?? ""} onChange={(e) => setDetails((d: any) => ({ ...d, dateTime: e.target.value }))} className="h-9" data-testid="transport-datetime" /></div>
+              <div className="space-y-1"><Label className="text-[11px]">Date &amp; time</Label>
+                {(() => {
+                  const [dt, tm] = String(details.dateTime || "").split("T");
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      <DateInput value={dt || ""} onChange={(nd) => setDetails((x: any) => ({ ...x, dateTime: nd ? `${nd}T${tm || "09:00"}` : "" }))} testId="transport-date" />
+                      <TimeField value={tm || ""} onChange={(nt) => setDetails((x: any) => ({ ...x, dateTime: `${dt || ""}T${nt}` }))} testId="transport-time" />
+                    </div>
+                  );
+                })()}
+              </div>
             </TravelSection>
             <Separator />
             <TravelSection icon={UsersIcon} title="Purpose & People">

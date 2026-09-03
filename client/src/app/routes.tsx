@@ -12,10 +12,9 @@ import AttendancePage from "@/features/attendance/pages/attendance-page";
 import LeavePage from "@/features/leave/pages/leave-page";
 import HolidaysPage from "@/features/holidays/pages/holidays-page";
 import AnnouncementsPage from "@/features/announcements/pages/announcements-page";
-import SettingsPage from "@/features/settings/pages/settings-page";
+import AdminPage from "@/features/admin/pages/admin-page";
 import InviteAcceptPage from "@/features/auth/pages/invite-accept-page";
 import CandidateDocForm from "@/features/onboarding/pages/candidate-doc-form";
-import OfficeAdminPage from "@/features/hr-workspace/pages/office-admin-page";
 import CompanyWorkspacePage from "@/features/company-workspace/pages/company-workspace-page";
 import MyApprovalsPage from "@/features/company-workspace/pages/my-approvals-page";
 import ReimbursementReviewPage from "@/features/company-workspace/reimbursements/pages/reimbursement-review-page";
@@ -69,8 +68,7 @@ export function AppRoutes() {
       <Route path="/leave" component={() => <ProtectedRoute component={LeavePage} />} />
       <Route path="/holidays" component={() => <ProtectedRoute component={HolidaysPage} />} />
       <Route path="/announcements" component={() => <ProtectedRoute component={AnnouncementsPage} />} />
-      <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
-      <Route path="/workspace/office" component={() => <ProtectedRoute component={OfficeAdminPage} />} />
+      <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} />} />
       <Route path="/workspace/approvals" component={() => <ProtectedRoute component={MyApprovalsPage} />} />
       <Route path="/company-workspace" component={() => <ProtectedRoute component={CompanyWorkspacePage} />} />
       <Route path="/my-approvals" component={() => <ProtectedRoute component={MyApprovalsPage} />} />

@@ -19,8 +19,8 @@ export interface NavItem {
 }
 
 // vercel-deploy build: Payroll, Performance, Assets, Shifts, Onboarding, Approval
-// Notes, ATS, HR Ops, Admin Settings and Audit are hidden here (routes removed in
-// routes.tsx too). Backend is untouched — this only trims the UI surface.
+// Notes, ATS, HR Ops and Audit are hidden here (routes removed in routes.tsx too).
+// Admin Settings IS shown. Backend is untouched — this only trims the UI surface.
 export const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "hr_admin", "hr_executive"] },
@@ -51,16 +51,11 @@ export const companyItems: NavItem[] = [
 ];
 
 export const workspaceItems: NavItem[] = [
-  // Vendors, purchase requests and payments (formerly the office_admin module,
-  // now HR's). finance is listed because the API already grants it access.
-  { title: "Office Admin", href: "/workspace/office", icon: ShoppingCart, roles: ["super_admin", "hr_admin", "hr_executive", "finance"] },
   { title: "CEO Inbox", href: "/workspace/approvals", icon: Inbox, roles: ["super_admin"] },
 ];
 
-export const adminItems: NavItem[] = [];
-
-export const accountItems: NavItem[] = [
-  { title: "Settings", href: "/settings", icon: Settings },
+export const adminItems: NavItem[] = [
+  { title: "Admin Settings", href: "/admin", icon: Settings, roles: ["super_admin", "hr_admin", "hr_executive", "finance"] },
 ];
 
 // The nav item whose badge shows the CEO Inbox count.

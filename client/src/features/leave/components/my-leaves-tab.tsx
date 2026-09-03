@@ -8,12 +8,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/shared/data-table";
 import { Plane, Clock, Search, CheckCircle2, XCircle } from "lucide-react";
 import { format } from "date-fns";
-import { statusOf, canCancel, findCasualLeaveType, leaveTypeColor } from "../lib/leave-model";
+import { statusOf, findCasualLeaveType, leaveTypeColor, leaveActionFor } from "../lib/leave-model";
 import { StatCard } from "./leave-ui";
 
 /** The employee's own requests: four stat cards, filters, and the table.
  *  Owns its own search/status/type filter state. */
-export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, isLoading, onApply, onCancelRequest }: {
+export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, isLoading, onApply, onCancelRequest, onEndRequest }: {
   myYear: any[];
   leaveTypes: any[];
   leaveBalances: any[];
@@ -21,6 +21,7 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
   isLoading: boolean;
   onApply: () => void;
   onCancelRequest: (id: string) => void;
+  onEndRequest: (id: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -92,7 +93,19 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
               { key: "days", header: "Days", cellClassName: "text-muted-foreground", render: (r: any) => `${r.totalDays}d` },
               { key: "reason", header: "Reason", cellClassName: "text-muted-foreground max-w-[16rem] truncate", render: (r: any) => r.reason || "—" },
               { key: "status", header: "Status", render: (r: any) => { const sc = statusOf(r.status); return <Badge className={`text-xs ${sc.bg} ${sc.text}`}>{sc.label}</Badge>; } },
-              { key: "action", header: "Action", align: "right", render: (r: any) => canCancel(r) ? <Button size="sm" variant="outline" className="h-7 text-xs text-[#FF6F62] border-[#FF6F62]/30" onClick={() => onCancelRequest(r.id)} data-testid={`button-cancel-leave-${r.id}`}>Cancel</Button> : <span className="text-xs text-muted-foreground">—</span> },
+              { key: "action", header: "Action", align: "right", render: (r: any) => {
+                const a = leaveActionFor(r);
+                if (!a) return <span className="text-xs text-muted-foreground">—</span>;
+                const isEnd = a.kind === "end";
+                return (
+                  <Button
+                    size="sm" variant="outline"
+                    className={`h-7 text-xs ${isEnd ? "text-[#206295] border-[#206295]/30" : "text-[#FF6F62] border-[#FF6F62]/30"}`}
+                    onClick={() => (isEnd ? onEndRequest(r.id) : onCancelRequest(r.id))}
+                    data-testid={`button-${a.kind}-leave-${r.id}`}
+                  >{a.label}</Button>
+                );
+              } },
             ]}
             rows={filteredMy}
             getRowKey={(r: any) => r.id}

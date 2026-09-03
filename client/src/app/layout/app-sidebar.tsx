@@ -12,7 +12,7 @@ import BRAND from "@/lib/brand";
 import { useCeoInboxCount } from "@/features/company-workspace/api/ceo-inbox.api";
 import {
   navItems, companyItems, companyWorkspaceHub, companyWorkspaceChildren,
-  workspaceItems, adminItems, accountItems,
+  workspaceItems, adminItems,
   CEO_INBOX_HREF, type NavItem,
 } from "./nav-items";
 
@@ -234,8 +234,6 @@ export function AppSidebar() {
         {adminNav.length > 0 && (
           <NavSection label="Admin" items={adminNav} isActive={isActive} />
         )}
-
-        <NavSection label="Account" items={accountItems} isActive={isActive} />
       </SidebarContent>
     </Sidebar>
   );

@@ -62,6 +62,22 @@ export const reqYear = (r: any) => r.year ?? new Date(r.startDate).getFullYear()
 /** Cancellable while pending, or approved but not yet started. */
 export const canCancel = (r: any) => r.status === "pending" || (r.status === "approved" && new Date(r.startDate) > new Date());
 
+/** The self-service action available on one's own leave request, by status + dates:
+ *  - pending            → Withdraw   (PUT status=cancelled)
+ *  - approved, multi-day → End       (POST /:id/end — come back early, trims the remaining days)
+ *  - approved, single-day → Cancel   (PUT status=cancelled)
+ *  - anything already fully in the past → no action. */
+export function leaveActionFor(r: any): { kind: "withdraw" | "end" | "cancel"; label: string } | null {
+  if (r.status === "pending") return { kind: "withdraw", label: "Withdraw" };
+  if (r.status !== "approved") return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const end = parseYmd(r.endDate);
+  if (!end || end < today) return null;
+  return r.startDate !== r.endDate
+    ? { kind: "end", label: "End" }
+    : { kind: "cancel", label: "Cancel" };
+}
+
 /** The casual-leave type, matched by name or CL code — drives the balance stat card. */
 export const findCasualLeaveType = (leaveTypes: any[]) =>
   leaveTypes.find((l: any) => /casual/i.test(l.name || "") || (l.code || "").toUpperCase() === "CL");
