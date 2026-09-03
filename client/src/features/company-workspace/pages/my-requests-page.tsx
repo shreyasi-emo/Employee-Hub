@@ -229,7 +229,7 @@ export default function MyRequestsPage() {
 
   // Shared header controls (view · phase · search · status filter · sort · primary button)
   const controls = (newBtn: React.ReactNode, showPhase = false) => (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 flex-wrap">
       {/* View toggle — icon only */}
       <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
         <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>

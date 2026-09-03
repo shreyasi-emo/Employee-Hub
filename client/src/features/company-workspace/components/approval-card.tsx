@@ -62,7 +62,7 @@ export function ApprovalCard({
       )}
 
       <div className="p-6">
-        <div className="flex items-center gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6">
           {showCheckbox && (
             <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
               <Checkbox checked={!!selected} onCheckedChange={() => onToggleSelect?.()} data-testid={testId ? `${testId}-select` : undefined} />
@@ -70,7 +70,7 @@ export function ApprovalCard({
           )}
 
           {/* Identity — reference → amount → requester line */}
-          <div className="flex-1 min-w-0 pr-6">
+          <div className="flex-1 min-w-0 lg:pr-6">
             <div className="flex items-center gap-2">
               <Icon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
               <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">{reference}</span>
@@ -107,11 +107,11 @@ export function ApprovalCard({
           {/* Meta columns — icon / uppercase label / bold value, divided by tall separators */}
           {meta.length > 0 && (
             <>
-              <div className="self-center w-[1.4px] h-24 rounded-full bg-foreground/30 flex-shrink-0" />
-              <div className="flex items-stretch gap-6 flex-shrink-0">
+              <div className="hidden lg:block self-center w-[1.4px] h-24 rounded-full bg-foreground/30 flex-shrink-0" />
+              <div className="flex flex-wrap lg:flex-nowrap items-stretch gap-x-6 gap-y-3 lg:gap-6 flex-shrink-0">
                 {meta.map((m, i) => (
                   <Fragment key={i}>
-                    {i > 0 && <Separator orientation="vertical" className="h-14" />}
+                    {i > 0 && <Separator orientation="vertical" className="h-14 hidden lg:block" />}
                     <div className={`flex-shrink-0 ${m.width || "w-[120px]"}`}>
                       {m.icon && <m.icon className="h-3.5 w-3.5 text-muted-foreground" />}
                       <p className="text-[12px] uppercase tracking-wide text-muted-foreground mt-1">{m.label}</p>
@@ -128,7 +128,7 @@ export function ApprovalCard({
             <ChevronDown className={`h-5 w-5 text-muted-foreground flex-shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
           ) : onView && !selectionMode ? (
             <>
-              <Separator orientation="vertical" className="h-16" />
+              <Separator orientation="vertical" className="h-16 hidden lg:block" />
               <div className="flex-shrink-0 pr-2" onClick={(e) => e.stopPropagation()}>
                 <Button size="sm" variant="ghost" className="h-10 w-[108px] btn-glass text-[#206295] hover:text-[#206295]" onClick={onView} data-testid={testId ? `${testId}-view` : undefined}>
                   <Eye className="h-4 w-4 mr-1.5" /> {viewLabel}

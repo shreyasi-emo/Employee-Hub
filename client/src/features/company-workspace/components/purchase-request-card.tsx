@@ -29,8 +29,8 @@ export function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: a
   return (
     <Card data-testid={`card-${kind}-${item.id}`} className="border-0 hover-elevate active-elevate-2 cursor-pointer" onClick={() => onOpen(item.id)}>
       <CardContent className="p-[17px]">
-        <div className="flex items-stretch gap-0">
-          <div className="flex-1 min-w-0 flex items-start gap-3 pr-5">
+        <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-0">
+          <div className="flex-1 min-w-0 flex items-start gap-3 lg:pr-5">
             <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-1 ${isProc ? "bg-[#0E7C7B]/10 text-[#0E7C7B]" : "bg-[#206295]/10 text-[#206295]"}`}>{isProc ? <Package className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}</div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
@@ -44,21 +44,21 @@ export function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: a
           </div>
 
           {colDivider}
-          <div className="w-[150px] flex-shrink-0 px-5 flex flex-col justify-end">
+          <div className="w-full lg:w-[150px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
             <History className="h-4 w-4 text-muted-foreground" />
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Last Updated</p>
             <p className="text-sm font-semibold text-foreground mt-1.5 whitespace-nowrap">{item.updatedAt ? formatDate(item.updatedAt) : "—"}</p>
           </div>
 
           {colDivider}
-          <div className="w-[188px] flex-shrink-0 px-5 flex flex-col justify-end">
+          <div className="w-full lg:w-[188px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Approval Status</p>
             <div className="mt-1.5"><Badge className={`text-xs ${statusClass(item.status)}`}>{statusLabel(item.status)}</Badge></div>
           </div>
 
           {colDivider}
-          <div className="w-[188px] flex-shrink-0 px-5 flex flex-col justify-end items-end text-right">
+          <div className="w-full lg:w-[188px] flex-shrink-0 lg:px-5 flex flex-col justify-end items-start lg:items-end text-left lg:text-right">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">Amount</p>
             {amt > 0
               ? <p className="text-2xl font-bold text-[#206295] tracking-tight tabular-nums mt-1.5"><span className="font-semibold mr-0.5">₹</span>{amt.toLocaleString("en-IN")}</p>

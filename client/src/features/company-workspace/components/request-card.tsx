@@ -44,9 +44,9 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
   return (
     <Card data-testid={`card-request-${item.id}`} className={`border-0 ${readOnly ? "" : "hover-elevate active-elevate-2 cursor-pointer"} ${item.status === "changes_requested" ? "ring-1 ring-[#FF6F62]/50 bg-[#FF6F62]/[0.04]" : ""}`} onClick={readOnly ? undefined : () => onOpen?.(item)}>
       <CardContent className="p-[17px]">
-        <div className="flex items-stretch gap-0">
+        <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-0">
           {/* Identity */}
-          <div className="flex-1 min-w-0 flex items-start gap-3 pr-5">
+          <div className="flex-1 min-w-0 flex items-start gap-3 lg:pr-5">
             <div className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0 mt-1">
               <Icon className="h-4 w-4" />
             </div>
@@ -70,7 +70,7 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
           {/* Submitted on / Re-submitted On — reimbursements only */}
           {type === "reimbursement" && <>
             {colDivider}
-            <div className="w-[150px] flex-shrink-0 px-5 flex flex-col justify-end">
+            <div className="w-full lg:w-[150px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
               <CalendarClock className="h-4 w-4 text-muted-foreground" />
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap"><SubmittedLabel info={sub} /></div>
               <p className="text-sm font-semibold text-foreground mt-1.5 whitespace-nowrap">{formatDate(sub.date)}</p>
@@ -79,7 +79,7 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
 
           {colDivider}
           {/* Last Updated — all tabs */}
-          <div className="w-[150px] flex-shrink-0 px-5 flex flex-col justify-end">
+          <div className="w-full lg:w-[150px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
             <History className="h-4 w-4 text-muted-foreground" />
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Last Updated</p>
             <p className="text-sm font-semibold text-foreground mt-1.5 whitespace-nowrap">{item.updatedAt ? formatDate(item.updatedAt) : "—"}</p>
@@ -87,7 +87,7 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
 
           {colDivider}
           {/* Approval Status — sized to fit "APPROVAL STATUS" + widest status chip ("Changes Requested") with even margins */}
-          <div className="w-[188px] flex-shrink-0 px-5 flex flex-col justify-end">
+          <div className="w-full lg:w-[188px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Approval Status</p>
             <div className="mt-1.5">
@@ -99,7 +99,7 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
 
           {colDivider}
           {/* Payable — sized to fit ₹10,00,000 + "net of … advance" subtext */}
-          <div className="w-[188px] flex-shrink-0 px-5 flex flex-col justify-end items-end text-right">
+          <div className="w-full lg:w-[188px] flex-shrink-0 lg:px-5 flex flex-col justify-end items-start lg:items-end text-left lg:text-right">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">Payable</p>
             {amt > 0 ? (
               <>
