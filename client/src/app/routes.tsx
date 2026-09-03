@@ -41,9 +41,7 @@ function AppBootSplash() {
   return (
     <div className="flex h-screen items-center justify-center bg-background">
       <div className="text-center space-y-4">
-        <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mx-auto">
-          <span className="text-primary-foreground font-bold text-lg">E</span>
-        </div>
+        <img src="/favicon.png" alt="EMO Energy" className="h-14 w-auto block mx-auto" />
         <div className="space-y-2">
           <Skeleton className="h-4 w-32 mx-auto" />
           <Skeleton className="h-3 w-24 mx-auto" />

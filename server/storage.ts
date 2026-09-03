@@ -666,9 +666,13 @@ export const storage = {
     if (u) await db.insert(notifications).values({ userId: u.id, ...payload });
   },
 
-  async getUserNotifications(userId: string, limit = 30) {
+  async getUserNotifications(userId: string, limit = 30, days = 30) {
+    // Only recent notifications (last `days`), newest first, capped at `limit` — keeps
+    // the bell + Recent Activity fast and uncrowded as history grows unbounded.
+    const since = new Date();
+    since.setDate(since.getDate() - days);
     return db.select().from(notifications)
-      .where(eq(notifications.userId, userId))
+      .where(and(eq(notifications.userId, userId), gte(notifications.createdAt, since)))
       .orderBy(desc(notifications.createdAt))
       .limit(limit);
   },
