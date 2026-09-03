@@ -30,8 +30,6 @@ export interface Employee {
 export interface AuthState {
   user: CurrentUser | null;
   employee: Employee | null;
-  realRole?: UserRole;   // actual logged-in role (before dev impersonation)
-  devRole?: UserRole | null; // role currently being impersonated, if any
 }
 
 // Roles that can be ASSIGNED. Not the same as the DB enum:

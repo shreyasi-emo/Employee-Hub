@@ -32,18 +32,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (!user || !user.isActive) {
     return res.status(401).json({ error: "Not authenticated" });
   }
-  req.realRole = user.role;
-  // TEMPORARY: dev-only role impersonation. A super_admin can preview the app as
-  // any role via the header role switcher. Ignored in production.
-  if (
-    process.env.NODE_ENV !== "production" &&
-    req.session.devRole &&
-    user.role === "super_admin"
-  ) {
-    req.currentUser = { ...user, role: req.session.devRole as typeof user.role };
-  } else {
-    req.currentUser = user;
-  }
+  req.currentUser = user;
   next();
 }
 
@@ -116,7 +105,6 @@ export function requireTeamHandler(req: Request, res: Response, next: NextFuncti
 declare module "express-session" {
   interface SessionData {
     userId: string;
-    devRole?: string; // TEMPORARY: dev-only role impersonation
   }
 }
 
@@ -124,7 +112,6 @@ declare global {
   namespace Express {
     interface Request {
       currentUser?: typeof users.$inferSelect;
-      realRole?: string; // actual DB role, before any dev impersonation override
     }
   }
 }

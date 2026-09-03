@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth, useLogout, getRoleLabel } from "@/lib/auth";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
-import { DevRoleSwitcher } from "./dev-role-switcher";
 
 // Floating glassmorphic top header bar styling
 const HEADER_STYLE: React.CSSProperties = {
@@ -38,7 +37,6 @@ export function AppHeader() {
         <SidebarTrigger data-testid="button-sidebar-toggle" className="-ml-1" />
       </div>
       <div className="flex items-center gap-2">
-        <DevRoleSwitcher auth={auth} />
         <NotificationBell />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

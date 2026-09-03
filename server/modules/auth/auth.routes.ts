@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
 import { eq } from "drizzle-orm";
-import { users, roleEnum } from "@shared/schema";
+import { users } from "@shared/schema";
 import {
   requireAuth, requireHR, requireAdmin, requireRole,
   requireWorkspace, requireCEO, requireLogistics, requireTeamHandler,
@@ -110,35 +110,10 @@ export function registerAuthRoutes(app: Express) {
     if (user.employeeId) {
       employee = await storage.getEmployee(user.employeeId);
     }
-    // realRole / devRole power the dev-only role switcher (see /api/auth/dev-role)
     res.json({
       user: { ...user, password: undefined },
       employee,
-      realRole: req.realRole,
-      devRole: req.session.devRole ?? null,
     });
-  });
-
-  // TEMPORARY: dev-only role impersonation. Lets a super_admin preview the app as
-  // any role from the header switcher. Pass { role } to impersonate, or
-  // { role: "reset" } to return to the real role. Disabled in production.
-  app.post("/api/auth/dev-role", requireAuth, async (req, res) => {
-    if (process.env.NODE_ENV === "production" || process.env.ENABLE_DEV_LOGIN !== "true") {
-      return res.status(404).json({ error: "Not found" });
-    }
-    if (req.realRole !== "super_admin") {
-      return res.status(403).json({ error: "Only super_admin can switch roles" });
-    }
-    const { role } = req.body ?? {};
-    if (!role || role === "reset") {
-      delete req.session.devRole;
-      return res.json({ ok: true, devRole: null });
-    }
-    if (!roleEnum.enumValues.includes(role)) {
-      return res.status(400).json({ error: "Unknown role" });
-    }
-    req.session.devRole = role;
-    res.json({ ok: true, devRole: role });
   });
 
   app.put("/api/auth/change-password", requireAuth, async (req, res) => {
