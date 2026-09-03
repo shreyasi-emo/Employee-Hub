@@ -7,7 +7,6 @@ import { Bell, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { notifAvatarColor, notifVisual, notifEmployeeName } from "../lib/notification-visuals";
 
@@ -45,8 +44,8 @@ export function NotificationBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0 max-h-[70vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+      <PopoverContent align="end" className="w-[368px] p-0 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h4 className="text-sm font-semibold">Notifications</h4>
           {unread > 0 && (
             <button
@@ -58,7 +57,7 @@ export function NotificationBell() {
             </button>
           )}
         </div>
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="max-h-[60vh] overflow-y-auto">
           {notifs.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               <Bell className="h-8 w-8 mx-auto mb-2 opacity-30" />
@@ -106,7 +105,7 @@ export function NotificationBell() {
                 ); })}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
