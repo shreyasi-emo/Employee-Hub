@@ -58,7 +58,7 @@ export default function EmployeesPage() {
   const exitSelection = () => { setSelectionMode(false); setSelected(new Set()); };
 
   return (
-    <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
+    <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-[92rem] mx-auto">
       <EmployeesHeader
         count={employees.length}
         statusFilter={statusFilter}
