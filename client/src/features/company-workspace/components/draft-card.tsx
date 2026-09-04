@@ -1,4 +1,6 @@
 import { formatDate } from "../shared/request-format";
+import { moneyShort } from "@/lib/format";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { DRAFT_META, draftTitle, draftAmount, type Draft } from "../shared/drafts";
 import { colDivider } from "./request-ui";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +12,41 @@ export function DraftCard({ draft, onEdit, onDelete, onSubmit, submitting }: { d
   const meta = DRAFT_META[draft.type] || { label: draft.type, icon: FileText };
   const Icon = meta.icon;
   const amt = draftAmount(draft);
+  const isMobile = useIsMobile();
+
+  // Mobile: a compact single-row card — title + DRAFT on line 1, a |-separated category · saved ·
+  // amount meta line, with Edit / Submit / Delete stacked below (every action preserved).
+  if (isMobile) {
+    return (
+      <Card className="border-0 hover-elevate" data-testid={`draft-${draft.id}`}>
+        <CardContent className="p-3">
+          <div className="flex items-start gap-3">
+            <div className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Icon className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-foreground tracking-tight truncate">{draftTitle(draft)}</h3>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex-shrink-0">DRAFT</Badge>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1 min-w-0 flex-wrap">
+                <span className="truncate">{meta.label}</span>
+                <span className="text-border flex-shrink-0">|</span>
+                <span className="inline-flex items-center gap-1 flex-shrink-0"><CalendarClock className="h-3 w-3" />{formatDate(new Date(draft.savedAt).toISOString())}</span>
+                {amt > 0 && <><span className="text-border flex-shrink-0">|</span><span className="font-bold text-[#206295] tabular-nums flex-shrink-0">{moneyShort(amt)}</span></>}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/60">
+            <Button size="sm" variant="ghost" className="btn-glass text-[#206295] hover:text-[#206295] flex-1" onClick={() => onEdit(draft)} data-testid={`draft-edit-${draft.id}`}><Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit</Button>
+            <Button size="sm" className="btn-primary-gradient flex-1" disabled={submitting} onClick={() => onSubmit(draft)} data-testid={`draft-submit-${draft.id}`}><Send className="h-3.5 w-3.5 mr-1.5" /> Submit</Button>
+            <Button size="sm" variant="ghost" className="text-[#FF6F62] hover:text-[#FF6F62] flex-shrink-0" onClick={() => onDelete(draft)} data-testid={`draft-delete-${draft.id}`}><Trash2 className="h-4 w-4" /></Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="border-0 hover-elevate" data-testid={`draft-${draft.id}`}>
       <CardContent className="p-[17px]">

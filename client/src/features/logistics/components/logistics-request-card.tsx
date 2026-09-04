@@ -2,8 +2,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { statusClass, statusLabel } from "@/lib/status";
-import { Truck, MapPin, Package, Scale, Copy, ChevronRight } from "lucide-react";
+import { Truck, MapPin, Package, Scale, Copy, ChevronRight, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const fmtDate = (d: any) => (d ? format(new Date(d), "d MMM yyyy") : "—");
 const fmtKg = (w: any) => (w != null && w !== "" ? `${Number(w)} kg` : null); // strip the numeric column's trailing zeros
@@ -27,12 +28,45 @@ function Endpoint({ label, loc, date }: { label: string; loc: string; date: any 
 export function LogisticsRequestCard({ r, locName, onOpen }: {
   r: any; locName: (id: string) => string | undefined; onOpen: (r: any) => void;
 }) {
+  const isMobile = useIsMobile();
   const isInboard = r.requestType === "inboard";
   const from = r.fromLocationText || locName(r.fromLocationId) || "—";
   const to = r.toLocationText || locName(r.toLocationId) || "—";
   const weight = fmtKg(r.weightKg);
   const divider = <div className="hidden lg:block w-px self-stretch bg-border flex-shrink-0" />;
   const copyRef = (e: React.MouseEvent) => { e.stopPropagation(); navigator.clipboard?.writeText(r.reference); };
+
+  // Mobile: a compact single-row card — requester + status on line 1, reference (with copy) on
+  // line 2, route on line 3; the whole card opens the detail (same as View Details).
+  if (isMobile) {
+    return (
+      <Card data-testid={`logistics-card-${r.id}`} className="border hover-elevate active-elevate-2 cursor-pointer" onClick={() => onOpen(r)}>
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            <span className="h-11 w-11 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Truck className="h-5 w-5" /></span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-foreground truncate">{r.requesterName || "Unassigned"}</span>
+                <Badge className={`gap-1 text-[10px] flex-shrink-0 ${statusClass(r.status)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" /> {statusLabel(r.status)}</Badge>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                <span className="text-[11px] font-semibold text-muted-foreground tracking-wide truncate">{r.reference}</span>
+                <button onClick={copyRef} aria-label="Copy reference" className="h-4 w-4 rounded inline-flex items-center justify-center text-muted-foreground hover:text-[#206295] flex-shrink-0"><Copy className="h-3 w-3" /></button>
+                {r.requesterDept && <><span className="text-border flex-shrink-0">|</span><span className="text-[11px] text-muted-foreground truncate">{r.requesterDept}</span></>}
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-1 min-w-0">
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">{flatLoc(from)}</span>
+                <ArrowRight className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">{flatLoc(to)}</span>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card data-testid={`logistics-card-${r.id}`} className="border hover-elevate active-elevate-2 cursor-pointer" onClick={() => onOpen(r)}>

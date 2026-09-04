@@ -8,8 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Briefcase, MapPin, Calendar } from "lucide-react";
+import { Briefcase, MapPin, Calendar, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { statusColors, typeLabel } from "../lib/employee-constants";
 import { avatarColor, initials } from "../lib/employee-helpers";
 
@@ -22,10 +23,53 @@ export function EmployeeCard({ employee, departments, designations, selectionMod
   onOpen?: (employee: any) => void;
 }) {
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
   const desig = designations.find((d) => d.id === employee.designationId);
   const detail = "text-xs text-muted-foreground flex items-center gap-1.5";
   const c = avatarColor(employee.id);
   const onCardClick = () => (selectionMode ? onToggle() : onOpen ? onOpen(employee) : navigate(`/employees/${employee.id}`));
+
+  // Mobile: a compact single-row card (avatar · name/role/meta · status + chevron).
+  if (isMobile) {
+    return (
+      <Card
+        className={`border-0 card-hover cursor-pointer overflow-hidden ${selected ? "ring-2 ring-primary" : ""}`}
+        style={event ? { boxShadow: `0 0 0 1.5px ${event.tint}66` } : undefined}
+        onClick={onCardClick}
+        data-testid={`employee-card-${employee.id}`}
+      >
+        {event && (
+          <div className="flex items-center gap-1.5 px-3 py-1 text-white text-[10px] font-bold uppercase tracking-wide" style={{ background: event.tint }}>
+            <event.icon className="h-3 w-3 celebrate-pop flex-shrink-0" /> {event.label}
+          </div>
+        )}
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            {selectionMode && (
+              <Checkbox checked={selected} onClick={(e) => e.stopPropagation()} onCheckedChange={onToggle} className="flex-shrink-0" data-testid={`select-${employee.id}`} />
+            )}
+            <Avatar className="h-11 w-11 flex-shrink-0"><AvatarFallback className="text-sm font-semibold" style={{ backgroundColor: `${c}26`, color: c }}>{initials(employee.firstName, employee.lastName)}</AvatarFallback></Avatar>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold text-sm text-foreground truncate">{employee.firstName} {employee.lastName}</p>
+                <Badge className={`text-[10px] flex-shrink-0 ${statusColors[employee.employmentStatus] || statusColors.inactive}`}>{employee.employmentStatus.replace("_", " ")}</Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                {desig?.name || "—"}<span className="mx-1.5 text-border">|</span>{employee.employeeCode}
+              </p>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-0.5 min-w-0">
+                {employee.workLocation && <span className="inline-flex items-center gap-1 min-w-0"><MapPin className="h-3 w-3 flex-shrink-0" /><span className="truncate">{employee.workLocation}</span></span>}
+                {employee.workLocation && employee.joinDate && <span className="text-border flex-shrink-0">|</span>}
+                {employee.joinDate && <span className="inline-flex items-center gap-1 flex-shrink-0"><Calendar className="h-3 w-3 flex-shrink-0" />{format(new Date(employee.joinDate), "MMM d, yyyy")}</span>}
+              </div>
+            </div>
+            {!selectionMode && <ChevronRight className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card
       className={`border-0 card-hover cursor-pointer overflow-hidden ${selected ? "ring-2 ring-primary" : ""}`}
@@ -47,8 +91,8 @@ export function EmployeeCard({ employee, departments, designations, selectionMod
           <div className="flex-1 min-w-0 space-y-1">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-semibold text-sm text-foreground truncate">{employee.firstName} {employee.lastName}</p>
-                <p className="text-xs text-muted-foreground">{employee.employeeCode}</p>
+                <p className="font-semibold text-base sm:text-sm text-foreground truncate">{employee.firstName} {employee.lastName}</p>
+                <p className="text-[11px] sm:text-xs text-muted-foreground">{employee.employeeCode}</p>
               </div>
               <Badge className={`text-xs flex-shrink-0 ${statusColors[employee.employmentStatus] || statusColors.inactive}`}>{employee.employmentStatus.replace("_", " ")}</Badge>
             </div>

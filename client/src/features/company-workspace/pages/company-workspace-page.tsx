@@ -10,7 +10,8 @@ import { NewRequestDialog } from "@/features/company-workspace/office-purchases/
 import { NewTravelDialog } from "@/features/company-workspace/travel/components/travel";
 import { ReimbursementFormDialog } from "@/features/company-workspace/reimbursements/components/reimbursement-form";
 import { statusClass, statusLabel } from "@/lib/status";
-import { money, fmtDate, SERVICES } from "../shared/approval-format";
+import { money, moneyShort, fmtDate, SERVICES } from "../shared/approval-format";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { StatCard, NavCard } from "../components/approval-ui";
 import { ActivityDetailModal } from "../components/activity-detail-modal";
 import { TicketForm } from "../tickets/components/ticket-form";
@@ -23,6 +24,7 @@ import { appendDraft } from "../shared/drafts";
 export default function CompanyWorkspacePage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const {
     canTeam, canApprove, canReimbApprove,
     summary, sumLoading, travels,
@@ -56,7 +58,7 @@ export default function CompanyWorkspacePage() {
           <StatCard title="Pending Travels" value={(travels as any[]).filter((t: any) => ["pending_hr", "pending_approval", "under_review", "approved"].includes(t.status)).length} subtitle="in progress" icon={Car} color="bg-[#4BDCD9]/25 text-[#206295]" />
           <StatCard title="Open Tickets" value={summary?.tickets?.open || 0} subtitle="in progress" icon={TicketIcon} color="bg-[#206295]/15 text-[#206295]" />
           {/* Money, not a count — the subtitle names the claims so it can't be read as a fourth count. */}
-          <StatCard title="Pending Reimbursements" value={money(pendingReimbAmount)} subtitle={`${pendingReimbCount} ${pendingReimbCount === 1 ? "claim" : "claims"} ${canReimbApprove ? "awaiting your approval" : "pending"}`} icon={Receipt} color="bg-[#FF6F62]/20 text-[#FF6F62]" />
+          <StatCard title="Pending Reimbursements" value={isMobile ? moneyShort(pendingReimbAmount) : money(pendingReimbAmount)} subtitle={`${pendingReimbCount} ${pendingReimbCount === 1 ? "claim" : "claims"} ${canReimbApprove ? "awaiting your approval" : "pending"}`} icon={Receipt} color="bg-[#FF6F62]/20 text-[#FF6F62]" />
         </div>
       )}
 

@@ -142,7 +142,7 @@ export function ProfileActivityCard({ auditLogs, leaveRequests, leaveTypes }: { 
   items.sort((a, b) => +b.when - +a.when);
 
   return (
-    <Card className="h-full flex flex-col overflow-hidden">
+    <Card className="h-[24rem] lg:h-full flex flex-col overflow-hidden">
       <CardHeader className="pt-4 pb-2 flex flex-row items-center gap-2 space-y-0">
         <CardTitle className="text-base font-semibold flex items-center gap-2"><FileClock className="h-4 w-4 text-muted-foreground" /> Recent Activities</CardTitle>
       </CardHeader>

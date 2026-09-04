@@ -30,7 +30,7 @@ export function AppHeader() {
 
   return (
     <header
-      className="h-14 flex items-center justify-between px-4 backdrop-blur-md absolute top-3 left-4 right-4 sm:left-6 sm:right-6 z-50"
+      className="h-14 flex items-center justify-between px-4 md:backdrop-blur-md absolute top-3 left-4 right-4 sm:left-6 sm:right-6 z-50"
       style={HEADER_STYLE}
     >
       <div className="flex items-center gap-2">

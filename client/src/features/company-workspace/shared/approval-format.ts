@@ -1,7 +1,7 @@
 import { ShoppingCart, Car, TicketIcon, Receipt } from "lucide-react";
 import { format } from "date-fns";
-import { money, formatDate as fmtDate } from "@/lib/format";
-export { money, fmtDate };
+import { money, moneyShort, formatDate as fmtDate } from "@/lib/format";
+export { money, moneyShort, fmtDate };
 
 // Formatting and derivation for the approval surfaces: resubmission detection,
 // priority banding, category tinting, date-range filtering, and the service catalog list.

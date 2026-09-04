@@ -23,9 +23,9 @@ export function HeadcountChartCard({
   renderXTick: (p: any) => any;
 }) {
   return (
-    <Card className="border-0 h-full min-h-[20rem] flex flex-col">
+    <Card className="border-0 h-[24rem] lg:h-full min-h-[20rem] flex flex-col">
       <CardHeader className="pt-4 pb-2 space-y-2">
-        <div className="flex items-center justify-between gap-2 h-9">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:h-9">
           <CardTitle className="text-base font-semibold whitespace-nowrap shrink-0">Employee Headcount</CardTitle>
           <div className="flex items-center gap-2 shrink-0">
             <Select value={chartView} onValueChange={(v) => onChartView(v as any)}>
@@ -110,7 +110,7 @@ export function TodayDonutCard({ pieData, pieTotal, todayCounts }: {
   todayCounts: Record<string, number>;
 }) {
   return (
-    <Card className="border-0 h-full min-h-[20rem] flex flex-col">
+    <Card className="border-0 h-[24rem] lg:h-full min-h-[20rem] flex flex-col">
       <CardHeader className="pt-4 pb-2">
         <div className="flex items-center h-9">
           <CardTitle className="text-base font-semibold flex items-center gap-2"><UserCheck className="h-4 w-4 text-muted-foreground" /> Today's Attendance</CardTitle>

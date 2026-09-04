@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Car, BarChart3, Settings } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Car, BarChart3, Settings, MoreVertical } from "lucide-react";
 
 /** Title bar. HR also gets the Manage Bookings / Rental Requests mode toggle and
  *  the two admin actions. */
@@ -28,10 +29,22 @@ export function VehiclesHeader({ isHrAdmin, mode, onMode, pendingRentalCount, on
               <button onClick={() => onMode("calendar")} className={`px-3 h-full rounded-[10px] text-xs font-medium ${mode === "calendar" ? "btn-primary-gradient text-white" : "text-foreground/70"}`} data-testid="mode-calendar">Manage Bookings</button>
               <button onClick={() => onMode("requests")} className={`px-3 h-full rounded-[10px] text-xs font-medium ${mode === "requests" ? "btn-primary-gradient text-white" : "text-foreground/70"}`} data-testid="mode-requests">Rental Requests{pendingRentalCount ? ` (${pendingRentalCount})` : ""}</button>
             </div>
-            {/* Divider between the primary mode toggle and the secondary action buttons */}
-            <Separator orientation="vertical" className="self-stretch bg-border mx-1" />
-            <Button variant="outline" size="sm" className="h-10" onClick={onTrackUsage} data-testid="track-usage"><BarChart3 className="h-4 w-4 mr-1.5" /> Track Usage</Button>
-            <Button variant="outline" size="sm" className="h-10" onClick={onManageVehicles} data-testid="manage-vehicle"><Settings className="h-4 w-4 mr-1.5" /> Manage Vehicles</Button>
+            {/* Desktop: divider + the two secondary actions inline (unchanged). */}
+            <div className="hidden sm:flex items-center gap-2">
+              <Separator orientation="vertical" className="self-stretch bg-border mx-1" />
+              <Button variant="outline" size="sm" className="h-10" onClick={onTrackUsage} data-testid="track-usage"><BarChart3 className="h-4 w-4 mr-1.5" /> Track Usage</Button>
+              <Button variant="outline" size="sm" className="h-10" onClick={onManageVehicles} data-testid="manage-vehicle"><Settings className="h-4 w-4 mr-1.5" /> Manage Vehicles</Button>
+            </div>
+            {/* Mobile: the two admin actions fold into a kebab beside the mode toggle. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-10 w-10 sm:hidden" aria-label="More actions" data-testid="vehicles-more"><MoreVertical className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onTrackUsage} data-testid="menu-track-usage"><BarChart3 className="h-4 w-4 mr-2" /> Track Usage</DropdownMenuItem>
+                <DropdownMenuItem onClick={onManageVehicles} data-testid="menu-manage-vehicle"><Settings className="h-4 w-4 mr-2" /> Manage Vehicles</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         )}
       </div>

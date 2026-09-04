@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetTrigger } from "@/components/ui/sheet";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { useToast } from "@/hooks/use-toast";
-import { Search } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 
 // Brand palette only — teal (active), blue (invited/awaiting), coral (suspended), slate (exited).
 const statusColors: Record<string, string> = {
@@ -30,6 +31,7 @@ export function UsersSection() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // super_admin only offered to a super_admin (the API rejects anyone else assigning it).
   const assignableRoles = ALL_ROLES.filter((r) => r !== "super_admin" || user?.role === "super_admin");
@@ -99,8 +101,8 @@ export function UsersSection() {
 
   return (
     <div className="space-y-4">
-      {/* Search + role + status filters */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Desktop: search + role + status filters (unchanged). */}
+      <div className="hidden sm:flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by username, name or email…" className="pl-9" data-testid="input-search-users" />
@@ -119,6 +121,67 @@ export function UsersSection() {
             <SelectItem value="exited">Exited</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Mobile: search on its own row; role + status collapse behind one badged Filters sheet. */}
+      <div className="sm:hidden space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by username, name or email…" className="pl-9" data-testid="input-search-users-mobile" />
+          </div>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="secondary" size="sm" className="flex-shrink-0" data-testid="button-users-filters-mobile">
+                <SlidersHorizontal className="h-4 w-4 mr-1.5" /> Filters
+                {(roleFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0) > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#206295] px-1 text-[10px] font-bold text-white">{(roleFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0)}</span>}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+              <SheetHeader className="text-left"><SheetTitle>Filters</SheetTitle></SheetHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Role</p>
+                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger className="w-full" data-testid="sheet-role-filter"><SelectValue placeholder="Role" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All Roles</SelectItem>{ALL_ROLES.map((r) => <SelectItem key={r} value={r}>{getRoleLabel(r as any)}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Status</p>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full" data-testid="sheet-status-filter"><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="invited">Invited</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="exited">Exited</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <SheetFooter className="flex-row gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { setRoleFilter("all"); setStatusFilter("all"); }} data-testid="sheet-users-reset">Reset</Button>
+                <SheetClose asChild><Button className="flex-1 btn-primary-gradient text-white" data-testid="sheet-users-apply">Show results</Button></SheetClose>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </div>
+        {(roleFilter !== "all" || statusFilter !== "all") && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {roleFilter !== "all" && (
+              <button onClick={() => setRoleFilter("all")} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground hover-elevate" data-testid="chip-users-role">
+                <span className="truncate max-w-[8rem]">{getRoleLabel(roleFilter as any)}</span> <X className="h-3 w-3 flex-shrink-0" />
+              </button>
+            )}
+            {statusFilter !== "all" && (
+              <button onClick={() => setStatusFilter("all")} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground hover-elevate" data-testid="chip-users-status">
+                <span className="truncate max-w-[8rem] capitalize">{statusFilter}</span> <X className="h-3 w-3 flex-shrink-0" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <Card className="border-0"><CardContent className="p-0">
