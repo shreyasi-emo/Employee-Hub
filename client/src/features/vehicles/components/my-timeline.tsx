@@ -128,7 +128,7 @@ export function MyTimeline({ bookings, isMine, search, vehicles, onOpenBooking }
       {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-20"><Car className="h-9 w-9 text-muted-foreground/40 mb-2" /><p className="text-sm text-muted-foreground">No bookings match these filters.</p></div>
       ) : (
-        <ScrollArea className="h-[500px]">
+        <ScrollArea className="h-[360px] md:h-[500px]">
           {/* Continuous vertical connecting line — each card's coloured dot sits on it */}
           <div className="relative pl-6 pr-2 py-1">
             <span className="absolute left-[7px] top-3 bottom-3 w-px bg-border" aria-hidden />

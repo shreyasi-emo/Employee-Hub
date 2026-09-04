@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { StatCard } from "@/components/shared/stat-card";
 import { DataTable } from "@/components/shared/data-table";
@@ -8,12 +8,24 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetTrigger } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { Users, FileText, CalendarClock, Mail, UserCheck, UserPlus, Search, ArrowDownUp, Eye, MoreVertical, Copy, Download, Plus, CheckCircle2, XCircle, type LucideIcon } from "lucide-react";
+import { Users, FileText, CalendarClock, Mail, UserCheck, UserPlus, Search, ArrowDownUp, Eye, MoreVertical, Copy, Download, Plus, CheckCircle2, XCircle, SlidersHorizontal, X, type LucideIcon } from "lucide-react";
 import { format } from "date-fns";
 import { AddCandidateDialog } from "./add-candidate-dialog";
 import { OnboardDialog } from "./onboard-dialog";
+
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+const SORT_LABELS: Record<string, string> = { activity: "Latest Activity", newest: "Newest", oldest: "Oldest" };
 
 type StepKey = "doc_collection" | "date_of_joining" | "offer_letter" | "ready_to_onboard" | "onboarded" | "cancelled";
 const STEPS: Record<StepKey, { label: string; icon: LucideIcon; status: string; pill: string; tint: string }> = {
@@ -43,6 +55,7 @@ export function OnboardingDashboard() {
   const [sortBy, setSortBy] = useState("activity");
   const [add, setAdd] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const { data: requests = [] } = useQuery<any[]>({ queryKey: ["/api/onboarding/doc-requests"] });
   const rows = Array.isArray(requests) ? requests : [];
@@ -88,9 +101,24 @@ export function OnboardingDashboard() {
           <h1 className="text-2xl font-bold text-foreground">Onboarding</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Track and manage the onboarding process of all candidates.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={exportCsv}><Download className="h-4 w-4 mr-1.5" /> Export</Button>
-          <Button className="btn-primary-gradient" onClick={() => setAdd(true)} data-testid="onboarding-add-candidate"><Plus className="h-4 w-4 mr-1.5" /> Add Candidate</Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Desktop: Export + Add Candidate inline (unchanged). */}
+          <div className="hidden sm:flex items-center gap-2">
+            <Button variant="outline" onClick={exportCsv}><Download className="h-4 w-4 mr-1.5" /> Export</Button>
+            <Button className="btn-primary-gradient" onClick={() => setAdd(true)} data-testid="onboarding-add-candidate"><Plus className="h-4 w-4 mr-1.5" /> Add Candidate</Button>
+          </div>
+          {/* Mobile: Add Candidate visible; Export folds into a kebab. */}
+          <div className="flex sm:hidden items-center gap-2 w-full">
+            <Button className="btn-primary-gradient" onClick={() => setAdd(true)} data-testid="onboarding-add-candidate-mobile"><Plus className="h-4 w-4 mr-1.5" /> Add Candidate</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="ml-auto" aria-label="More actions" data-testid="onboarding-more-mobile"><MoreVertical className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportCsv} data-testid="menu-export-onboarding"><Download className="h-4 w-4 mr-2" /> Export</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
@@ -112,24 +140,91 @@ export function OnboardingDashboard() {
       </Tabs>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[12rem]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, email, or candidate ID…" className="pl-8 h-10 w-full" data-testid="onb-search" />
-        </div>
-        <Select value={dept} onValueChange={setDept}>
-          <SelectTrigger className="h-10 w-[160px] flex-shrink-0"><SelectValue placeholder="Department" /></SelectTrigger>
-          <SelectContent><SelectItem value="all">All departments</SelectItem>{departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-        </Select>
-        <Select value={position} onValueChange={setPosition}>
-          <SelectTrigger className="h-10 w-[160px] flex-shrink-0"><SelectValue placeholder="Position" /></SelectTrigger>
-          <SelectContent><SelectItem value="all">All positions</SelectItem>{positions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-        </Select>
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="h-10 w-[200px] gap-1 flex-shrink-0"><ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /><span className="text-muted-foreground">Sort:</span><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="activity">Latest Activity</SelectItem><SelectItem value="newest">Newest</SelectItem><SelectItem value="oldest">Oldest</SelectItem></SelectContent>
-        </Select>
-      </div>
+      {(() => {
+        const chips: { key: string; label: string; onClear: () => void }[] = [];
+        if (dept !== "all") chips.push({ key: "dept", label: dept, onClear: () => setDept("all") });
+        if (position !== "all") chips.push({ key: "position", label: position, onClear: () => setPosition("all") });
+        if (sortBy !== "activity") chips.push({ key: "sort", label: SORT_LABELS[sortBy] ?? sortBy, onClear: () => setSortBy("activity") });
+        const resetAll = () => { setDept("all"); setPosition("all"); setSortBy("activity"); };
+        return (
+          <>
+            {/* Desktop: search + department + position + sort inline (unchanged). */}
+            <div className="hidden sm:flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[12rem]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, email, or candidate ID…" className="pl-8 h-10 w-full" data-testid="onb-search" />
+              </div>
+              <Select value={dept} onValueChange={setDept}>
+                <SelectTrigger className="h-10 w-[160px] flex-shrink-0"><SelectValue placeholder="Department" /></SelectTrigger>
+                <SelectContent><SelectItem value="all">All departments</SelectItem>{departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={position} onValueChange={setPosition}>
+                <SelectTrigger className="h-10 w-[160px] flex-shrink-0"><SelectValue placeholder="Position" /></SelectTrigger>
+                <SelectContent><SelectItem value="all">All positions</SelectItem>{positions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="h-10 w-[200px] gap-1 flex-shrink-0"><ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /><span className="text-muted-foreground">Sort:</span><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="activity">Latest Activity</SelectItem><SelectItem value="newest">Newest</SelectItem><SelectItem value="oldest">Oldest</SelectItem></SelectContent>
+              </Select>
+            </div>
+
+            {/* Mobile: search + Filters on one row; department + position + sort behind one badged Filters sheet. */}
+            <div className="sm:hidden space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, email, or candidate ID…" className="pl-8 h-10 w-full" data-testid="onb-search-mobile" />
+                </div>
+                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-shrink-0" data-testid="button-filters-mobile">
+                      <SlidersHorizontal className="h-4 w-4 mr-1.5" /> Filters
+                      {chips.length > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#206295] px-1 text-[10px] font-bold text-white">{chips.length}</span>}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+                    <SheetHeader className="text-left"><SheetTitle>Filters</SheetTitle></SheetHeader>
+                    <div className="space-y-4 py-4">
+                      <FilterField label="Department">
+                        <Select value={dept} onValueChange={setDept}>
+                          <SelectTrigger className="w-full" data-testid="sheet-dept"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="all">All departments</SelectItem>{departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </FilterField>
+                      <FilterField label="Position">
+                        <Select value={position} onValueChange={setPosition}>
+                          <SelectTrigger className="w-full" data-testid="sheet-position"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="all">All positions</SelectItem>{positions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </FilterField>
+                      <FilterField label="Sort">
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                          <SelectTrigger className="w-full" data-testid="sheet-sort"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="activity">Latest Activity</SelectItem><SelectItem value="newest">Newest</SelectItem><SelectItem value="oldest">Oldest</SelectItem></SelectContent>
+                        </Select>
+                      </FilterField>
+                    </div>
+                    <SheetFooter className="flex-row gap-2">
+                      <Button variant="outline" className="flex-1" onClick={resetAll} data-testid="sheet-reset">Reset</Button>
+                      <SheetClose asChild><Button className="flex-1 btn-primary-gradient text-white" data-testid="sheet-apply">Show results</Button></SheetClose>
+                    </SheetFooter>
+                  </SheetContent>
+                </Sheet>
+              </div>
+              {chips.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {chips.map((c) => (
+                    <button key={c.key} onClick={c.onClear} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground hover-elevate" data-testid={`chip-${c.key}`}>
+                      <span className="truncate max-w-[8rem]">{c.label}</span> <X className="h-3 w-3 flex-shrink-0" />
+                    </button>
+                  ))}
+                  {chips.length > 1 && <button onClick={resetAll} className="text-xs font-medium text-[#206295] underline underline-offset-2" data-testid="chip-clear-all">Clear all</button>}
+                </div>
+              )}
+            </div>
+          </>
+        );
+      })()}
 
       {/* Table */}
       <Card className="border-0"><CardContent className="p-0">

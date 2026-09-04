@@ -12,8 +12,10 @@ export const CARD_STYLE: React.CSSProperties = {
   background:
     "linear-gradient(rgba(255,255,255,0.10), rgba(255,255,255,0.10)), rgba(255,255,255,0.50)",
   backgroundBlendMode: "overlay",
-  backdropFilter: "blur(12px)",
-  WebkitBackdropFilter: "blur(12px)",
+  // Blur is driven by --card-blur so the mobile media query in index.css can switch it off
+  // (inline styles can't be targeted by a media query directly). Desktop = blur(12px).
+  backdropFilter: "var(--card-blur)",
+  WebkitBackdropFilter: "var(--card-blur)",
   // Unified glass shadow — matches the header bar
   boxShadow:
     "0 0 8px rgba(44,62,98,0.15), inset 2px 2px 2px -2px #fff, inset -2px -2px 2px -2px #fff, 0 8px 12px rgba(0,0,0,0.08)",

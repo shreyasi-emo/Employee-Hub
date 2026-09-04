@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, Plus, Trash2, Users, X } from "lucide-react";
+import { Clock, Plus, Trash2, Users, X, MoreVertical } from "lucide-react";
 import { format, addDays, startOfWeek } from "date-fns";
 import { DAYS, SHORT_DAYS } from "../lib/days";
 import { ShiftFormDialog } from "../components/shift-form-dialog";
@@ -64,13 +65,30 @@ export default function ShiftsPage() {
           <p className="text-sm text-muted-foreground">{shifts.length} shifts defined</p>
         </div>
         {hrUser && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowAssign(true)} data-testid="button-assign-shift">
-              <Users className="h-4 w-4 mr-2" /> Assign Shift
-            </Button>
-            <Button onClick={() => setShowCreate(true)} data-testid="button-create-shift">
-              <Plus className="h-4 w-4 mr-2" /> Create Shift
-            </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            {/* Desktop: Assign Shift + Create Shift inline (unchanged). */}
+            <div className="hidden sm:flex gap-2">
+              <Button variant="outline" onClick={() => setShowAssign(true)} data-testid="button-assign-shift">
+                <Users className="h-4 w-4 mr-2" /> Assign Shift
+              </Button>
+              <Button onClick={() => setShowCreate(true)} data-testid="button-create-shift">
+                <Plus className="h-4 w-4 mr-2" /> Create Shift
+              </Button>
+            </div>
+            {/* Mobile: Create Shift visible; Assign Shift folds into a kebab. */}
+            <div className="flex sm:hidden items-center gap-2 w-full">
+              <Button onClick={() => setShowCreate(true)} data-testid="button-create-shift-mobile">
+                <Plus className="h-4 w-4 mr-2" /> Create Shift
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="ml-auto" aria-label="More actions" data-testid="shifts-more-mobile"><MoreVertical className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setShowAssign(true)} data-testid="menu-assign-shift"><Users className="h-4 w-4 mr-2" /> Assign Shift</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         )}
       </div>

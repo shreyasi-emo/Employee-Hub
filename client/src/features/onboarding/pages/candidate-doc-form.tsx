@@ -187,7 +187,7 @@ export default function CandidateDocForm() {
         </Section>
       </div>
 
-      <div className="sticky bottom-0 mt-5 -mx-4 sm:mx-0 bg-background/80 backdrop-blur border-t border-border sm:border-0 sm:bg-transparent sm:backdrop-blur-0 px-4 sm:px-0 py-4 flex justify-end">
+      <div className="sticky bottom-0 mt-5 -mx-4 sm:mx-0 bg-background/80 border-t border-border sm:border-0 sm:bg-transparent px-4 sm:px-0 py-4 flex justify-end">
         <Button className="btn-primary-gradient w-full sm:w-auto" disabled={submitting} onClick={submit} data-testid="onboarding-submit">
           {submitting ? "Submitting…" : "Submit documents"}
         </Button>

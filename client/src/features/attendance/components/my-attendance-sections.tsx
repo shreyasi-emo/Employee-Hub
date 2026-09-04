@@ -3,7 +3,8 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Home, Route, UserCheck, CircleCheck, Briefcase, CalendarDays } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Home, Route, UserCheck, CircleCheck, Briefcase, CalendarDays, MoreVertical } from "lucide-react";
 import { StatCard } from "./attendance-ui";
 
 export function MyAttendanceHeader({ onApplyWfh, onMarkOnDuty }: {
@@ -19,9 +20,24 @@ export function MyAttendanceHeader({ onApplyWfh, onMarkOnDuty }: {
           <p className="text-sm text-muted-foreground">View your attendance history and update your work status.</p>
         </div>
       </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button variant="outline" className="h-10 text-[12px]" onClick={onApplyWfh} data-testid="apply-wfh"><Home className="h-4 w-4 mr-1.5" /> Apply Work from Home</Button>
-        <Button className="btn-primary-gradient h-10 text-[12px]" onClick={onMarkOnDuty} data-testid="mark-on-duty"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</Button>
+      <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+        {/* Desktop: both actions inline (unchanged). */}
+        <div className="hidden sm:flex items-center gap-2 flex-wrap">
+          <Button variant="outline" className="h-10 text-[12px]" onClick={onApplyWfh} data-testid="apply-wfh"><Home className="h-4 w-4 mr-1.5" /> Apply Work from Home</Button>
+          <Button className="btn-primary-gradient h-10 text-[12px]" onClick={onMarkOnDuty} data-testid="mark-on-duty"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</Button>
+        </div>
+        {/* Mobile: Mark On Duty visible; Apply WFH folds into a kebab. */}
+        <div className="flex sm:hidden items-center gap-2 w-full">
+          <Button className="btn-primary-gradient h-10 text-[12px]" onClick={onMarkOnDuty} data-testid="mark-on-duty-mobile"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-10 w-10 ml-auto" aria-label="More actions" data-testid="my-attendance-more-mobile"><MoreVertical className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onApplyWfh} data-testid="menu-apply-wfh"><Home className="h-4 w-4 mr-2" /> Apply Work from Home</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   );

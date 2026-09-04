@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Calendar, FileText } from "lucide-react";
+import { Plus, Calendar, FileText, MoreVertical } from "lucide-react";
 import { reqYear, yearOptions } from "../lib/leave-model";
 import {
   useLeaveRequests, useLeaveTypes, useLeaveBalances, useLeaveLedger, useUpdateLeaveStatus, useEndLeaveRequest,
@@ -79,14 +80,33 @@ export default function LeavePage() {
           <h1 className="text-2xl font-bold text-foreground">Leave Management</h1>
           <p className="text-sm text-muted-foreground">Manage leave requests, balances, approvals &amp; team availability</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-            <SelectTrigger className="w-32" data-testid="select-leave-year"><Calendar className="h-4 w-4 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
-            <SelectContent>{years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-          </Select>
-          <div className="w-px self-stretch bg-border mx-1" />
-          <Button variant="secondary" size="sm" onClick={() => setShowPolicy(true)} data-testid="button-leave-policy"><FileText className="h-4 w-4 mr-1" /> Leave Policy</Button>
-          {!exec && <Button size="sm" onClick={() => setShowApply(true)} data-testid="button-apply-leave"><Plus className="h-4 w-4 mr-1" /> Apply Leave</Button>}
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          {/* Desktop: year + Leave Policy + Apply Leave inline (unchanged). */}
+          <div className="hidden sm:flex items-center gap-2 flex-wrap">
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+              <SelectTrigger className="w-32" data-testid="select-leave-year"><Calendar className="h-4 w-4 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+              <SelectContent>{years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+            </Select>
+            <div className="w-px self-stretch bg-border mx-1" />
+            <Button variant="secondary" size="sm" onClick={() => setShowPolicy(true)} data-testid="button-leave-policy"><FileText className="h-4 w-4 mr-1" /> Leave Policy</Button>
+            {!exec && <Button size="sm" onClick={() => setShowApply(true)} data-testid="button-apply-leave"><Plus className="h-4 w-4 mr-1" /> Apply Leave</Button>}
+          </div>
+          {/* Mobile: keep the year Select + Apply Leave visible; Leave Policy folds into a kebab. */}
+          <div className="flex sm:hidden items-center gap-2 w-full">
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+              <SelectTrigger className="w-32" data-testid="select-leave-year-mobile"><Calendar className="h-4 w-4 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+              <SelectContent>{years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+            </Select>
+            {!exec && <Button size="sm" onClick={() => setShowApply(true)} data-testid="button-apply-leave-mobile"><Plus className="h-4 w-4 mr-1" /> Apply Leave</Button>}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="icon" className="ml-auto" aria-label="More actions" data-testid="button-leave-more-mobile"><MoreVertical className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowPolicy(true)} data-testid="menu-leave-policy"><FileText className="h-4 w-4 mr-2" /> Leave Policy</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 

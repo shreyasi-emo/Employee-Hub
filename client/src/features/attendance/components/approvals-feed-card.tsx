@@ -34,7 +34,7 @@ export function ApprovalsFeedCard() {
   };
 
   return (
-    <Card className="border-0 h-full min-h-[20rem] flex flex-col">
+    <Card className="border-0 h-[24rem] lg:h-full min-h-[20rem] flex flex-col">
       <CardHeader className="pt-4 pb-2 px-4">
         <div className="flex flex-row items-center justify-between gap-2 h-9">
           <CardTitle className="text-base font-semibold flex items-center gap-2">

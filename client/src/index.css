@@ -289,6 +289,22 @@
   backdrop-filter: blur(10px);
 }
 
+/* Mobile perf: backdrop-filter blur is re-sampled every scroll frame, which janks on
+   phones. Below md we drop the blur (the translucent background + shadow stay, so cards
+   still read as "glass"); desktop keeps the full frosted glass. --card-blur drives the
+   inline dashboard CARD_STYLE, which a media query can't otherwise reach. */
+:root { --card-blur: blur(12px); }
+@media (max-width: 767px) {
+  :root { --card-blur: none; }
+  .card-surface,
+  .btn-glass,
+  .tab-trigger[data-state="inactive"],
+  .btn-secondary-b {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 /* ===== Global scrollbar — minimal, subtle, no arrows =====
    Thin transparent track with a soft rounded thumb (matches the Present-list /
    Radix ScrollArea look). Applied app-wide for consistency. */
@@ -327,6 +343,18 @@
 
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Opt-out: hide the scrollbar on touch/swipe strips (pill rows, tab strips).
+   Unlayered + after the rules above so it actually overrides them. */
+.no-scrollbar {
+  -ms-overflow-style: none;   /* IE/Edge */
+  scrollbar-width: none;      /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;              /* Chrome/Safari */
+  width: 0;
+  height: 0;
 }
 
 /**

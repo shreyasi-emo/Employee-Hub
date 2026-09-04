@@ -120,9 +120,9 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
         data-testid={`announcement-${ann.id}`}
         onClick={expandable ? onToggle : undefined}
       >
-        <CardContent className="p-5 flex flex-col h-full">
+        <CardContent className="p-4 sm:p-5 flex flex-col h-full">
           <div className="flex items-start justify-between gap-2 flex-shrink-0">
-            <div className={`h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.tile}`}><Icon className="h-6 w-6" /></div>
+            <div className={`h-11 w-11 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.tile}`}><Icon className="h-5 w-5 sm:h-6 sm:w-6" /></div>
             {/* stop the delete menu from also toggling the card */}
             <div onClick={(e) => e.stopPropagation()}>{canManage && <MoreMenu id={ann.id} onDelete={onDelete} />}</div>
           </div>
@@ -152,10 +152,10 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
 
   // List view — left column = icon + title + date + poster; right column = the message body.
   return (
-    <div className={`p-5 flex flex-col lg:flex-row items-start gap-4 ${isExpired ? "opacity-60" : ""}`} data-testid={`announcement-${ann.id}`}>
+    <div className={`p-4 sm:p-5 flex flex-col lg:flex-row items-start gap-3 sm:gap-4 ${isExpired ? "opacity-60" : ""}`} data-testid={`announcement-${ann.id}`}>
       {/* LEFT — icon + meta */}
       <div className="flex items-start gap-3 w-full lg:w-72 lg:flex-shrink-0">
-        <div className={`h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.tile}`}><Icon className="h-5 w-5" /></div>
+        <div className={`h-10 w-10 sm:h-11 sm:w-11 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.tile}`}><Icon className="h-5 w-5" /></div>
         <div className="min-w-0 flex-1">
           <Badges ann={ann} isUrgent={isUrgent} isExpired={isExpired} />
           <div className="mt-2.5 space-y-1.5">

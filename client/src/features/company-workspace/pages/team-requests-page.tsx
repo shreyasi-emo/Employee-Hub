@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, ShoppingCart, Car, TicketIcon, ChevronLeft, Search, LayoutGrid, Table2, ArrowDownUp } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetTrigger } from "@/components/ui/sheet";
+import { Users, ShoppingCart, Car, TicketIcon, ChevronLeft, Search, LayoutGrid, Table2, ArrowDownUp, SlidersHorizontal, X } from "lucide-react";
 import { RequestCard } from "../components/request-card";
 import { DataTable } from "@/components/shared/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ export default function TeamRequestsPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("latest");
   const [view, setView] = useState<"card" | "table">("card");
+  const [filterSheet, setFilterSheet] = useState(false); // mobile Filters bottom-sheet (Member + Status + Sort)
 
   const { data: teamData, isLoading, error } = useQuery<any>({ queryKey: ["/api/team-requests"], retry: false });
 
@@ -91,6 +93,13 @@ export default function TeamRequestsPage() {
     return <div className="space-y-2">{items.map((it: any) => <RequestCard key={it.id} item={it} type={type} readOnly byline={getMemberName(it.requesterId)} />)}</div>;
   };
 
+  // Active (non-default) filters for the mobile Filters sheet — badge count + dismissible chips.
+  const teamFilterChips: { key: string; label: string; onClear: () => void }[] = [];
+  if (memberFilter !== "all") teamFilterChips.push({ key: "member", label: getMemberName(memberFilter), onClear: () => setMemberFilter("all") });
+  if (statusFilter !== "all") teamFilterChips.push({ key: "status", label: statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1), onClear: () => setStatusFilter("all") });
+  if (sortBy !== "latest") teamFilterChips.push({ key: "sort", label: "Oldest", onClear: () => setSortBy("latest") });
+  const resetTeamFilters = () => { setMemberFilter("all"); setStatusFilter("all"); setSortBy("latest"); };
+
   return (
     <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
       <div className="flex items-center gap-3">
@@ -125,7 +134,8 @@ export default function TeamRequestsPage() {
           </TabsList>
 
           {/* Canonical controls strip (same as My Requests) — read-only, plus a member filter. */}
-          <div className="flex items-center gap-3 flex-wrap">
+          {/* Desktop — original inline strip (unchanged). */}
+          <div className="hidden sm:flex items-center gap-3 flex-wrap">
             <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
               <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
               <button onClick={() => setView("table")} aria-label="Table view" data-testid="view-table" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
@@ -160,6 +170,83 @@ export default function TeamRequestsPage() {
                 <SelectItem value="oldest">Oldest</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Mobile — search + Filters on one row; view toggle below; Member + Status + Sort go in a Filters sheet. */}
+          <div className="sm:hidden space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search requests…" className="pl-8 h-10 w-full" data-testid="input-search-team-requests-mobile" />
+              </div>
+              <Sheet open={filterSheet} onOpenChange={setFilterSheet}>
+                <SheetTrigger asChild>
+                  <Button variant="secondary" size="sm" className="flex-shrink-0" data-testid="button-filters-mobile">
+                    <SlidersHorizontal className="h-4 w-4 mr-1.5" /> Filters
+                    {teamFilterChips.length > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#206295] px-1 text-[10px] font-bold text-white">{teamFilterChips.length}</span>}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+                  <SheetHeader className="text-left"><SheetTitle>Filters</SheetTitle></SheetHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Member</p>
+                      <Select value={memberFilter} onValueChange={setMemberFilter}>
+                        <SelectTrigger className="w-full" data-testid="sheet-member-filter"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Members</SelectItem>
+                          {teamMembers.filter((m: any) => m.userId).map((m: any) => (
+                            <SelectItem key={m.id} value={m.userId}>{m.firstName} {m.lastName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Status</p>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-full" data-testid="sheet-status-filter"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="approved">Approved</SelectItem>
+                          <SelectItem value="rejected">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Sort</p>
+                      <Select value={sortBy} onValueChange={setSortBy}>
+                        <SelectTrigger className="w-full" data-testid="sheet-sort"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="latest">Newest</SelectItem>
+                          <SelectItem value="oldest">Oldest</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <SheetFooter className="flex-row gap-2">
+                    <Button variant="outline" className="flex-1" onClick={resetTeamFilters} data-testid="sheet-reset">Reset</Button>
+                    <SheetClose asChild><Button className="flex-1 btn-primary-gradient text-white" data-testid="sheet-apply">Show results</Button></SheetClose>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
+                <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card-mobile" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
+                <button onClick={() => setView("table")} aria-label="Table view" data-testid="view-table-mobile" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
+              </div>
+            </div>
+            {teamFilterChips.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {teamFilterChips.map((c) => (
+                  <button key={c.key} onClick={c.onClear} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground hover-elevate" data-testid={`chip-${c.key}`}>
+                    <span className="truncate max-w-[8rem]">{c.label}</span> <X className="h-3 w-3 flex-shrink-0" />
+                  </button>
+                ))}
+                {teamFilterChips.length > 1 && <button onClick={resetTeamFilters} className="text-xs font-medium text-[#206295] underline underline-offset-2" data-testid="chip-clear-all">Clear all</button>}
+              </div>
+            )}
           </div>
 
           <TabsContent value="purchases" className="mt-0">{render(purchases, "purchase", "No purchase requests from team.")}</TabsContent>

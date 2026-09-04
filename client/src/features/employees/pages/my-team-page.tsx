@@ -101,19 +101,36 @@ export default function MyTeamPage() {
 
       {/* Search + status filter */}
       {reports.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your team…" className="pl-9" data-testid="input-search-team" />
+        <>
+          {/* Desktop: search + status inline (unchanged). */}
+          <div className="hidden sm:flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your team…" className="pl-9" data-testid="input-search-team" />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40" data-testid="select-team-status"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                {EMP_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                <SelectItem value="all">All Statuses</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40" data-testid="select-team-status"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              {EMP_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-              <SelectItem value="all">All Statuses</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          {/* Mobile: single status filter — search full-width, the Select stacked full-width below. */}
+          <div className="sm:hidden space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your team…" className="pl-9" data-testid="input-search-team-mobile" />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full" data-testid="select-team-status-mobile"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                {EMP_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                <SelectItem value="all">All Statuses</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </>
       )}
 
       {isLoading ? (

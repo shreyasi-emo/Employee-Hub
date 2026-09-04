@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { FileText, IndianRupee, Eye, MoreVertical, ChevronDown } from "lucide-react";
+import { moneyShort } from "@/lib/format";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Shared "premium" approval card — the canonical reimbursement-card layout, reused across every
 // approval surface (reimbursements / office purchases / procurement / travel) so they read identically:
@@ -32,11 +34,116 @@ export function ApprovalCard({
 }) {
   const amt = Number(amount) || 0;
   const showCheckbox = selectable && (selectionMode || checkboxAlways);
+  const isMobile = useIsMobile();
   const handleCardClick = () => {
     if (selectionMode && selectable) return onToggleSelect?.();
     if (expandable) return onToggleExpand?.();
     return onView?.();
   };
+
+  // Mobile: a compact single-row card — reference + badges on line 1, a compact ₹ amount, the
+  // requester + facts, then a |-separated meta line. The overflow menu, checkbox, expand chevron
+  // and View button all move into a right-side stack, and the accordion body (approve / reject /
+  // raise-query) still drops in below unchanged.
+  if (isMobile) {
+    return (
+      <div
+        data-testid={testId}
+        className={`group card-surface card-hover relative overflow-hidden cursor-pointer ${selectionMode && selected ? "ring-2 ring-[#206295]" : ""}`}
+        onClick={handleCardClick}
+      >
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            {showCheckbox && (
+              <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0 mt-0.5">
+                <Checkbox checked={!!selected} onCheckedChange={() => onToggleSelect?.()} data-testid={testId ? `${testId}-select` : undefined} />
+              </div>
+            )}
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Icon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">{reference}</span>
+                {badge}
+                {resubmitted && <Badge className="text-[10px] bg-[#206295]/15 text-[#206295] flex-shrink-0">Resubmitted</Badge>}
+              </div>
+              <div className="mt-1">
+                {amt > 0
+                  ? <span className="text-xl font-bold text-[#206295] tracking-tight tabular-nums">{moneyShort(amt)}</span>
+                  : <span className="text-sm font-semibold text-muted-foreground">{amountFallback || "—"}</span>}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1 text-xs min-w-0 flex-wrap">
+                <span className="flex-shrink-0">
+                  <span className="font-bold text-foreground">{requesterName || "Employee"}</span>
+                  {requesterCode ? <span className="text-muted-foreground font-normal"> ({requesterCode})</span> : null}
+                </span>
+                {facts.map((f, i) => (
+                  <Fragment key={i}>
+                    <span className="text-border flex-shrink-0">|</span>
+                    <span className={f.truncate ? "min-w-0 truncate" : "flex-shrink-0"}>
+                      {f.label && <span className="text-muted-foreground">{f.label}: </span>}
+                      <span className={f.muted ? "text-muted-foreground" : "font-semibold text-foreground/90"}>{f.value}</span>
+                    </span>
+                  </Fragment>
+                ))}
+              </div>
+              {meta.length > 0 && (
+                <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-muted-foreground flex-wrap min-w-0">
+                  {meta.map((m, i) => (
+                    <Fragment key={i}>
+                      {i > 0 && <span className="text-border flex-shrink-0">|</span>}
+                      <span className="inline-flex items-center gap-1 min-w-0">
+                        {m.icon && <m.icon className="h-3 w-3 flex-shrink-0" />}
+                        <span className="uppercase tracking-wide">{m.label}</span>
+                        {m.badge ? m.badge : <span className="font-semibold text-foreground truncate">{m.value}</span>}
+                      </span>
+                    </Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right stack — overflow menu, then the expand chevron or the View button */}
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+              {!selectionMode && menu.length > 0 && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" data-testid={testId ? `${testId}-more` : undefined}><MoreVertical className="h-4 w-4" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      {menu.map((m, i) => (
+                        <DropdownMenuItem key={i} className={m.danger ? "text-[#FF6F62] focus:text-[#FF6F62]" : ""} onClick={m.onClick}>
+                          {m.icon && <m.icon className="h-4 w-4 mr-2" />} {m.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+              {expandable ? (
+                <ChevronDown className={`h-5 w-5 text-muted-foreground flex-shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+              ) : onView && !selectionMode ? (
+                <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <Button size="sm" variant="ghost" className="h-9 btn-glass text-[#206295] hover:text-[#206295]" onClick={onView} data-testid={testId ? `${testId}-view` : undefined}>
+                    <Eye className="h-4 w-4 mr-1.5" /> {viewLabel}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {/* Accordion body — drops down in place */}
+        {expandable && expanded && (
+          <div className="border-t border-border bg-muted/20 px-4 py-4" onClick={(e) => e.stopPropagation()}>
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid={testId}

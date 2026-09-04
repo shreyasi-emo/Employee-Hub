@@ -142,7 +142,7 @@ export function CalendarCard({ holidayDates, upcomingHolidays, employees, readOn
                     key={ev.id}
                     type="button"
                     onClick={() => openView(ev)}
-                    className="w-full text-left rounded-[12px] border border-primary/20 bg-primary/5 backdrop-blur-md p-3 hover-elevate"
+                    className="w-full text-left rounded-[12px] border border-primary/20 bg-primary/5 md:backdrop-blur-md p-3 hover-elevate"
                     style={{ boxShadow: "0 0 8px rgba(44,62,98,0.15), inset 2px 2px 2px -2px #fff, inset -2px -2px 2px -2px #fff, 0 8px 12px rgba(0,0,0,0.08)" }}
                     data-testid={`event-tile-${ev.id}`}
                   >

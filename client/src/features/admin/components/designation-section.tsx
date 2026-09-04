@@ -92,7 +92,8 @@ export function DesignationSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Desktop: search + department filter + add (unchanged). */}
+      <div className="hidden sm:flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search designations…" className="pl-9" data-testid="input-search-desigs" />
@@ -104,6 +105,23 @@ export function DesignationSection() {
         <Button size="sm" onClick={() => setShowAdd(true)} data-testid="button-add-desig">
           <Plus className="h-4 w-4 mr-1.5" /> Add Designation
         </Button>
+      </div>
+
+      {/* Mobile: search full-width; single department filter + Add stacked below. */}
+      <div className="sm:hidden space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search designations…" className="pl-9" data-testid="input-search-desigs-mobile" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={deptFilter} onValueChange={setDeptFilter}>
+            <SelectTrigger className="flex-1" data-testid="select-desig-dept-filter-mobile"><SelectValue placeholder="Department" /></SelectTrigger>
+            <SelectContent><SelectItem value="all">All Departments</SelectItem>{departments.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+          </Select>
+          <Button size="sm" className="flex-shrink-0" onClick={() => setShowAdd(true)} data-testid="button-add-desig-mobile">
+            <Plus className="h-4 w-4 mr-1.5" /> Add Designation
+          </Button>
+        </div>
       </div>
       {showAdd && (
         <Card>
