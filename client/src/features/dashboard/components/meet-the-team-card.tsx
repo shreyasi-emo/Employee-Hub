@@ -19,7 +19,7 @@ export function MeetTheTeamCard({ employees, departments, designations, meId }: 
     .filter((e) => !term || `${e.firstName} ${e.lastName} ${deptName(e.departmentId) || ""} ${desigName(e.designationId) || ""} ${e.employeeCode || ""}`.toLowerCase().includes(term))
     .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
   return (
-    <Card className="border-0 lg:col-span-3 h-[26rem] flex flex-col" style={CARD_STYLE}>
+    <Card className="border-0 lg:col-span-3 h-[20rem] md:h-[26rem] flex flex-col" style={CARD_STYLE}>
       <CardHeader className="pt-4 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base font-semibold flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Meet the Team <span className="text-xs font-normal text-muted-foreground">{list.length}</span></CardTitle>
         <div className="relative w-full sm:w-56">

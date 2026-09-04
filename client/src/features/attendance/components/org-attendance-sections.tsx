@@ -3,8 +3,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
-import { Users, UserCheck, Plane, Download, CalendarDays } from "lucide-react";
+import { Users, UserCheck, Plane, Download, CalendarDays, MoreVertical } from "lucide-react";
 import { StatCard } from "./attendance-ui";
 
 export function OrgAttendanceHeader({
@@ -25,26 +26,53 @@ export function OrgAttendanceHeader({
         <h1 className="text-2xl font-bold text-foreground">Attendance</h1>
         <p className="text-sm text-muted-foreground">Headcount trends and attendance for {rangeLabel}</p>
       </div>
-      <div className="flex gap-2 flex-wrap items-center">
-        <Select value={preset} onValueChange={onPreset}>
-          <SelectTrigger className="w-40" data-testid="select-date-preset"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="today">Today</SelectItem>
-            <SelectItem value="week">This Week</SelectItem>
-            <SelectItem value="month">This Month</SelectItem>
-            <SelectItem value="custom">Custom Range</SelectItem>
-          </SelectContent>
-        </Select>
-        {preset === "custom" && (
-          <DateRangePicker value={customRange} onChange={onCustomRange} align="end" testId="button-custom-range" />
-        )}
+      <div className="flex gap-2 flex-wrap items-center w-full sm:w-auto">
+        {/* Desktop: date preset + range + Report + Override inline (unchanged). */}
+        <div className="hidden sm:flex gap-2 flex-wrap items-center">
+          <Select value={preset} onValueChange={onPreset}>
+            <SelectTrigger className="w-40" data-testid="select-date-preset"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+          {preset === "custom" && (
+            <DateRangePicker value={customRange} onChange={onCustomRange} align="end" testId="button-custom-range" />
+          )}
 
-        {/* Separator between the date filter and the action buttons */}
-        <div className="w-px self-stretch bg-border mx-1" />
-        <Button variant="secondary" size="sm" onClick={onReport} data-testid="button-report-attendance">
-          <Download className="h-4 w-4 mr-1" /> Report
-        </Button>
-        {canOverride && <Button size="sm" onClick={onOverride} data-testid="button-override">Override Attendance</Button>}
+          {/* Separator between the date filter and the action buttons */}
+          <div className="w-px self-stretch bg-border mx-1" />
+          <Button variant="secondary" size="sm" onClick={onReport} data-testid="button-report-attendance">
+            <Download className="h-4 w-4 mr-1" /> Report
+          </Button>
+          {canOverride && <Button size="sm" onClick={onOverride} data-testid="button-override">Override Attendance</Button>}
+        </div>
+        {/* Mobile: keep the date preset + range + Override visible; Report folds into a kebab. */}
+        <div className="flex sm:hidden gap-2 flex-wrap items-center w-full">
+          <Select value={preset} onValueChange={onPreset}>
+            <SelectTrigger className="w-40" data-testid="select-date-preset-mobile"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+          {preset === "custom" && (
+            <DateRangePicker value={customRange} onChange={onCustomRange} align="end" testId="button-custom-range-mobile" />
+          )}
+          {canOverride && <Button size="sm" onClick={onOverride} data-testid="button-override-mobile">Override Attendance</Button>}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="icon" className="ml-auto" aria-label="More actions" data-testid="org-attendance-more-mobile"><MoreVertical className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onReport} data-testid="menu-report-attendance"><Download className="h-4 w-4 mr-2" /> Report</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   );

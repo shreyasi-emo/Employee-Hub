@@ -5,15 +5,75 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Pencil, TrendingUp, CheckCircle2, ChevronDown, ChevronUp, Edit, Lock } from "lucide-react";
 import { format } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { GOAL_STATUSES } from "../lib/performance-constants";
 
 // ---- Goal Card ----
 export function GoalCard({ goal, onEdit, onProgress, onApprove, canManage }: {
   goal: any; onEdit: () => void; onProgress: () => void; onApprove: () => void; canManage: boolean;
 }) {
+  const isMobile = useIsMobile();
   const [expanded, setExpanded] = useState(false);
   const statusInfo = GOAL_STATUSES[goal.status] || GOAL_STATUSES.not_started;
   const StatusIcon = statusInfo.icon;
+
+  // The action cluster (expand + progress + edit + approve) — shared by both layouts.
+  const actions = (
+    <div className="flex items-center gap-1 flex-shrink-0">
+      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpanded(e => !e)} data-testid={`button-expand-goal-${goal.id}`}>
+        {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+      </Button>
+      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onProgress} title="Update progress" data-testid={`button-progress-${goal.id}`}>
+        <TrendingUp className="h-3.5 w-3.5" />
+      </Button>
+      {canManage && !goal.isLocked && (
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} data-testid={`button-edit-goal-${goal.id}`}>
+          <Edit className="h-3.5 w-3.5" />
+        </Button>
+      )}
+      {canManage && !goal.isApproved && !goal.isLocked && (
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600" onClick={onApprove} title="Approve goal" data-testid={`button-approve-goal-${goal.id}`}>
+          <CheckCircle2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
+    </div>
+  );
+
+  // Mobile: a compact single-row card — title on line 1, category|status|approved + meta below,
+  // action icons on the right, expandable description underneath. All actions preserved.
+  if (isMobile) {
+    return (
+      <Card className="group" data-testid={`card-goal-${goal.id}`}>
+        <CardContent className="p-3">
+          <div className="flex items-center gap-2">
+            <span className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+              <StatusIcon className="h-4 w-4 text-muted-foreground" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-medium text-sm text-foreground truncate">{goal.title}</span>
+                {goal.isLocked && <Lock className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+              </div>
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                {goal.category}
+                <span className="mx-1.5 text-border">|</span>
+                {statusInfo.label}
+                {goal.isApproved && <><span className="mx-1.5 text-border">|</span>Approved</>}
+              </p>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-0.5 min-w-0 truncate">
+                <span>Weight: <strong className="text-foreground">{goal.weight}%</strong></span>
+                {goal.dueDate && <><span className="text-border">|</span><span>Due {format(new Date(goal.dueDate), "dd MMM yyyy")}</span></>}
+              </div>
+            </div>
+            {actions}
+          </div>
+          {expanded && goal.description && (
+            <p className="mt-2 text-sm text-muted-foreground border-t pt-2">{goal.description}</p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="group" data-testid={`card-goal-${goal.id}`}>

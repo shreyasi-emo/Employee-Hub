@@ -10,7 +10,7 @@ export function RecentActivityCard() {
   const { data: notifications = [] } = useQuery<any[]>({ queryKey: ["/api/notifications"] });
   const items = (notifications as any[]).slice(0, 15);
   return (
-    <Card className="border-0 h-[26rem] flex flex-col" style={CARD_STYLE}>
+    <Card className="border-0 h-[20rem] md:h-[26rem] flex flex-col" style={CARD_STYLE}>
       <CardHeader className="pt-4 pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
         <CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
       </CardHeader>

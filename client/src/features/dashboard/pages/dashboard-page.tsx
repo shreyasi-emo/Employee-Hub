@@ -7,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, Plane, Calendar, ArrowRight, UserCheck, ClipboardList, ShoppingCart, Car, CalendarDays, Route, Home, Hash, Briefcase, Mail, ArrowUpRight, PartyPopper } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Users, Plane, Calendar, ArrowRight, UserCheck, ClipboardList, ShoppingCart, Car, CalendarDays, Route, Home, Hash, Briefcase, Mail, ArrowUpRight, PartyPopper, MoreVertical } from "lucide-react";
 import { todayEvent } from "@/features/employees/lib/employee-helpers";
 import { ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format } from "date-fns";
@@ -225,34 +226,61 @@ export default function DashboardPage() {
             {format(today, "EEEE, MMMM d, yyyy")} · {getRoleLabel(user?.role as any)}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {isHR(user!) && (
-            <Button asChild size="sm" data-testid="button-add-employee">
-              <a href="/employees?action=new">
-                <Users className="h-4 w-4 mr-1.5" />
-                Add Employee
-              </a>
-            </Button>
-          )}
-          {emp && !showAdminLayout && !isExec && (
-            <>
-              <Button variant="outline" size="sm" asChild data-testid="button-mark-on-duty">
-                <a href="/attendance?action=on-duty"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</a>
+        <div className="flex gap-2 flex-wrap w-full sm:w-auto">
+          {/* Desktop: all quick actions inline (unchanged). */}
+          <div className="hidden sm:flex gap-2 flex-wrap">
+            {isHR(user!) && (
+              <Button asChild size="sm" data-testid="button-add-employee">
+                <a href="/employees?action=new">
+                  <Users className="h-4 w-4 mr-1.5" />
+                  Add Employee
+                </a>
               </Button>
-              <Button variant="outline" size="sm" asChild data-testid="button-apply-wfh">
-                <a href="/attendance?action=wfh"><Home className="h-4 w-4 mr-1.5" /> Apply WFH</a>
+            )}
+            {emp && !showAdminLayout && !isExec && (
+              <>
+                <Button variant="outline" size="sm" asChild data-testid="button-mark-on-duty">
+                  <a href="/attendance?action=on-duty"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</a>
+                </Button>
+                <Button variant="outline" size="sm" asChild data-testid="button-apply-wfh">
+                  <a href="/attendance?action=wfh"><Home className="h-4 w-4 mr-1.5" /> Apply WFH</a>
+                </Button>
+                <div className="w-px self-stretch bg-border mx-0.5" aria-hidden="true" />
+              </>
+            )}
+            {!isExec && (
+              <Button variant="outline" size="sm" asChild data-testid="button-apply-leave">
+                <a href="/leave?action=apply">
+                  <Plane className="h-4 w-4 mr-1.5" />
+                  Apply Leave
+                </a>
               </Button>
-              <div className="w-px self-stretch bg-border mx-0.5" aria-hidden="true" />
-            </>
-          )}
-          {!isExec && (
-            <Button variant="outline" size="sm" asChild data-testid="button-apply-leave">
-              <a href="/leave?action=apply">
-                <Plane className="h-4 w-4 mr-1.5" />
-                Apply Leave
-              </a>
-            </Button>
-          )}
+            )}
+          </div>
+          {/* Mobile: primary stays visible, quick actions fold into a right-aligned kebab. */}
+          <div className="flex sm:hidden items-center gap-2 w-full">
+            {isHR(user!) && (
+              <Button asChild size="sm" data-testid="button-add-employee-mobile">
+                <a href="/employees?action=new"><Users className="h-4 w-4 mr-1.5" /> Add Employee</a>
+              </Button>
+            )}
+            {!isExec && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="ml-auto" aria-label="Quick actions" data-testid="button-dashboard-actions"><MoreVertical className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {emp && !showAdminLayout && (
+                    <>
+                      <DropdownMenuItem asChild><a href="/attendance?action=on-duty"><Route className="h-4 w-4 mr-2" /> Mark On Duty</a></DropdownMenuItem>
+                      <DropdownMenuItem asChild><a href="/attendance?action=wfh"><Home className="h-4 w-4 mr-2" /> Apply WFH</a></DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuItem asChild><a href="/leave?action=apply"><Plane className="h-4 w-4 mr-2" /> Apply Leave</a></DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </div>
 
@@ -484,7 +512,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
               <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={employees} readOnly bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
-              <div className="h-[27rem]">{announcementsPanel}</div>
+              <div className="h-[20rem] md:h-[27rem]">{announcementsPanel}</div>
             </div>
           );
         }
@@ -520,7 +548,7 @@ export default function DashboardPage() {
               <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={employees} bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
 
               {/* RIGHT — Announcements (below 4th overview card) */}
-              <div className="h-[27rem]">{announcementsPanel}</div>
+              <div className="h-[20rem] md:h-[27rem]">{announcementsPanel}</div>
             </div>
           );
         }
@@ -575,7 +603,7 @@ export default function DashboardPage() {
             <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={[]} readOnly bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
 
             {/* RIGHT — Announcements */}
-            <div className="h-[27rem]">{announcementsPanel}</div>
+            <div className="h-[20rem] md:h-[27rem]">{announcementsPanel}</div>
           </div>
         );
       })()}

@@ -2,12 +2,44 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Car, Users, Clock, ChevronRight, MapPin, Route, AlertTriangle, CalendarDays, User } from "lucide-react";
 import { format, isSameDay } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { isDueSoon } from "../lib/booking-engine";
 import { statusBadgeClass, statusLabel } from "../lib/booking-visuals";
 
 // Rental approval request card — same primary-card style as the Travel Timeline cards, clickable → details popup.
 export function RentalRequestCard({ b, nameByUser, onOpen }: any) {
+  const isMobile = useIsMobile();
   const dueSoon = isDueSoon(b);
+
+  // Mobile: a compact single-row card — purpose + badges on line 1, When/Pax and Requester
+  // condensed onto meta lines (the stat columns are hidden below md on desktop anyway).
+  if (isMobile) {
+    return (
+      <button type="button" onClick={() => onOpen(b)} data-testid={`rental-req-${b.id}`}
+        className={`w-full text-left card-surface card-hover rounded-2xl p-3 flex items-center gap-3 ${dueSoon ? "ring-1 ring-[#FF6F62]/50" : ""}`}>
+        <span className="h-11 w-11 rounded-xl bg-[#FF6F62]/15 text-[#FF6F62] flex items-center justify-center flex-shrink-0"><Car className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-bold text-foreground truncate">{b.purpose}</span>
+            <Badge className="text-[10px] bg-[#206295]/15 text-[#206295]">Awaiting HR Approval</Badge>
+            {dueSoon && <Badge className="text-[10px] bg-[#FF6F62]/20 text-[#FF6F62] font-semibold inline-flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Due Soon</Badge>}
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1 min-w-0">
+            <span className="inline-flex items-center gap-1 min-w-0 truncate"><CalendarDays className="h-3 w-3 flex-shrink-0" /><span className="truncate"><span className="font-semibold text-foreground">{format(new Date(b.startTime), "d MMM")}</span> {format(new Date(b.startTime), "h:mm a")}–{format(new Date(b.endTime), "h:mm a")}</span></span>
+            <span className="text-border flex-shrink-0">|</span>
+            <span className="inline-flex items-center gap-1 flex-shrink-0"><Users className="h-3 w-3" />{b.passengers || 1}</span>
+          </div>
+          <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5 min-w-0">
+            <User className="h-3 w-3 flex-shrink-0" /><span className="truncate">{(b.requesterId && nameByUser[b.requesterId]) || "—"}</span>
+            <span className="text-border flex-shrink-0">|</span>
+            <span className="whitespace-nowrap flex-shrink-0">Rental</span>
+          </div>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+      </button>
+    );
+  }
+
   return (
     <button type="button" onClick={() => onOpen(b)} data-testid={`rental-req-${b.id}`}
       className={`w-full text-left card-surface card-hover rounded-2xl px-4 py-3.5 flex items-center gap-4 ${dueSoon ? "ring-1 ring-[#FF6F62]/50" : ""}`}>

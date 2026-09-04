@@ -15,12 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetTrigger } from "@/components/ui/sheet";
 import { NewRequestDialog, OfficePurchaseDetailDialog } from "@/features/company-workspace/office-purchases/components/office-purchase";
 import { NewTravelDialog, TravelDetailDialog, TRAVEL_CATS } from "@/features/company-workspace/travel/components/travel";
 import { ProcurementDetailDialog } from "@/features/company-workspace/procurement/components/procurement";
 import { useToast } from "@/hooks/use-toast";
 import { DateInput } from "@/components/shared/datetime-field";
-import { Plus, ShoppingCart, Car, TicketIcon, Receipt, ChevronLeft, Package, Trash2, Search, LayoutGrid, Table2, ArrowDownUp, Save, FileEdit } from "lucide-react";
+import { Plus, ShoppingCart, Car, TicketIcon, Receipt, ChevronLeft, Package, Trash2, Search, LayoutGrid, Table2, ArrowDownUp, Save, FileEdit, SlidersHorizontal, X } from "lucide-react";
 import { format } from "date-fns";
 import { ReimbursementFormDialog, reimbDraftComplete } from "@/features/company-workspace/reimbursements/components/reimbursement-form";
 import { statusClass, statusLabel } from "@/lib/status";
@@ -33,6 +34,13 @@ import { RequestCard } from "../components/request-card";
 import { PurchaseRequestCard } from "../components/purchase-request-card";
 import { DraftCard } from "../components/draft-card";
 import { ReimbCardView } from "../reimbursements/components/reimb-card-view";
+
+// Labels for the mobile Filters sheet's active chips (Status + Sort).
+const STATUS_CHIP_LABELS: Record<string, string> = { pending: "Pending", approved: "Approved", rejected: "Rejected" };
+const SORT_CHIP_LABELS: Record<string, string> = {
+  status_change: "Latest Status Change", date_desc: "Newest", date_asc: "Oldest",
+  amount_desc: "Amount: High → Low", amount_asc: "Amount: Low → High",
+};
 
 export default function MyRequestsPage() {
   const { data: auth } = useAuth();
@@ -53,6 +61,7 @@ export default function MyRequestsPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("status_change");
   const [view, setView] = useState<"card" | "table">("card");
+  const [filterSheet, setFilterSheet] = useState(false); // mobile Filters bottom-sheet (Status + Sort)
   const [phase, setPhase] = useState<"active" | "completed">("active"); // In Progress / Completed — mirrors the approval screens' phase toggle
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ type: string; item: any } | null>(null);
@@ -227,43 +236,135 @@ export default function MyRequestsPage() {
     </div>
   );
 
-  // Shared header controls (view · phase · search · status filter · sort · primary button)
-  const controls = (newBtn: React.ReactNode, showPhase = false) => (
-    <div className="flex items-center gap-3 flex-wrap">
-      {/* View toggle — icon only */}
-      <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
-        <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
-        <button onClick={() => setView("table")} aria-label="Table view" data-testid="view-table" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
-      </div>
-      <div className="w-px self-stretch flex-shrink-0 bg-foreground/30" />
-      {showPhase && phaseToggle}
-      {/* Search — fills available width */}
-      <div className="relative flex-1 min-w-0">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search requests…" className="pl-8 h-10 w-full" data-testid="input-search-requests" />
-      </div>
-      <Select value={statusFilter} onValueChange={setStatusFilter}>
-        <SelectTrigger className="h-10 w-[130px] flex-shrink-0" data-testid="select-status-filter"><SelectValue placeholder="Filter" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All</SelectItem>
-          <SelectItem value="pending">Pending</SelectItem>
-          <SelectItem value="approved">Approved</SelectItem>
-          <SelectItem value="rejected">Rejected</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select value={sortBy} onValueChange={setSortBy}>
-        <SelectTrigger className="h-10 w-[230px] gap-1 flex-shrink-0" data-testid="select-sort"><ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /><span className="text-muted-foreground">Sort:</span><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="status_change">Latest Status Change</SelectItem>
-          <SelectItem value="date_desc">Newest</SelectItem>
-          <SelectItem value="date_asc">Oldest</SelectItem>
-          <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
-          <SelectItem value="amount_asc">Amount: Low → High</SelectItem>
-        </SelectContent>
-      </Select>
-      <div className="flex-shrink-0">{newBtn}</div>
+  // Mobile-only clone of the phase toggle (distinct test-ids so it can coexist with the desktop one).
+  const phaseToggleMobile = (
+    <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0" data-testid="req-phase-toggle-mobile">
+      {(["active", "completed"] as const).map((p) => (
+        <button key={p} onClick={() => setPhase(p)} data-testid={`req-phase-${p}-mobile`} className={`px-3 h-full rounded-[10px] text-xs font-medium ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}>
+          {p === "active" ? "In Progress" : "Completed"}
+        </button>
+      ))}
     </div>
   );
+
+  // Shared header controls (view · phase · search · status filter · sort · primary button).
+  // Desktop keeps the original inline strip; mobile keeps toggles + New visible and folds
+  // Status + Sort into a Filters bottom-sheet with dismissible active chips.
+  const controls = (newBtn: React.ReactNode, showPhase = false) => {
+    const filterChips: { key: string; label: string; onClear: () => void }[] = [];
+    if (statusFilter !== "all") filterChips.push({ key: "status", label: STATUS_CHIP_LABELS[statusFilter] ?? statusFilter, onClear: () => setStatusFilter("all") });
+    if (sortBy !== "status_change") filterChips.push({ key: "sort", label: SORT_CHIP_LABELS[sortBy] ?? sortBy, onClear: () => setSortBy("status_change") });
+    const resetFilters = () => { setStatusFilter("all"); setSortBy("status_change"); };
+    return (
+      <>
+        {/* Desktop — original inline toolbar (unchanged). */}
+        <div className="hidden sm:flex items-center gap-3 flex-wrap">
+          {/* View toggle — icon only */}
+          <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
+            <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
+            <button onClick={() => setView("table")} aria-label="Table view" data-testid="view-table" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
+          </div>
+          <div className="w-px self-stretch flex-shrink-0 bg-foreground/30" />
+          {showPhase && phaseToggle}
+          {/* Search — fills available width */}
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search requests…" className="pl-8 h-10 w-full" data-testid="input-search-requests" />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-10 w-[130px] flex-shrink-0" data-testid="select-status-filter"><SelectValue placeholder="Filter" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="h-10 w-[230px] gap-1 flex-shrink-0" data-testid="select-sort"><ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /><span className="text-muted-foreground">Sort:</span><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="status_change">Latest Status Change</SelectItem>
+              <SelectItem value="date_desc">Newest</SelectItem>
+              <SelectItem value="date_asc">Oldest</SelectItem>
+              <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
+              <SelectItem value="amount_asc">Amount: Low → High</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex-shrink-0">{newBtn}</div>
+        </div>
+
+        {/* Mobile — search + Filters on one row; view · phase toggles + New below. */}
+        <div className="sm:hidden space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search requests…" className="pl-8 h-10 w-full" data-testid="input-search-requests-mobile" />
+            </div>
+            <Sheet open={filterSheet} onOpenChange={setFilterSheet}>
+              <SheetTrigger asChild>
+                <Button variant="secondary" size="sm" className="flex-shrink-0" data-testid="button-filters-mobile">
+                  <SlidersHorizontal className="h-4 w-4 mr-1.5" /> Filters
+                  {filterChips.length > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#206295] px-1 text-[10px] font-bold text-white">{filterChips.length}</span>}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+                <SheetHeader className="text-left"><SheetTitle>Filters</SheetTitle></SheetHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Status</p>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-full" data-testid="sheet-status-filter"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Sort</p>
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="w-full" data-testid="sheet-sort"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="status_change">Latest Status Change</SelectItem>
+                        <SelectItem value="date_desc">Newest</SelectItem>
+                        <SelectItem value="date_asc">Oldest</SelectItem>
+                        <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
+                        <SelectItem value="amount_asc">Amount: Low → High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <SheetFooter className="flex-row gap-2">
+                  <Button variant="outline" className="flex-1" onClick={resetFilters} data-testid="sheet-reset">Reset</Button>
+                  <SheetClose asChild><Button className="flex-1 btn-primary-gradient text-white" data-testid="sheet-apply">Show results</Button></SheetClose>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
+              <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card-mobile" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
+              <button onClick={() => setView("table")} aria-label="Table view" data-testid="view-table-mobile" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
+            </div>
+            {showPhase && phaseToggleMobile}
+            <div className="ml-auto flex-shrink-0">{newBtn}</div>
+          </div>
+          {filterChips.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {filterChips.map((c) => (
+                <button key={c.key} onClick={c.onClear} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground hover-elevate" data-testid={`chip-${c.key}`}>
+                  <span className="truncate max-w-[8rem]">{c.label}</span> <X className="h-3 w-3 flex-shrink-0" />
+                </button>
+              ))}
+              {filterChips.length > 1 && <button onClick={resetFilters} className="text-xs font-medium text-[#206295] underline underline-offset-2" data-testid="chip-clear-all">Clear all</button>}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  };
 
   const fTickets = refine(tickets as any[], "ticket");
   const fReimb = refine(reimbursements as any[], "reimbursement");
@@ -335,8 +436,8 @@ export default function MyRequestsPage() {
                 const c = TRAVEL_CATS[t.category] || TRAVEL_CATS.flight;
                 const route = t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "") : `${t.details?.from || "?"} → ${t.details?.to || "?"}`;
                 return (
-                  <div key={t.id} className="card-surface card-hover p-4 flex items-center gap-4 cursor-pointer" onClick={() => setTravelDetailId(t.id)} data-testid={`trip-${t.id}`}>
-                    <span className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${c.tint}1a`, color: c.tint }}><c.icon className="h-4 w-4" /></span>
+                  <div key={t.id} className="card-surface card-hover p-3 sm:p-4 flex items-center gap-3 sm:gap-4 cursor-pointer" onClick={() => setTravelDetailId(t.id)} data-testid={`trip-${t.id}`}>
+                    <span className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${c.tint}1a`, color: c.tint }}><c.icon className="h-4 w-4" /></span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-semibold text-foreground truncate">{t.reference}</span><Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge></div>
                       <p className="text-xs text-muted-foreground truncate mt-0.5">{c.label} | {route}{t.startDate ? ` | ${format(new Date(t.startDate), "MMM d, yyyy")}` : ""}</p>

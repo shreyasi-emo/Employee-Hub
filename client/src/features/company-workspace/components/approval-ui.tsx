@@ -16,7 +16,7 @@ export function StatCard({ title, value, subtitle, icon: Icon, color, onClick }:
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1 flex-1 min-w-0">
           <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-[33px] leading-tight font-bold text-foreground truncate">{value}</p>
+          <p className="text-2xl sm:text-[33px] leading-tight font-bold text-foreground truncate">{value}</p>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
         <div className={`p-2.5 rounded-xl flex-shrink-0 ${color}`}><Icon className="h-5 w-5" /></div>

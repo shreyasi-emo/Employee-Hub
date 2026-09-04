@@ -83,6 +83,9 @@ export default function EmployeesPage() {
         locFilter={locFilter} onLocFilter={setLocFilter} allLocations={allLocations}
         typeFilter={typeFilter} onTypeFilter={setTypeFilter}
         viewMode={viewMode} onViewMode={setViewMode}
+        selectionMode={selectionMode} onEnterSelection={() => setSelectionMode(true)}
+        deptFilter={deptFilter} onDeptFilter={setDeptFilter}
+        deptCounts={deptCounts} totalCount={employees.length}
       />
 
       <DepartmentPills

@@ -95,13 +95,19 @@ export function MyAttendanceCalendar({
               const trip = inM ? travelDays[key] : undefined;
               return (
                 <button key={day.toISOString()} onClick={() => onSelect(day)}
-                  className={`min-h-[72px] rounded-lg border p-1.5 text-left flex flex-col transition-colors hover-elevate ${isSel ? "ring-2 ring-[#206295] ring-offset-2 ring-offset-background" : (isToday && !todaySolid) ? "ring-2 ring-[#206295]" : ""} ${inM ? (isWeekend ? "bg-muted/30 border-border/60" : "bg-background border-border/80") : "bg-muted/30 border-transparent text-muted-foreground/50"}`}
+                  className={`min-h-[52px] sm:min-h-[72px] rounded-lg border p-1.5 text-left flex flex-col transition-colors hover-elevate ${isSel ? "ring-2 ring-[#206295] ring-offset-2 ring-offset-background" : (isToday && !todaySolid) ? "ring-2 ring-[#206295]" : ""} ${inM ? (isWeekend ? "bg-muted/30 border-border/60" : "bg-background border-border/80") : "bg-muted/30 border-transparent text-muted-foreground/50"}`}
                   style={todaySolid ? { backgroundColor: `${color}80`, borderColor: color! } : (showFill ? { backgroundColor: `${color}33` } : undefined)}
                   data-testid={`myatt-day-${format(day, "yyyy-MM-dd")}`}>
                   <span className="self-start w-full flex items-center justify-between text-sm font-semibold" style={solidText ? { color: solidText } : undefined}>{format(day, "d")}{trip && <Plane className="h-3 w-3 text-[#206295]" aria-label="Travel booked" />}</span>
-                  {showLabel && (showFill
-                    ? <span className="mt-auto max-w-full truncate text-[11px] font-medium" style={{ color: solidText ?? (LABEL_COLOR[st || ""] || color!) }} title={label}>{label}</span>
-                    : <span className="mt-auto self-start inline-flex max-w-full truncate rounded-md border px-1.5 py-0.5 text-[10px] font-semibold" style={{ color: LABEL_COLOR[st || ""] || color!, borderColor: `${color}80` }} title={label}>{label}</span>
+                  {showLabel && (
+                    <>
+                      {/* Mobile: a status dot — the text label is unreadable at phone cell width. */}
+                      <span className="mt-auto sm:hidden h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: solidText ?? color! }} aria-label={label} />
+                      {/* Desktop: the full status label. */}
+                      {showFill
+                        ? <span className="mt-auto hidden sm:block max-w-full truncate text-[11px] font-medium" style={{ color: solidText ?? (LABEL_COLOR[st || ""] || color!) }} title={label}>{label}</span>
+                        : <span className="mt-auto hidden sm:inline-flex self-start max-w-full truncate rounded-md border px-1.5 py-0.5 text-[10px] font-semibold" style={{ color: LABEL_COLOR[st || ""] || color!, borderColor: `${color}80` }} title={label}>{label}</span>}
+                    </>
                   )}
                 </button>
               );
@@ -109,7 +115,7 @@ export function MyAttendanceCalendar({
           </div>
         </>
       ) : (
-        <ScrollArea className="h-[420px]">
+        <ScrollArea className="h-[320px] md:h-[420px]">
           <div className="space-y-2 pr-2">
             {(() => { const rows = timeline.filter((r) => calFilter === "all" || r.status === calFilter); return rows.length === 0 ? (
               <div className="text-center py-16"><CalendarDays className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" /><p className="text-sm text-muted-foreground">{calFilter === "all" ? "No attendance recorded this month." : "No matching days this month."}</p></div>

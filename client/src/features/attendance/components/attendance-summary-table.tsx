@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Search, Download } from "lucide-react";
+import { Search, Download, SlidersHorizontal, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetTrigger } from "@/components/ui/sheet";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 
 const pctColor = (p: number) => p >= 90 ? "#0E7C7B" : p >= 75 ? "#B5611A" : "#C24A3E";
@@ -20,6 +21,7 @@ export function AttendanceSummaryTable({ reportRows, departments, from, to, onEx
   const [tblSearch, setTblSearch] = useState("");
   const [tblDept, setTblDept] = useState("all");
   const [tblLoc, setTblLoc] = useState("all");
+  const [filterSheet, setFilterSheet] = useState(false);
   const [tblSort, setTblSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
 
   const toggleSort = (key: string) => setTblSort((s) => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "name" || key === "department" ? "asc" : "desc" });
@@ -57,7 +59,8 @@ export function AttendanceSummaryTable({ reportRows, departments, from, to, onEx
   return (
     <div className="space-y-4">
       {/* One-line toolbar: title · separator · search · dept · location */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Desktop: one-line toolbar (unchanged). */}
+      <div className="hidden sm:flex items-center gap-3 flex-wrap">
         <h2 className="text-lg font-bold text-foreground shrink-0">Attendance Summary</h2>
         <div className="w-px self-stretch bg-foreground/30 shrink-0 mx-[7px]" />
         <div className="relative flex-1 min-w-48">
@@ -78,6 +81,62 @@ export function AttendanceSummaryTable({ reportRows, departments, from, to, onEx
             {tblLocations.map((l: any) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Mobile: title, then search + a Filters sheet (Department, Location). */}
+      <div className="sm:hidden space-y-3">
+        <h2 className="text-lg font-bold text-foreground">Attendance Summary</h2>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input value={tblSearch} onChange={(e) => setTblSearch(e.target.value)} placeholder="Search by name or code..." className="pl-9" data-testid="input-table-search-mobile" />
+          </div>
+          <Sheet open={filterSheet} onOpenChange={setFilterSheet}>
+            <SheetTrigger asChild>
+              <Button variant="secondary" size="sm" className="flex-shrink-0" data-testid="button-att-filters-mobile">
+                <SlidersHorizontal className="h-4 w-4 mr-1.5" /> Filters
+                {(tblDept !== "all" ? 1 : 0) + (tblLoc !== "all" ? 1 : 0) > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#206295] px-1 text-[10px] font-bold text-white">{(tblDept !== "all" ? 1 : 0) + (tblLoc !== "all" ? 1 : 0)}</span>}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+              <SheetHeader className="text-left"><SheetTitle>Filters</SheetTitle></SheetHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Department</p>
+                  <Select value={tblDept} onValueChange={setTblDept}>
+                    <SelectTrigger className="w-full" data-testid="sheet-table-dept"><SelectValue placeholder="All Departments" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All Departments</SelectItem>{departments.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Location</p>
+                  <Select value={tblLoc} onValueChange={setTblLoc}>
+                    <SelectTrigger className="w-full" data-testid="sheet-table-loc"><SelectValue placeholder="All Locations" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All Locations</SelectItem>{tblLocations.map((l: any) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <SheetFooter className="flex-row gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { setTblDept("all"); setTblLoc("all"); }} data-testid="sheet-table-reset">Reset</Button>
+                <SheetClose asChild><Button className="flex-1 btn-primary-gradient text-white" data-testid="sheet-table-apply">Show results</Button></SheetClose>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </div>
+        {(tblDept !== "all" || tblLoc !== "all") && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {tblDept !== "all" && (
+              <button onClick={() => setTblDept("all")} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground hover-elevate" data-testid="chip-table-dept">
+                <span className="truncate max-w-[8rem]">{departments.find((d: any) => d.id === tblDept)?.name ?? "Department"}</span> <X className="h-3 w-3 flex-shrink-0" />
+              </button>
+            )}
+            {tblLoc !== "all" && (
+              <button onClick={() => setTblLoc("all")} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground hover-elevate" data-testid="chip-table-loc">
+                <span className="truncate max-w-[8rem]">{tblLoc}</span> <X className="h-3 w-3 flex-shrink-0" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <Card className="border-0">
         <CardContent className="p-0">
