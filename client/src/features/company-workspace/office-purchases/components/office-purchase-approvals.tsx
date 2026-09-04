@@ -114,7 +114,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
     const checked = sel.has(o.id);
     return (
       <div key={o.id} data-testid={`appr-op-${o.id}`} className={`group card-surface card-hover relative p-4 cursor-pointer ${selectable && checked ? "ring-2 ring-[#206295]" : ""} ${selMode && !selectable ? "opacity-60" : ""}`} onClick={() => (selectable ? toggleSel(o.id) : selMode ? undefined : setDetailId(o.id))}>
-        <div className="flex items-center gap-5">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-5">
           {selMode && <Checkbox checked={checked} disabled={!selectable} onClick={(e: any) => e.stopPropagation()} onCheckedChange={() => selectable && toggleSel(o.id)} className="flex-shrink-0" />}
           <div className="flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-2">
@@ -130,33 +130,33 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
               <span className="min-w-0 truncate"><span className="text-muted-foreground">{lines.length} item{lines.length !== 1 ? "s" : ""}: </span><span className="text-muted-foreground">{summary}</span></span>
             </div>
           </div>
-          <div className="self-center w-px h-20 rounded-full bg-border flex-shrink-0" />
-          <div className="flex items-stretch gap-4 flex-shrink-0">
+          <div className="hidden lg:block self-center w-px h-20 rounded-full bg-border flex-shrink-0" />
+          <div className="flex flex-wrap lg:flex-nowrap items-stretch gap-4 flex-shrink-0">
             <div className="w-[104px]">
               <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Submitted</p>
               <p className="text-sm font-semibold text-foreground mt-1">{o.createdAt ? fmtDate(o.createdAt) : "—"}</p>
             </div>
-            <div className="w-px self-stretch bg-border rounded-full flex-shrink-0" />
+            <div className="hidden lg:block w-px self-stretch bg-border rounded-full flex-shrink-0" />
             <div className="w-[104px]">
               <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Dept</p>
               <p className="text-sm font-semibold text-foreground mt-1 truncate">{o.department || "—"}</p>
             </div>
-            <div className="w-px self-stretch bg-border rounded-full flex-shrink-0" />
+            <div className="hidden lg:block w-px self-stretch bg-border rounded-full flex-shrink-0" />
             <div className="w-[104px]">
               <Clock className="h-3.5 w-3.5 text-muted-foreground" />
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Priority</p>
               <div className="mt-1"><Badge className={`text-[10px] px-2 py-0.5 font-semibold ${pr.cls}`}>{pr.label}</Badge></div>
             </div>
-            <div className="w-px self-stretch bg-border rounded-full flex-shrink-0" />
+            <div className="hidden lg:block w-px self-stretch bg-border rounded-full flex-shrink-0" />
             <div className="w-[104px]">
               <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Status</p>
               <div className="mt-1"><Badge className={`text-[10px] ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge></div>
             </div>
             {!selMode && <>
-              <div className="w-px self-stretch bg-border rounded-full flex-shrink-0" />
+              <div className="hidden lg:block w-px self-stretch bg-border rounded-full flex-shrink-0" />
               <div className="flex items-center flex-shrink-0 pl-1" onClick={(e) => e.stopPropagation()}>
                 <Button size="sm" variant="ghost" className="h-10 w-[100px] btn-glass text-[#206295] hover:text-[#206295]" onClick={() => setDetailId(o.id)} data-testid={`review-op-${o.id}`}><Eye className="h-4 w-4 mr-1.5" /> {phase === "pending" ? "Review" : "View"}</Button>
               </div>

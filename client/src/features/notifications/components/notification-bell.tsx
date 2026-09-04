@@ -44,7 +44,7 @@ export function NotificationBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[368px] p-0 overflow-hidden">
+      <PopoverContent align="end" className="w-[368px] max-w-[calc(100vw-1.5rem)] p-0 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h4 className="text-sm font-semibold">Notifications</h4>
           {unread > 0 && (

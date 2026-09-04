@@ -50,7 +50,7 @@ export function LogisticsRequestCard({ r, locName, onOpen }: {
                 <span className="text-xs font-semibold text-muted-foreground tracking-wide">{r.reference}</span>
                 <button onClick={copyRef} aria-label="Copy reference" className="h-4 w-4 rounded inline-flex items-center justify-center text-muted-foreground hover:text-[#206295]"><Copy className="h-3 w-3" /></button>
               </div>
-              <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
                 {r.goodsCategory && <><span className="font-semibold text-foreground capitalize whitespace-nowrap">{r.goodsCategory}</span><Sep /></>}
                 <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><Truck className="h-3.5 w-3.5" /> {isInboard ? "Inboard" : "Outboard"}</span>
                 <Sep />
