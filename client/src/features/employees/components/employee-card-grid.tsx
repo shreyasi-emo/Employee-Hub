@@ -1,4 +1,5 @@
-import { usePaged, PaginationBar } from "@/components/shared/pagination";
+import { usePaged, PaginationBar, PAGE_SIZE } from "@/components/shared/pagination";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { EmployeeCard } from "./employee-ui";
 
 /** Paged card grid for the directory. Owns its own page cursor. */
@@ -11,7 +12,8 @@ export function EmployeeCardGrid({ employees, departments, designations, selecti
   onToggle: (id: string) => void;
   onOpen?: (employee: any) => void;
 }) {
-  const paged = usePaged(employees);
+  const isMobile = useIsMobile();
+  const paged = usePaged(employees, isMobile ? 8 : PAGE_SIZE);
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
