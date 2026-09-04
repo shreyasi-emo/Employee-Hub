@@ -484,7 +484,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
               <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={employees} readOnly bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
-              <div className="lg:h-[27rem]">{announcementsPanel}</div>
+              <div className="h-[27rem]">{announcementsPanel}</div>
             </div>
           );
         }
@@ -520,7 +520,7 @@ export default function DashboardPage() {
               <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={employees} bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
 
               {/* RIGHT — Announcements (below 4th overview card) */}
-              <div className="lg:h-[27rem]">{announcementsPanel}</div>
+              <div className="h-[27rem]">{announcementsPanel}</div>
             </div>
           );
         }
@@ -575,7 +575,7 @@ export default function DashboardPage() {
             <CalendarCard holidayDates={holidayDates} upcomingHolidays={upcomingHolidays} employees={[]} readOnly bookingDates={bookingDates} upcomingBookings={upcomingBookings} />
 
             {/* RIGHT — Announcements */}
-            <div className="lg:h-[27rem]">{announcementsPanel}</div>
+            <div className="h-[27rem]">{announcementsPanel}</div>
           </div>
         );
       })()}

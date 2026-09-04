@@ -21,7 +21,7 @@ export function VehiclesHeader({ isHrAdmin, mode, onMode, pendingRentalCount, on
           <p className="text-sm text-muted-foreground">Book the company car directly, or request a rental</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap justify-end">
         {isHrAdmin && (
           <>
             <div className="segmented-toggle inline-flex p-0.5 h-10">

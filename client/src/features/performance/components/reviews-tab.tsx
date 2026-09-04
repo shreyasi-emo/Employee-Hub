@@ -195,7 +195,7 @@ export function ReviewsTab({ cycleId, cycle, employees }: { cycleId: string; cyc
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <Label className="text-xs">Final Rating</Label>
                     <Select defaultValue={review?.finalOutcome?.finalRating || ""} onValueChange={v => {}}>

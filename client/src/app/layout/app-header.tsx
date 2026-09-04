@@ -38,7 +38,7 @@ export function AppHeader() {
         <SidebarTrigger data-testid="button-sidebar-toggle" className="-ml-1" />
       </div>
       <div className="flex items-center gap-2">
-        <DevRoleSwitcher auth={auth} />
+        <div className="hidden sm:block"><DevRoleSwitcher auth={auth} /></div>
         <NotificationBell />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
