@@ -74,7 +74,7 @@ export function RaiseRequestDialog({ open, onOpenChange }: any) {
               </div>
             </>
           )}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-sm font-medium">Quantity</label>
               <Input type="number" min={1} value={form.quantity} onChange={e => setForm((f: any) => ({ ...f, quantity: Number(e.target.value) }))} />

@@ -24,8 +24,8 @@ type Row = {
 };
 
 // Shared column widths so the fixed header and the scrolling rows line up exactly.
-const COL_DATE = "w-36 flex-shrink-0";
-const COL_EVENT = "w-64 flex-shrink-0";
+const COL_DATE = "w-24 sm:w-36 flex-shrink-0";
+const COL_EVENT = "w-32 sm:w-64 flex-shrink-0";
 const COL_DETAIL = "flex-1 min-w-0";
 const PAGE = 25; // lazy-load window — render this many, then more as you scroll
 
@@ -111,7 +111,7 @@ export function EmploymentHistoryTab({ empId, leaves = [], leaveTypes = [] }: { 
 
       <Card className="border-0 overflow-hidden lg:flex-1 lg:min-h-0 flex flex-col">
         {/* Fixed header — same surface as the card (no separate fill), never scrolls */}
-        <div className="flex items-center gap-4 px-6 py-3 text-[13px] font-semibold text-muted-foreground border-b border-border flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-6 py-3 text-[13px] font-semibold text-muted-foreground border-b border-border flex-shrink-0">
           <div className={COL_DATE}>Date</div>
           <div className={COL_EVENT}>Event</div>
           <div className={COL_DETAIL}>Details</div>
@@ -125,7 +125,7 @@ export function EmploymentHistoryTab({ empId, leaves = [], leaveTypes = [] }: { 
         ) : (
           <div className="lg:flex-1 lg:min-h-0 overflow-y-auto list-divider" onScroll={onScroll}>
             {view.map((r) => (
-              <div key={r.id} className="flex items-start gap-4 px-6 py-3 hover-elevate" data-testid={`history-${r.id}`}>
+              <div key={r.id} className="flex items-start gap-2 sm:gap-4 px-3 sm:px-6 py-3 hover-elevate" data-testid={`history-${r.id}`}>
                 <div className={`${COL_DATE} text-sm text-foreground/80 whitespace-nowrap pt-0.5`}>{format(r.when, "MMM d, yyyy")}</div>
                 <div className={`${COL_EVENT} flex items-center gap-2.5 min-w-0`}>
                   <span className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${r.color}1a`, color: r.color }}><r.icon className="h-3.5 w-3.5" /></span>

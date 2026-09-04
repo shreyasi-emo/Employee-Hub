@@ -57,7 +57,7 @@ export function AnnouncementsToolbar({ announcements, categories, categoryFilter
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap">
       {/* Canonical shadcn Tabs (same as My Requests / Team Requests) */}
-      <Tabs value={categoryFilter} onValueChange={onCategory}>
+      <Tabs value={categoryFilter} onValueChange={onCategory} className="min-w-0 max-w-full overflow-x-auto">
         <TabsList>
           <TabsTrigger value="all" data-testid="filter-all">All ({announcements.length})</TabsTrigger>
           {categories.map((c) => (

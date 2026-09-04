@@ -104,7 +104,7 @@ export function GoalDialog({ open, onClose, cycleId, goal, employees }: {
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label>Target Value</Label>
               <Input data-testid="input-goal-target" type="number" inputMode="decimal" value={form.targetValue} onChange={e => setForm(f => ({ ...f, targetValue: e.target.value }))} placeholder="e.g. 100" />

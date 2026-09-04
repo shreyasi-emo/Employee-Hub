@@ -456,7 +456,7 @@ export function ReimbursementApprovalModal({ reimb, canAct, open, onClose, onExp
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[68vw] max-w-[68vw] h-[85vh] p-0 overflow-hidden gap-0 rounded-2xl bg-background/85 backdrop-blur-xl !flex flex-col [&>button]:hidden">
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] sm:w-[68vw] sm:max-w-[68vw] h-[85vh] p-0 overflow-hidden gap-0 rounded-2xl bg-background/85 backdrop-blur-xl !flex flex-col [&>button]:hidden">
         <DialogTitle className="sr-only">Reimbursement Details</DialogTitle>
         {/* top-right controls: export · expand · close */}
         <div className="absolute right-4 top-4 z-10 flex items-center gap-2">

@@ -22,13 +22,13 @@ export function VehiclesOverviewStats({ vehicleCount, confirmedToday, slotsThisW
 }) {
   return (
     <Card className="border-0">
-      <CardContent className="p-4 flex items-stretch gap-4">
+      <CardContent className="p-4 flex flex-wrap items-stretch gap-4">
         <OverviewStat icon={Car} heading="Company Vehicles" value={vehicleCount} sub="total" valueClass="text-[#206295]" />
-        <Separator orientation="vertical" className="h-12 self-center bg-foreground/25" />
+        <Separator orientation="vertical" className="h-12 self-center bg-foreground/25 hidden md:block" />
         <OverviewStat icon={CircleCheck} heading="Confirmed" value={confirmedToday} sub="today" />
-        <Separator orientation="vertical" className="h-12 self-center bg-foreground/25" />
+        <Separator orientation="vertical" className="h-12 self-center bg-foreground/25 hidden md:block" />
         <OverviewStat icon={Clock} heading="Slots Available" value={slotsThisWeek} sub="this week" valueClass="text-[#0E7C7B]" />
-        <Separator orientation="vertical" className="h-12 self-center bg-foreground/25" />
+        <Separator orientation="vertical" className="h-12 self-center bg-foreground/25 hidden md:block" />
         <OverviewStat icon={ShieldCheck} heading="Rental Backup"
           badge={<Badge className={rentalAvailable ? "bg-[#4BDCD9]/25 text-[#0E7C7B]" : "bg-[#64748B]/15 text-[#64748B]"}>{rentalAvailable ? "Available on request" : "Unavailable"}</Badge>} />
       </CardContent>

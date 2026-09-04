@@ -87,7 +87,7 @@ export function TrackUsagePanel({ open, onOpenChange, employees, bookings, vehic
                 <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or department…" className="h-9 pl-8 text-sm" data-testid="usage-search" />
               </div>
               {/* Line 2: date window (left) · department + icon-only sort (right) */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
                   <SelectTrigger className="w-auto h-9 text-xs gap-1.5" data-testid="usage-period"><CalendarDays className="h-3.5 w-3.5" /><SelectValue /></SelectTrigger>
                   <SelectContent>

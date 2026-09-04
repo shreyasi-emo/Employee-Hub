@@ -81,7 +81,7 @@ export function SelfEditDialog({ open, onOpenChange, employee }: { open: boolean
           </Section>
 
           <Section icon={AlertCircle} title="Emergency Contact">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div><L>Name</L><Input value={f.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} /></div>
               <div><L>Phone</L><Input value={f.emergencyContactPhone} onChange={(e) => set("emergencyContactPhone", e.target.value)} type="tel" inputMode="tel" /></div>
               <div><L>Relation</L><Input value={f.emergencyContactRelation} onChange={(e) => set("emergencyContactRelation", e.target.value)} /></div>
@@ -89,7 +89,7 @@ export function SelfEditDialog({ open, onOpenChange, employee }: { open: boolean
           </Section>
 
           <Section icon={CreditCard} title="Bank Details">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div><L>Bank Name</L><Input value={f.bankName} onChange={(e) => set("bankName", e.target.value)} /></div>
               <div><L>Account (Masked)</L><Input value={f.bankAccountMasked} onChange={(e) => set("bankAccountMasked", e.target.value)} inputMode="numeric" /></div>
               <div><L>IFSC</L><Input value={f.ifscCode} onChange={(e) => set("ifscCode", e.target.value.toUpperCase())} /></div>

@@ -110,12 +110,12 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
                 <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email *</FormLabel>{T({ ...field, type: "email" })}<FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel>{T({ ...field, type: "tel", inputMode: "tel" })}<FormMessage /></FormItem>)} />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <FormField control={form.control} name="dateOfBirth" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><DateInput value={field.value} onChange={field.onChange} /></FormItem>)} />
                 <FormField control={form.control} name="gender" render={({ field }) => (<FormItem><FormLabel>Gender</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger></FormControl><SelectContent>{GENDERS.map((g) => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                 <FormField control={form.control} name="maritalStatus" render={({ field }) => (<FormItem><FormLabel>Marital Status</FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger></FormControl><SelectContent>{MARITAL.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select></FormItem>)} />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <FormField control={form.control} name="bloodGroup" render={({ field }) => (<FormItem><FormLabel>Blood Group</FormLabel>{T({ ...field, placeholder: "e.g. O+" })}</FormItem>)} />
               </div>
             </Section>
@@ -153,12 +153,12 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
             <Separator />
 
             <Section icon={CreditCard} title="Statutory & Bank">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <FormField control={form.control} name="panNumber" render={({ field }) => (<FormItem><FormLabel>PAN</FormLabel>{T({ ...field })}</FormItem>)} />
                 <FormField control={form.control} name="aadhaarMasked" render={({ field }) => (<FormItem><FormLabel>Aadhaar (masked)</FormLabel>{T({ ...field, inputMode: "numeric" })}</FormItem>)} />
                 <FormField control={form.control} name="uan" render={({ field }) => (<FormItem><FormLabel>UAN</FormLabel>{T({ ...field, inputMode: "numeric" })}</FormItem>)} />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <FormField control={form.control} name="bankName" render={({ field }) => (<FormItem><FormLabel>Bank Name</FormLabel>{T({ ...field })}</FormItem>)} />
                 <FormField control={form.control} name="bankAccountMasked" render={({ field }) => (<FormItem><FormLabel>Account (masked)</FormLabel>{T({ ...field, inputMode: "numeric" })}</FormItem>)} />
                 <FormField control={form.control} name="ifscCode" render={({ field }) => (<FormItem><FormLabel>IFSC</FormLabel>{T({ ...field })}</FormItem>)} />
@@ -176,7 +176,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
                 <FormField control={form.control} name="currentAddress" render={({ field }) => (<FormItem><FormLabel>Current Address</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="permanentAddress" render={({ field }) => (<FormItem><FormLabel>Permanent Address</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl></FormItem>)} />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <FormField control={form.control} name="emergencyContactName" render={({ field }) => (<FormItem><FormLabel>Emergency Name</FormLabel>{T({ ...field })}</FormItem>)} />
                 <FormField control={form.control} name="emergencyContactPhone" render={({ field }) => (<FormItem><FormLabel>Emergency Phone</FormLabel>{T({ ...field, type: "tel", inputMode: "tel" })}</FormItem>)} />
                 <FormField control={form.control} name="emergencyContactRelation" render={({ field }) => (<FormItem><FormLabel>Relation</FormLabel>{T({ ...field })}</FormItem>)} />
