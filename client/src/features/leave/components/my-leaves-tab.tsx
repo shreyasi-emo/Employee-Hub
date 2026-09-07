@@ -159,17 +159,38 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
         );
       })()}
 
-      {/* Table */}
-      <Card className="border-0"><CardContent className="p-0">
-        {isLoading ? (
-          <div className="p-4"><Skeleton className="h-32 w-full" /></div>
-        ) : filteredMy.length === 0 ? (
-          <div className="text-center py-12">
-            <Plane className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">{myYear.length === 0 ? "No leave requests yet" : "No requests match your filters"}</p>
-            {myYear.length === 0 && <Button variant="outline" size="sm" className="mt-3" onClick={onApply}>Apply for Leave</Button>}
-          </div>
-        ) : (
+      {/* Desktop: table. Mobile: compact card list. */}
+      {isLoading ? (
+        <Card className="border-0"><CardContent className="p-4"><Skeleton className="h-32 w-full" /></CardContent></Card>
+      ) : filteredMy.length === 0 ? (
+        <Card className="border-0"><CardContent className="text-center py-12">
+          <Plane className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">{myYear.length === 0 ? "No leave requests yet" : "No requests match your filters"}</p>
+          {myYear.length === 0 && <Button variant="outline" size="sm" className="mt-3" onClick={onApply}>Apply for Leave</Button>}
+        </CardContent></Card>
+      ) : isMobile ? (
+        <div className="space-y-3">
+          {filteredMy.map((r: any) => {
+            const lt = leaveTypes.find((l: any) => l.id === r.leaveTypeId); const sc = statusOf(r.status); const a = leaveActionFor(r);
+            return (
+              <div key={r.id} className="card-surface rounded-xl p-3" data-testid={`leave-row-card-${r.id}`}>
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-foreground truncate flex-1"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />{lt?.name || "—"}</span>
+                  <Badge className={`text-[10px] flex-shrink-0 ${sc.bg} ${sc.text}`}>{sc.label}</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">{format(new Date(r.startDate), "MMM d")}{r.startDate !== r.endDate ? ` – ${format(new Date(r.endDate), "MMM d, yyyy")}` : `, ${format(new Date(r.startDate), "yyyy")}`}<span className="mx-1.5 text-border">|</span>{r.totalDays}d</p>
+                {r.reason && <p className="text-[11px] text-muted-foreground/80 mt-1 line-clamp-1" title={r.reason}>{r.reason}</p>}
+                {a && (
+                  <div className="mt-2.5">
+                    <Button size="sm" variant="outline" className={`h-8 w-full text-xs ${a.kind === "end" ? "text-[#206295] border-[#206295]/30" : "text-[#FF6F62] border-[#FF6F62]/30"}`} onClick={() => (a.kind === "end" ? onEndRequest(r.id) : onCancelRequest(r.id))} data-testid={`button-${a.kind}-leave-${r.id}`}>{a.label}</Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <Card className="border-0"><CardContent className="p-0">
           <DataTable
             columns={[
               { key: "type", header: "Leave Type", render: (r: any) => { const lt = leaveTypes.find((l: any) => l.id === r.leaveTypeId); return <span className="flex items-center gap-1.5 text-foreground"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />{lt?.name || "—"}</span>; } },
@@ -195,8 +216,8 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
             getRowKey={(r: any) => r.id}
             testIdPrefix="leave-row"
           />
-        )}
-      </CardContent></Card>
+        </CardContent></Card>
+      )}
     </div>
   );
 }
