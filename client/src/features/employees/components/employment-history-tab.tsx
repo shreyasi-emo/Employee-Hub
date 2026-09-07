@@ -64,7 +64,7 @@ export function EmploymentHistoryTab({ empId, leaves = [], leaveTypes = [] }: { 
       out.push({
         id: `leave-${l.id}`, when: new Date(l.createdAt), kind: "leave", color: LEAVE_TINT[l.status] || "#206295", icon: Plane,
         title: `Applied for ${name}`,
-        detail: <span className="text-muted-foreground text-xs capitalize">{range} · {status}</span>,
+        detail: <span className="text-muted-foreground text-xs capitalize">{range} | {status}</span>,
         search: `${name} ${range} ${status}`.toLowerCase(),
       });
     }

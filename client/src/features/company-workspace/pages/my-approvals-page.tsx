@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExpandableApprovalDialog } from "../components/expandable-approval-dialog";
 import { ShoppingCart, Plane, Receipt, Package, ChevronLeft, Check, Eye } from "lucide-react";
 import { TravelApprovals } from "@/features/company-workspace/travel/components/travel";
@@ -73,7 +74,7 @@ export default function MyApprovalsPage() {
   if (canTravelApprove) done(travelAll, ["booked", "rejected", "cancelled"]).forEach((t) => completedRows.push({ key: `tv-${t.id}`, icon: Plane, cat: "Travel", title: t.reference, sub: t.employeeName || "Employee", amount: Number(t.amount) || 0, date: t.bookedAt || t.decidedAt || t.updatedAt || t.createdAt, status: t.status }));
   completedRows.sort((a, b) => +new Date(b.date || 0) - +new Date(a.date || 0));
   return (
-    <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-[92rem] mx-auto">
       <div className="flex items-center gap-3">
         <Button variant="secondary" size="icon" className="h-10 w-10 flex-shrink-0" onClick={() => navigate("/company-workspace")} aria-label="Back" data-testid="button-back-workspace"><ChevronLeft className="h-4 w-4" /></Button>
         <div>
@@ -139,7 +140,15 @@ export default function MyApprovalsPage() {
       ) : (
         <>
           {/* Non-CEO approvers: category tabs at the top, ordered by pending count, active tab highlighted. */}
-          <div className="flex gap-2 flex-wrap">
+          {/* Mobile: category dropdown (matches My Requests). */}
+          <Select value={effectiveTab} onValueChange={setApprTab}>
+            <SelectTrigger className="sm:hidden w-full h-10" data-testid="select-appr-tab-mobile"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {apprTabs.map((t) => <SelectItem key={t.key} value={t.key}>{t.label}{t.count > 0 ? ` (${t.count})` : ""}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {/* Desktop: category button strip. */}
+          <div className="hidden sm:flex gap-2 flex-wrap">
             {apprTabs.map((t) => (
               <Button key={t.key} size="sm" variant={effectiveTab === t.key ? "default" : "secondary"} onClick={() => setApprTab(t.key)} data-testid={`appr-tab-${t.key}`}>
                 <t.icon className="h-4 w-4 mr-1.5" /> {t.label}

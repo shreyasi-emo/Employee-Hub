@@ -61,4 +61,4 @@ export const MINE_CHIP = "bg-[#0E7C7B] text-white border border-[#0E7C7B]";
 export const driverInitials = (n?: string) => (n || "").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 export const empName = (e: any) => `${e?.firstName || ""} ${e?.lastName || ""}`.trim() || e?.username || "Employee";
 
-export const manageStatusBadge = (s: string) => s === "maintenance" ? "bg-[#F59E0B]/20 text-[#B45309] dark:text-[#F59E0B]" : "bg-[#4BDCD9]/25 text-[#0E7C7B]";
+export const manageStatusBadge = (s: string) => s === "maintenance" ? "bg-[#64748B]/15 text-[#64748B] dark:text-[#94A3B8]" : "bg-[#4BDCD9]/25 text-[#0E7C7B]";

@@ -15,7 +15,7 @@ import { statusClass, statusLabel } from "@/lib/status";
 import { matchesFilter, searchText, titleOf, subOf, amountOf, money, formatDate, formatStatus } from "../shared/request-format";
 
 // Read-only view of a manager's direct reports' requests. Same canonical toolbar as My Requests
-// (view toggle · search · status filter · sort) plus a member filter; renders the shared RequestCard
+// (view toggle | search | status filter | sort) plus a member filter; renders the shared RequestCard
 // / RequestTable in read-only mode.
 export default function TeamRequestsPage() {
   const [tab, setTab] = useState("purchases");

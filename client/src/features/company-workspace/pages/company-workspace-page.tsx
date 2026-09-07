@@ -58,7 +58,7 @@ export default function CompanyWorkspacePage() {
           <StatCard title="Pending Travels" value={(travels as any[]).filter((t: any) => ["pending_hr", "pending_approval", "under_review", "approved"].includes(t.status)).length} subtitle="in progress" icon={Car} color="bg-[#4BDCD9]/25 text-[#206295]" />
           <StatCard title="Open Tickets" value={summary?.tickets?.open || 0} subtitle="in progress" icon={TicketIcon} color="bg-[#206295]/15 text-[#206295]" />
           {/* Money, not a count — the subtitle names the claims so it can't be read as a fourth count. */}
-          <StatCard title="Pending Reimbursements" value={isMobile ? moneyShort(pendingReimbAmount) : money(pendingReimbAmount)} subtitle={`${pendingReimbCount} ${pendingReimbCount === 1 ? "claim" : "claims"} ${canReimbApprove ? "awaiting your approval" : "pending"}`} icon={Receipt} color="bg-[#FF6F62]/20 text-[#FF6F62]" />
+          <StatCard title={isMobile ? "Pending Reimb." : "Pending Reimbursements"} value={isMobile ? moneyShort(pendingReimbAmount) : money(pendingReimbAmount)} subtitle={`${pendingReimbCount} ${pendingReimbCount === 1 ? "claim" : "claims"} ${canReimbApprove ? "awaiting your approval" : "pending"}`} icon={Receipt} color="bg-[#FF6F62]/20 text-[#FF6F62]" />
         </div>
       )}
 

@@ -24,7 +24,7 @@ export function WfhApprovalsCard() {
           <div key={r.id} className="flex items-center gap-3 rounded-xl border border-border/60 p-3">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground truncate">{empName(r.employeeId)}</p>
-              <p className="text-[11px] text-muted-foreground truncate">{format(new Date(r.date), "EEE, d MMM yyyy")}{r.meta?.reason ? ` · ${r.meta.reason}` : ""}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{format(new Date(r.date), "EEE, d MMM yyyy")}{r.meta?.reason ? ` | ${r.meta.reason}` : ""}</p>
             </div>
             <Button size="sm" variant="outline" className="h-8 text-xs" disabled={decide.isPending} onClick={() => decide.mutate({ employeeId: r.employeeId, date: r.date, decision: "rejected" })} data-testid={`wfh-reject-${r.employeeId}-${r.date}`}>Reject</Button>
             <Button size="sm" className="btn-primary-gradient h-8 text-xs" disabled={decide.isPending} onClick={() => decide.mutate({ employeeId: r.employeeId, date: r.date, decision: "approved" })} data-testid={`wfh-approve-${r.employeeId}-${r.date}`}>Approve</Button>

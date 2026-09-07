@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 type Row = { key: string; icon: any; cat: string; title: string; sub: string; amount: number; date: any; status: string };
 
 // Decided-approval history across every category the viewer approves. A single scannable table
-// (Category · Reference · Requester · Amount · Date · Status) with search + category filter, so it's
+// (Category | Reference | Requester | Amount | Date | Status) with search + category filter, so it's
 // easy to grasp at a glance. Uses the shared ApprovalToolbar + DataTable (which paginates itself).
 export function CompletedApprovals({ rows }: { rows: Row[] }) {
   const [search, setSearch] = useState("");

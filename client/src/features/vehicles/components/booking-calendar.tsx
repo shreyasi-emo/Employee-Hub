@@ -55,7 +55,7 @@ export function BookingCalendar({ view, setView, cursor, setCursor, bookings, se
 
   return (
     <div className="card-surface rounded-2xl p-4">
-      {/* Controls: view toggle · filter */}
+      {/* Controls: view toggle | filter */}
       <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
         <div className="segmented-toggle inline-flex p-0.5 h-9">
           {(["month", "week"] as const).map((v) => (
@@ -109,7 +109,7 @@ export function BookingCalendar({ view, setView, cursor, setCursor, bookings, se
                 <div className="space-y-1">
                   {evs.slice(0, 3).map((b: any) => {
                     const v = bookingVisual(b);
-                    return <div key={b.id} role="button" onClick={(e) => { e.stopPropagation(); onOpenBooking && onOpenBooking(b); }} className={`text-[10px] leading-tight rounded px-1 py-0.5 truncate cursor-pointer ${chipOf(b)}`} title={`${v.label} · ${format(new Date(b.startTime), "h:mm a")}–${format(new Date(b.endTime), "h:mm a")} · ${b.purpose}`}>{format(new Date(b.startTime), "h:mm a")} {b.purpose || v.label}</div>;
+                    return <div key={b.id} role="button" onClick={(e) => { e.stopPropagation(); onOpenBooking && onOpenBooking(b); }} className={`text-[10px] leading-tight rounded px-1 py-0.5 truncate cursor-pointer ${chipOf(b)}`} title={`${v.label} | ${format(new Date(b.startTime), "h:mm a")}–${format(new Date(b.endTime), "h:mm a")} | ${b.purpose}`}>{format(new Date(b.startTime), "h:mm a")} {b.purpose || v.label}</div>;
                   })}
                   {evs.length > 3 && <div className="text-[10px] text-muted-foreground pl-1">+{evs.length - 3} more</div>}
                 </div>
@@ -175,7 +175,7 @@ export function BookingCalendar({ view, setView, cursor, setCursor, bookings, se
                     if (b.bookingType !== "company_car") {
                       if (!actual.valid) return null;
                       return (
-                        <div key={b.id} onClick={(e) => { e.stopPropagation(); onOpenBooking && onOpenBooking(b); }} style={{ top: actual.top, height: actual.height, ...pos }} className={`absolute z-[2] rounded-md px-1 py-0.5 overflow-hidden text-[10px] leading-tight cursor-pointer ${chipOf(b)}`} title={`${v.label} · ${times} · ${b.purpose}`}>
+                        <div key={b.id} onClick={(e) => { e.stopPropagation(); onOpenBooking && onOpenBooking(b); }} style={{ top: actual.top, height: actual.height, ...pos }} className={`absolute z-[2] rounded-md px-1 py-0.5 overflow-hidden text-[10px] leading-tight cursor-pointer ${chipOf(b)}`} title={`${v.label} | ${times} | ${b.purpose}`}>
                           <div className="font-medium truncate">{b.purpose || v.label}</div>
                           <div className="truncate opacity-90">{times}</div>
                         </div>
@@ -189,7 +189,7 @@ export function BookingCalendar({ view, setView, cursor, setCursor, bookings, se
                       <Fragment key={b.id}>
                         {before.valid && <div style={{ top: before.top, height: before.height, ...pos, ...GHOST_STYLE }} className="absolute z-[1] rounded-t-md border border-dotted border-[#206295]/50 pointer-events-none" aria-hidden />}
                         {actual.valid && (
-                          <div onClick={(e) => { e.stopPropagation(); onOpenBooking && onOpenBooking(b); }} style={{ top: actual.top, height: actual.height, ...pos }} className={`absolute z-[2] ${blueCls} px-1 py-0.5 overflow-hidden text-[10px] leading-tight cursor-pointer ${chipOf(b)}`} title={`${v.label} · ${times} · ${b.purpose}`}>
+                          <div onClick={(e) => { e.stopPropagation(); onOpenBooking && onOpenBooking(b); }} style={{ top: actual.top, height: actual.height, ...pos }} className={`absolute z-[2] ${blueCls} px-1 py-0.5 overflow-hidden text-[10px] leading-tight cursor-pointer ${chipOf(b)}`} title={`${v.label} | ${times} | ${b.purpose}`}>
                             <div className="font-medium truncate">{b.purpose || v.label}</div>
                             <div className="truncate opacity-90">{times}</div>
                           </div>

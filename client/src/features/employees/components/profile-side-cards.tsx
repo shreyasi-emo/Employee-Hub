@@ -136,7 +136,7 @@ export function ProfileActivityCard({ auditLogs, leaveRequests, leaveTypes }: { 
     items.push({
       id: `leave-${r.id}`, when: new Date(r.createdAt),
       icon: Plane, color: "#0E7C7B",
-      text: `${ltName(r.leaveTypeId)} · ${range} — ${r.status}`,
+      text: `${ltName(r.leaveTypeId)} | ${range} — ${r.status}`,
     });
   }
   items.sort((a, b) => +b.when - +a.when);

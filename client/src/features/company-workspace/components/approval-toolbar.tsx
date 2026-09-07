@@ -10,8 +10,8 @@ import { Search, MousePointerClick, CheckSquare } from "lucide-react";
 const TB_SEP = "self-stretch flex-shrink-0";
 
 // Shared header row for every approval surface (reimbursement / office / procurement / travel) so they
-// all read identically — only the filter/sort content differs. Layout: search (leftmost) · filters · sort
-// · extra (view toggle / date range / export) · [right] Select · pagination. Selection *actions* stay with
+// all read identically — only the filter/sort content differs. Layout: search (leftmost) | filters | sort
+// | extra (view toggle / date range / export) | [right] Select | pagination. Selection *actions* stay with
 // each caller (their bulk logic differs); this owns the uniform chrome only.
 export function ApprovalToolbar({
   search, onSearch, searchPlaceholder = "Search requests…",

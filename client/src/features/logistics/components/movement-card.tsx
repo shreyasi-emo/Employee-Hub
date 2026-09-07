@@ -25,7 +25,7 @@ export function MovementCard({ m, isHandler, onAction }: any) {
     </div>
   );
 
-  // Mobile: a compact single-row card (ref + status · route · item summary · dates), with the
+  // Mobile: a compact single-row card (ref + status | route | item summary | dates), with the
   // handler action buttons stacked below the row unchanged.
   if (isMobile) {
     return (
@@ -84,7 +84,7 @@ export function MovementCard({ m, isHandler, onAction }: any) {
           </div>
         </div>
         <div className="text-sm text-muted-foreground">
-          {(m.items || []).length} item(s) · {m.totalQuantity ?? 0} units · {m.totalWeightKg ?? 0} kg
+          {(m.items || []).length} item(s) | {m.totalQuantity ?? 0} units | {m.totalWeightKg ?? 0} kg
         </div>
         {m.notes && <p className="text-sm">{m.notes}</p>}
         {isHandler && (

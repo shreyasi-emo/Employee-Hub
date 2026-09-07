@@ -113,9 +113,9 @@ export default function LeavePage() {
       {!emp && <p className="text-sm text-muted-foreground italic" data-testid="text-no-emp-profile">No employee profile linked to your account.</p>}
 
       {/* Tab buttons */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="grid grid-cols-2 sm:flex gap-2 sm:flex-wrap">
         {tabs.map((t) => (
-          <Button key={t.key} size="sm" variant={currentTab === t.key ? "default" : "secondary"} onClick={() => setActiveTab(t.key)} data-testid={`tab-${t.key}`}>
+          <Button key={t.key} size="sm" className="w-full sm:w-auto justify-center sm:justify-start" variant={currentTab === t.key ? "default" : "secondary"} onClick={() => setActiveTab(t.key)} data-testid={`tab-${t.key}`}>
             {t.label}
             {t.badge ? <Badge className={`ml-1.5 text-xs ${currentTab === t.key ? "bg-white/25 text-white" : "bg-[#206295]/12 text-[#206295]"}`}>{t.badge}</Badge> : null}
           </Button>

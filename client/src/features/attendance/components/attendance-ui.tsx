@@ -29,7 +29,7 @@ export function StatCard({ title, value, subtitle, icon: Icon, color }: {
           <div className="space-y-1 flex-1 min-w-0">
             <p className="text-sm text-muted-foreground">{title}</p>
             <p className="text-[33px] leading-tight font-bold text-foreground">{value}</p>
-            {subtitle}
+            {subtitle && <div className="hidden sm:block">{subtitle}</div>}
           </div>
           <div className={`p-2.5 rounded-xl flex-shrink-0 ${color}`}>
             <Icon className="h-5 w-5" />

@@ -249,18 +249,18 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
 
                 {/* Identity — reading flow: reference → amount → employee */}
                 <div className="flex-1 min-w-0 lg:pr-6">
-                  {/* 1 · Reference (heading) */}
+                  {/* 1 | Reference (heading) */}
                   <div className="flex items-center gap-2">
                     <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                     <span className="text-[13px] font-semibold tracking-wide text-foreground truncate">{r.reference}</span>
                     <Badge className="text-[10px] px-2 py-0.5 capitalize" style={catStyle(r.category || "other")}>{r.category || "—"}</Badge>
                   </div>
-                  {/* 2 · Amount (primary emphasis — blue) */}
+                  {/* 2 | Amount (primary emphasis — blue) */}
                   <div className="flex items-end gap-1 mt-1.5">
                     <IndianRupee className="h-7 w-7 text-[#206295] mb-1" />
                     <span className="text-[2.1rem] leading-none font-bold text-[#206295] tracking-tight tabular-nums">{amt.toLocaleString("en-IN")}</span>
                   </div>
-                  {/* 3 · Employee · HOD · Purpose (one line, small vertical separators) */}
+                  {/* 3 | Employee | HOD | Purpose (one line, small vertical separators) */}
                   <div className="flex items-center gap-2.5 mt-2.5 text-sm min-w-0">
                     <span className="flex-shrink-0">
                       <span className="font-bold text-foreground">{r.employeeName || "Employee"}</span>

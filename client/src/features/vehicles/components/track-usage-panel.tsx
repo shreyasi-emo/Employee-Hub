@@ -86,7 +86,7 @@ export function TrackUsagePanel({ open, onOpenChange, employees, bookings, vehic
                 <Search className="h-4 w-4 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or department…" className="h-9 pl-8 text-sm" data-testid="usage-search" />
               </div>
-              {/* Line 2: date window (left) · department + icon-only sort (right) */}
+              {/* Line 2: date window (left) | department + icon-only sort (right) */}
               <div className="flex items-center gap-2 flex-wrap">
                 <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
                   <SelectTrigger className="w-auto h-9 text-xs gap-1.5" data-testid="usage-period"><CalendarDays className="h-3.5 w-3.5" /><SelectValue /></SelectTrigger>
@@ -149,7 +149,7 @@ export function TrackUsagePanel({ open, onOpenChange, employees, bookings, vehic
                 <Avatar className="h-10 w-10 flex-shrink-0"><AvatarImage src={selected.emp.avatarUrl} /><AvatarFallback className="text-sm bg-[#206295]/15 text-[#206295]">{driverInitials(empName(selected.emp))}</AvatarFallback></Avatar>
                 <div className="min-w-0">
                   <SheetTitle className="truncate">{empName(selected.emp)}</SheetTitle>
-                  <p className="text-xs text-muted-foreground">{deptName(selected.emp.departmentId)} · {selected.count} {selected.count === 1 ? "trip" : "trips"}</p>
+                  <p className="text-xs text-muted-foreground">{deptName(selected.emp.departmentId)} | {selected.count} {selected.count === 1 ? "trip" : "trips"}</p>
                 </div>
               </div>
             </SheetHeader>

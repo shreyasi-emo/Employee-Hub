@@ -35,7 +35,7 @@ export function MyAttendanceCalendar({
 
   return (
     <div className="lg:col-span-2 card-surface rounded-2xl p-4">
-      {/* Controls: view toggle · status filter (matches the booking calendar) */}
+      {/* Controls: view toggle | status filter (matches the booking calendar) */}
       <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
         <div className="segmented-toggle inline-flex p-0.5 h-9">
           <button onClick={() => onView("calendar")} className={`px-3 h-full rounded-[10px] text-xs font-medium inline-flex items-center gap-1.5 ${view === "calendar" ? "btn-primary-gradient text-white" : "text-foreground/70"}`} data-testid="myatt-calendar"><CalendarDays className="h-3.5 w-3.5" /> Calendar</button>
@@ -91,7 +91,7 @@ export function MyAttendanceCalendar({
               const showFill = showLabel && !isFut;              // future planned days = label only, no fill
               const todaySolid = isToday && !!color && !pendingWfh; // today is a solid filled box
               const solidText = todaySolid ? textOn(blendWhite(color!, TODAY_FILL_ALPHA)) : undefined;
-              const label = pendingWfh ? "WFH · Pending" : statusLabelOf(st || undefined);
+              const label = pendingWfh ? "WFH | Pending" : statusLabelOf(st || undefined);
               const trip = inM ? travelDays[key] : undefined;
               return (
                 <button key={day.toISOString()} onClick={() => onSelect(day)}
