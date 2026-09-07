@@ -175,11 +175,12 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
             return (
               <div key={r.id} className="card-surface rounded-xl p-3" data-testid={`leave-row-card-${r.id}`}>
                 <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-foreground truncate flex-1"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />{lt?.name || "—"}</span>
-                  <Badge className={`text-[10px] flex-shrink-0 ${sc.bg} ${sc.text}`}>{sc.label}</Badge>
+                  <span className="text-sm font-semibold text-foreground flex-shrink-0">{Number(r.totalDays)} day{Number(r.totalDays) !== 1 ? "s" : ""}</span>
+                  {lt && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground min-w-0 truncate"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />{lt.name}</span>}
+                  <Badge className={`text-[10px] flex-shrink-0 ml-auto ${sc.bg} ${sc.text}`}>{sc.label}</Badge>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-1.5">{format(new Date(r.startDate), "MMM d")}{r.startDate !== r.endDate ? ` – ${format(new Date(r.endDate), "MMM d, yyyy")}` : `, ${format(new Date(r.startDate), "yyyy")}`}<span className="mx-1.5 text-border">|</span>{r.totalDays}d</p>
-                {r.reason && <p className="text-[11px] text-muted-foreground/80 mt-1 line-clamp-1" title={r.reason}>{r.reason}</p>}
+                <p className="text-[11px] text-muted-foreground mt-1">{format(new Date(r.startDate), "MMM d")}{r.startDate !== r.endDate ? ` – ${format(new Date(r.endDate), "MMM d, yyyy")}` : `, ${format(new Date(r.startDate), "yyyy")}`}</p>
+                {r.reason && <p className="text-[11px] text-muted-foreground/70 mt-0.5 line-clamp-1" title={r.reason}>{r.reason}</p>}
                 {a && (
                   <div className="mt-2.5">
                     <Button size="sm" variant="outline" className={`h-8 w-full text-xs ${a.kind === "end" ? "text-[#206295] border-[#206295]/30" : "text-[#FF6F62] border-[#FF6F62]/30"}`} onClick={() => (a.kind === "end" ? onEndRequest(r.id) : onCancelRequest(r.id))} data-testid={`button-${a.kind}-leave-${r.id}`}>{a.label}</Button>
