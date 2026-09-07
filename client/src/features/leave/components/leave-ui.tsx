@@ -29,7 +29,7 @@ export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove,
   // Mobile: a compact card per request instead of a sideways-scrolling table (desktop keeps the table).
   if (isMobile) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 px-4 pb-4">
         {requests.length === 0 ? (
           <div className="card-surface rounded-2xl py-12 text-center"><p className="text-sm text-muted-foreground">{emptyText || "No leave requests"}</p></div>
         ) : requests.map((r: any) => {
