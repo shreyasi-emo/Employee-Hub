@@ -1,7 +1,7 @@
 import { money, fmtDate, dayInRange, rangeSuffix, OP_PRIORITY, LIST_PAGE_SIZE } from "../../shared/approval-format";
 import { ApprovalDateRange, ViewToggle } from "../../components/approval-ui";
 import { OfficePurchaseBatchModal } from "./office-purchase-batch-modal";
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,9 @@ import { exportXlsx } from "@/lib/export-xlsx";
 import { OfficePurchaseDetailDialog } from "@/features/company-workspace/office-purchases/components/office-purchase";
 import { ShoppingCart, ArrowRight, ChevronLeft, Check, ChevronRight, MessageSquare, CalendarClock, IndianRupee, Eye, Download, ArrowDownUp, Building2, Clock, CheckSquare, CheckCircle2, Layers, SlidersHorizontal, X } from "lucide-react";
 import { statusClass, statusLabel } from "@/lib/status";
+import { useIsMobile } from "@/hooks/use-mobile";
 
-export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allItems: any[]; canTriage: boolean; canCeo: boolean }) {
+export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCategorySlot }: { allItems: any[]; canTriage: boolean; canCeo: boolean; mobileCategorySlot?: ReactNode }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [openSecs, setOpenSecs] = useState<Set<string>>(new Set());  // pending sections expanded past the initial cap
+  const isMobile = useIsMobile();
 
   const baseList = useMemo(() => {
     if (phase === "ordered") return (allItems as any[]).filter((o) => o.status === "ordered");
@@ -118,6 +120,33 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
     const summary = lines.length ? `${lines[0]?.description || "Item"}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}` : "—";
     const selectable = selMode && o.status === "priced";
     const checked = sel.has(o.id);
+    // Mobile: a compact card — only the essentials (ref + status, amount + priority, requester | items, Review).
+    if (isMobile) {
+      return (
+        <div key={o.id} data-testid={`appr-op-${o.id}`} className={`card-surface card-hover relative p-3 cursor-pointer ${selectable && checked ? "ring-2 ring-[#206295]" : ""} ${selMode && !selectable ? "opacity-60" : ""}`} onClick={() => (selectable ? toggleSel(o.id) : selMode ? undefined : setDetailId(o.id))}>
+          <div className="flex items-center gap-2">
+            {selMode && <Checkbox checked={checked} disabled={!selectable} onClick={(e: any) => e.stopPropagation()} onCheckedChange={() => selectable && toggleSel(o.id)} className="flex-shrink-0" />}
+            <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            <span className="text-[13px] font-semibold text-foreground truncate flex-1">{o.reference}</span>
+            <Badge className={`text-[10px] flex-shrink-0 ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge>
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-1.5">
+            {amt > 0
+              ? <span className="text-xl font-bold text-[#206295] tabular-nums leading-none">₹{amt.toLocaleString("en-IN")}</span>
+              : <span className="text-xs text-muted-foreground">Amount pending HR pricing</span>}
+            <Badge className={`text-[10px] flex-shrink-0 ${pr.cls}`}>{pr.label}</Badge>
+          </div>
+          <p className="text-[11px] text-muted-foreground truncate mt-1">
+            <span className="font-medium text-foreground">{o.employeeName || "Employee"}</span> ({o.employeeCode || "—"})<span className="mx-1.5 text-border">|</span>{lines.length} item{lines.length !== 1 ? "s" : ""}: {summary}
+          </p>
+          {!selMode && (
+            <div onClick={(e) => e.stopPropagation()} className="mt-2">
+              <Button size="sm" variant="ghost" className="h-9 w-full btn-glass text-[#206295] hover:text-[#206295]" onClick={() => setDetailId(o.id)} data-testid={`review-op-${o.id}`}><Eye className="h-4 w-4 mr-1.5" /> {phase === "pending" ? "Review" : "View"}</Button>
+            </div>
+          )}
+        </div>
+      );
+    }
     return (
       <div key={o.id} data-testid={`appr-op-${o.id}`} className={`group card-surface card-hover relative p-4 cursor-pointer ${selectable && checked ? "ring-2 ring-[#206295]" : ""} ${selMode && !selectable ? "opacity-60" : ""}`} onClick={() => (selectable ? toggleSel(o.id) : selMode ? undefined : setDetailId(o.id))}>
         <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-5">
@@ -272,15 +301,15 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
 
       {/* Toolbar — mobile: phase dropdown + Filters sheet (Status / Priority / Sort / Date range). */}
       <div className="sm:hidden space-y-3">
+        {/* Row 1: phase toggle on top, full-width (3 equal segments). */}
+        <div className="segmented-toggle flex p-0.5 h-9 w-full">
+          {(["pending", "ordered", "completed"] as const).map((p) => (
+            <button key={p} onClick={() => { setPhase(p); setPage(1); exitSel(); }} className={`flex-1 h-full rounded-[10px] text-xs font-medium capitalize ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`phase-${p}-mobile`}>{p}</button>
+          ))}
+        </div>
+        {/* Row 2: category dropdown + Filters. */}
         <div className="flex items-center gap-2">
-          <Select value={phase} onValueChange={(v) => { setPhase(v as any); setPage(1); exitSel(); }}>
-            <SelectTrigger className="flex-1 min-w-0 h-9" data-testid="phase-mobile"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="ordered">Ordered</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
+          {mobileCategorySlot && <div className="flex-1 min-w-0">{mobileCategorySlot}</div>}
           <Sheet open={filterSheet} onOpenChange={setFilterSheet}>
             <SheetTrigger asChild>
               <Button variant="secondary" size="sm" className="h-9 flex-shrink-0" data-testid="op-filters-mobile">
