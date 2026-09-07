@@ -7,13 +7,14 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetTrigger } from "@/components/ui/sheet";
 import { DataTable } from "@/components/shared/data-table";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { exportXlsx } from "@/lib/export-xlsx";
 import { OfficePurchaseDetailDialog } from "@/features/company-workspace/office-purchases/components/office-purchase";
-import { ShoppingCart, ArrowRight, ChevronLeft, Check, ChevronRight, MessageSquare, CalendarClock, IndianRupee, Eye, Download, ArrowDownUp, Building2, Clock, CheckSquare, CheckCircle2, Layers } from "lucide-react";
+import { ShoppingCart, ArrowRight, ChevronLeft, Check, ChevronRight, MessageSquare, CalendarClock, IndianRupee, Eye, Download, ArrowDownUp, Building2, Clock, CheckSquare, CheckCircle2, Layers, SlidersHorizontal, X } from "lucide-react";
 import { statusClass, statusLabel } from "@/lib/status";
 
 export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allItems: any[]; canTriage: boolean; canCeo: boolean }) {
@@ -27,6 +28,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date_desc");
   const [view, setView] = useState<"card" | "table">("card");
+  const [filterSheet, setFilterSheet] = useState(false);
   const [selMode, setSelMode] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
@@ -103,6 +105,10 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
       ))}
     </div>
   );
+
+  // Mobile: filters live in a bottom sheet; this counts the active (non-default) ones for the badge/chips.
+  const opActiveFilters = (statusFilter !== "all" ? 1 : 0) + (priorityFilter !== "all" ? 1 : 0) + (sortBy !== "date_desc" ? 1 : 0) + ((range.from || range.to) ? 1 : 0);
+  const resetOpFilters = () => { setStatusFilter("all"); setPriorityFilter("all"); setSortBy("date_desc"); setRange({}); setPage(1); };
 
   // ---- card renderers ----
   const singleCard = (o: any) => {
@@ -218,8 +224,8 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 justify-between">
+      {/* Toolbar — desktop (unchanged). */}
+      <div className="hidden sm:flex flex-wrap items-center gap-2 justify-between">
         <div className="flex flex-wrap items-center gap-2">
           {phaseToggle}
           <div className="w-px self-stretch bg-foreground/30 mx-0.5" />
@@ -262,6 +268,82 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo }: { allIt
             </div>
           )}
         </div>
+      </div>
+
+      {/* Toolbar — mobile: phase dropdown + Filters sheet (Status / Priority / Sort / Date range). */}
+      <div className="sm:hidden space-y-3">
+        <div className="flex items-center gap-2">
+          <Select value={phase} onValueChange={(v) => { setPhase(v as any); setPage(1); exitSel(); }}>
+            <SelectTrigger className="flex-1 min-w-0 h-9" data-testid="phase-mobile"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="ordered">Ordered</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Sheet open={filterSheet} onOpenChange={setFilterSheet}>
+            <SheetTrigger asChild>
+              <Button variant="secondary" size="sm" className="h-9 flex-shrink-0" data-testid="op-filters-mobile">
+                <SlidersHorizontal className="h-4 w-4 mr-1.5" /> Filters
+                {opActiveFilters > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#206295] px-1 text-[10px] font-bold text-white">{opActiveFilters}</span>}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+              <SheetHeader className="text-left"><SheetTitle>Filters</SheetTitle></SheetHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Status</p>
+                  <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+                    <SelectTrigger className="w-full" data-testid="sheet-op-status"><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All Statuses</SelectItem>{statuses.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Priority</p>
+                  <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
+                    <SelectTrigger className="w-full" data-testid="sheet-op-priority"><SelectValue placeholder="Priority" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All Priority</SelectItem><SelectItem value="high">High</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="low">Low</SelectItem></SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Sort</p>
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="w-full" data-testid="sheet-op-sort"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="date_desc">Newest first</SelectItem><SelectItem value="date_asc">Oldest first</SelectItem><SelectItem value="amount_desc">Amount: High → Low</SelectItem><SelectItem value="amount_asc">Amount: Low → High</SelectItem></SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Date range</p>
+                  <ApprovalDateRange value={range} onChange={(v) => { setRange(v); setPage(1); }} />
+                </div>
+              </div>
+              <SheetFooter className="flex-row gap-2">
+                <Button variant="outline" className="flex-1" onClick={resetOpFilters} data-testid="sheet-op-reset">Reset</Button>
+                <SheetClose asChild><Button className="flex-1 btn-primary-gradient text-white" data-testid="sheet-op-apply">Show results</Button></SheetClose>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </div>
+        {(canGroup || phase === "completed" || totalPages > 1) && (
+          <div className="flex items-center gap-2">
+            {canGroup && !selMode && <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelMode(true)} data-testid="op-group-mobile"><Layers className="h-4 w-4 mr-1.5" /> Group &amp; send</Button>}
+            {phase === "completed" && <Button variant="secondary" size="sm" className="h-9" disabled={sorted.length === 0} onClick={doExport} data-testid="op-export-mobile"><Download className="h-4 w-4 mr-1.5" /> Export ({sorted.length})</Button>}
+            {!(phase === "pending" && view === "card") && totalPages > 1 && (
+              <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} data-testid="page-prev-mobile"><ChevronLeft className="h-4 w-4" /></Button>
+                <span className="px-1 tabular-nums">{curPage} / {totalPages}</span>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage >= totalPages} onClick={() => setPage(curPage + 1)} data-testid="page-next-mobile"><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+            )}
+          </div>
+        )}
+        {opActiveFilters > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {statusFilter !== "all" && <button onClick={() => { setStatusFilter("all"); setPage(1); }} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground hover-elevate" data-testid="op-chip-status"><span className="truncate max-w-[8rem]">{statusLabel(statusFilter)}</span> <X className="h-3 w-3 flex-shrink-0" /></button>}
+            {priorityFilter !== "all" && <button onClick={() => { setPriorityFilter("all"); setPage(1); }} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground capitalize hover-elevate" data-testid="op-chip-priority">{priorityFilter} <X className="h-3 w-3 flex-shrink-0" /></button>}
+            {(range.from || range.to) && <button onClick={() => { setRange({}); setPage(1); }} className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-1 text-xs text-foreground hover-elevate" data-testid="op-chip-range">Date range <X className="h-3 w-3 flex-shrink-0" /></button>}
+          </div>
+        )}
       </div>
 
       {/* Selection bar — pick priced requests to send singly or as a group */}
