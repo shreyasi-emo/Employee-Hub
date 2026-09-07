@@ -30,7 +30,7 @@ export function BulkUpdateDialog({ open, onOpenChange, ids, departments, locatio
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Bulk Update · {ids.length} selected</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Bulk Update | {ids.length} selected</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
             <p className="text-sm font-medium">Field</p>

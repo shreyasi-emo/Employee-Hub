@@ -27,5 +27,5 @@ export function exportJoiners(joiners: any[], range: { from: Date; to?: Date }, 
   const rows = joiners.map((e) => [e.employeeCode, e.firstName, e.lastName, e.email, e.phone || "", fmtD(e.dateOfBirth), e.gender || "", e.maritalStatus || "", fmtD(e.joinDate), fmtD(e.confirmationDate), fmtD(e.lastWorkingDate), e.noticePeriodDays ?? "", e.probationDays ?? "", typeLabel(e.employmentType), e.employmentStatus, nameFrom(departments, e.departmentId), nameFrom(designations, e.designationId), mgr(e.managerId), e.workLocation || "", e.panNumber || "", e.aadhaarMasked || "", e.uan || "", yn(e.pfEligible), yn(e.esiEligible), e.bankName || "", e.bankAccountMasked || "", e.ifscCode || "", e.currentAddress || "", e.permanentAddress || "", e.emergencyContactName || "", e.emergencyContactPhone || "", e.emergencyContactRelation || ""]);
   const f = format(range.from, "dd MMM yyyy"), t = format(range.to ?? range.from, "dd MMM yyyy");
   const span = f === t ? f : `${f} – ${t}`;
-  exportXlsx({ filename: `joiners-${format(range.from, "yyyy-MM-dd")}.xlsx`, sheet: "Joiners", title: `Joiners · ${span} (${joiners.length})`, headers, rows });
+  exportXlsx({ filename: `joiners-${format(range.from, "yyyy-MM-dd")}.xlsx`, sheet: "Joiners", title: `Joiners | ${span} (${joiners.length})`, headers, rows });
 }

@@ -67,7 +67,7 @@ export function OnboardDialog({ requestId, open, onClose }: { requestId: string 
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-border space-y-0">
           <DialogTitle className="flex items-center gap-2 flex-wrap pr-8">
             <span className="text-lg font-bold text-foreground">{r?.candidateName || "Candidate"}</span>
-            <Badge className={`text-[11px] px-2 py-0 border-transparent ${onboarded ? "bg-[#4BDCD9]/25 text-[#0E7C7B]" : "bg-[#206295]/15 text-[#206295]"}`}>{onboarded ? `Onboarded · ${r?.employeeCode}` : "Submitted"}</Badge>
+            <Badge className={`text-[11px] px-2 py-0 border-transparent ${onboarded ? "bg-[#4BDCD9]/25 text-[#0E7C7B]" : "bg-[#206295]/15 text-[#206295]"}`}>{onboarded ? `Onboarded | ${r?.employeeCode}` : "Submitted"}</Badge>
           </DialogTitle>
           {r?.candidateEmail && <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground"><span>{r.candidateEmail}</span>{r.candidatePhone && <><Bar /><span>{r.candidatePhone}</span></>}</div>}
         </DialogHeader>

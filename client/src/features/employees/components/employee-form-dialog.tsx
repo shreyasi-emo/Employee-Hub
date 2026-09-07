@@ -81,7 +81,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, departments, 
               <div>
                 <p className="text-sm font-semibold text-foreground">Employee account created successfully.</p>
                 <p className="text-sm text-muted-foreground mt-1">They can now log in using their company Google account.</p>
-                <p className="text-xs text-muted-foreground mt-2">{created.name} · {created.email}</p>
+                <p className="text-xs text-muted-foreground mt-2">{created.name} | {created.email}</p>
               </div>
             </div>
             <Button className="w-full" onClick={() => { setCreated(null); form.reset(emptyForm); onOpenChange(false); }}>Done</Button>

@@ -24,7 +24,7 @@ function Endpoint({ label, loc, date }: { label: string; loc: string; date: any 
   );
 }
 
-// Logistics request card — single row: requester + cargo · route (pickup → drop) · status · action.
+// Logistics request card — single row: requester + cargo | route (pickup → drop) | status | action.
 export function LogisticsRequestCard({ r, locName, onOpen }: {
   r: any; locName: (id: string) => string | undefined; onOpen: (r: any) => void;
 }) {
@@ -72,7 +72,7 @@ export function LogisticsRequestCard({ r, locName, onOpen }: {
     <Card data-testid={`logistics-card-${r.id}`} className="border hover-elevate active-elevate-2 cursor-pointer" onClick={() => onOpen(r)}>
       <CardContent className="p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-0">
-          {/* PART 1 — requester · reference · cargo meta */}
+          {/* PART 1 — requester | reference | cargo meta */}
           <div className="flex gap-3 lg:flex-1 lg:min-w-0 lg:pr-5">
             <span className="h-11 w-11 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Truck className="h-5 w-5" /></span>
             <div className="min-w-0">
@@ -96,7 +96,7 @@ export function LogisticsRequestCard({ r, locName, onOpen }: {
 
           {divider}
 
-          {/* MIDDLE — from (pickup) ···🚚···> to (drop) */}
+          {/* MIDDLE — from (pickup) |||🚚|||> to (drop) */}
           <div className="flex items-start gap-3 min-w-0 lg:flex-1 lg:px-5">
             <Endpoint label="From (Pickup)" loc={from} date={r.pickupDate} />
             <div className="flex items-center flex-1 min-w-[2rem] self-center">

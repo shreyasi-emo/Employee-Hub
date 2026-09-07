@@ -290,7 +290,7 @@ export default function HRopsPage() {
                 <div key={r.id} data-testid={`card-approved-req-${r.id}`} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
                   <div>
                     <p className="text-sm font-medium text-foreground">{r.title}</p>
-                    <p className="text-xs text-muted-foreground">{r.department} · {r.location} · {r.positions} position{r.positions !== 1 ? "s" : ""}</p>
+                    <p className="text-xs text-muted-foreground">{r.department} | {r.location} | {r.positions} position{r.positions !== 1 ? "s" : ""}</p>
                   </div>
                   <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-0 text-xs">Approved</Badge>
                 </div>
@@ -312,7 +312,7 @@ export default function HRopsPage() {
                 <div key={o.id} data-testid={`card-approved-offer-${o.id}`} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
                   <div>
                     <p className="text-sm font-medium text-foreground">{o.candidateName}</p>
-                    <p className="text-xs text-muted-foreground">{o.offeredRole} · {o.offeredCtc ? `CTC: ₹${Number(o.offeredCtc).toLocaleString("en-IN")}` : ""}</p>
+                    <p className="text-xs text-muted-foreground">{o.offeredRole} | {o.offeredCtc ? `CTC: ₹${Number(o.offeredCtc).toLocaleString("en-IN")}` : ""}</p>
                   </div>
                   <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-0 text-xs">Approved</Badge>
                 </div>
@@ -329,7 +329,7 @@ export default function HRopsPage() {
                 <div key={p.id} data-testid={`card-approved-purchase-${p.id}`} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
                   <div>
                     <p className="text-sm font-medium text-foreground">{p.category}</p>
-                    <p className="text-xs text-muted-foreground">{p.description} · ₹{Number(p.estimatedAmount || 0).toLocaleString("en-IN")}</p>
+                    <p className="text-xs text-muted-foreground">{p.description} | ₹{Number(p.estimatedAmount || 0).toLocaleString("en-IN")}</p>
                   </div>
                   <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-0 text-xs">Approved</Badge>
                 </div>
@@ -346,7 +346,7 @@ export default function HRopsPage() {
                 <div key={t.id} data-testid={`card-approved-travel-${t.id}`} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
                   <div>
                     <p className="text-sm font-medium text-foreground">{t.fromCity} → {t.toCity}</p>
-                    <p className="text-xs text-muted-foreground">{t.travelDate ? format(new Date(t.travelDate), "MMM d, yyyy") : ""} · {t.purpose}</p>
+                    <p className="text-xs text-muted-foreground">{t.travelDate ? format(new Date(t.travelDate), "MMM d, yyyy") : ""} | {t.purpose}</p>
                     {t.assignedToName && <p className="text-xs text-blue-600 dark:text-blue-400">Assigned: {t.assignedToName}</p>}
                   </div>
                   <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-0 text-xs">Approved</Badge>
@@ -364,7 +364,7 @@ export default function HRopsPage() {
                 <div key={p.id} data-testid={`card-approved-payment-${p.id}`} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
                   <div>
                     <p className="text-sm font-medium text-foreground">{p.description || p.category}</p>
-                    <p className="text-xs text-muted-foreground">₹{Number(p.amount || 0).toLocaleString("en-IN")} · {p.paymentType?.replace(/_/g, " ")}</p>
+                    <p className="text-xs text-muted-foreground">₹{Number(p.amount || 0).toLocaleString("en-IN")} | {p.paymentType?.replace(/_/g, " ")}</p>
                   </div>
                   <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-0 text-xs">Approved</Badge>
                 </div>

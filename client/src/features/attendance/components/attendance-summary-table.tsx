@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetTrigger } from "@/components/ui/sheet";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 
-const pctColor = (p: number) => p >= 90 ? "#0E7C7B" : p >= 75 ? "#B5611A" : "#C24A3E";
+const pctColor = (p: number) => p >= 90 ? "#0E7C7B" : p >= 75 ? "#206295" : "#C24A3E";
 
 /** Full per-employee attendance summary for the selected period — same
  *  present-by-default model as the report. Owns its own search/filter/sort state. */
@@ -58,7 +58,7 @@ export function AttendanceSummaryTable({ reportRows, departments, from, to, onEx
 
   return (
     <div className="space-y-4">
-      {/* One-line toolbar: title · separator · search · dept · location */}
+      {/* One-line toolbar: title | separator | search | dept | location */}
       {/* Desktop: one-line toolbar (unchanged). */}
       <div className="hidden sm:flex items-center gap-3 flex-wrap">
         <h2 className="text-lg font-bold text-foreground shrink-0">Attendance Summary</h2>

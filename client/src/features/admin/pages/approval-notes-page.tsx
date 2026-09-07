@@ -59,7 +59,7 @@ export default function ApprovalNotesPage() {
                   {n.summary && <p className="text-sm">{n.summary}</p>}
                   <div className="text-sm text-muted-foreground">
                     {(n.linkedRequestIds || []).length} linked request(s)
-                    {n.totalEstimatedCost && <> · Est. ₹{n.totalEstimatedCost}</>}
+                    {n.totalEstimatedCost && <> | Est. ₹{n.totalEstimatedCost}</>}
                   </div>
                   {isCEO && (
                     <div className="space-y-2 pt-2 border-t">

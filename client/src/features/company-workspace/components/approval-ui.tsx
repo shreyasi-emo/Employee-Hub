@@ -12,12 +12,12 @@ import { format } from "date-fns";
 // <button> when `onClick` is given. Not the shared components/shared/stat-card.tsx.
 export function StatCard({ title, value, subtitle, icon: Icon, color, onClick }: { title: string; value: any; subtitle?: React.ReactNode; icon: any; color: string; onClick?: () => void; }) {
   const inner = (
-    <CardContent className="p-5">
+    <CardContent className="p-4 sm:p-5">
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1 flex-1 min-w-0">
           <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-2xl sm:text-[33px] leading-tight font-bold text-foreground truncate">{value}</p>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+          <p className="text-xl sm:text-[33px] leading-tight font-bold text-foreground truncate">{value}</p>
+          {subtitle && <p className="hidden sm:block text-xs text-muted-foreground">{subtitle}</p>}
         </div>
         <div className={`p-2.5 rounded-xl flex-shrink-0 ${color}`}><Icon className="h-5 w-5" /></div>
       </div>

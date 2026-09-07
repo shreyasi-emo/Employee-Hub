@@ -25,7 +25,7 @@ export function AssetCard({ asset, assignedTo, canManage, onOpen, onQuickDelete 
       <Badge variant="outline" className="text-[10px] capitalize flex-shrink-0">{asset.status}</Badge>
     );
 
-  // Mobile: a compact single-row card (icon · name/code·category/condition·assignee · delete).
+  // Mobile: a compact single-row card (icon | name/code|category/condition|assignee | delete).
   if (isMobile) {
     return (
       <Card className="hover-elevate relative cursor-pointer" data-testid={`asset-${asset.id}`} onClick={onOpen}>

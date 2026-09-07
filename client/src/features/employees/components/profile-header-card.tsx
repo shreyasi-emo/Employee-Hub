@@ -11,7 +11,7 @@ import { avatarColor, initials } from "../lib/employee-helpers";
 
 const STATUS_OPTS = ["active", "on_notice", "inactive", "exited"];
 
-// Profile header — the reference layout (avatar · name · role/dept · status pills · contact row · actions)
+// Profile header — the reference layout (avatar | name | role/dept | status pills | contact row | actions)
 // rendered in our own styling: the app's Card, brand status colours (teal Active, not green), brand tokens.
 export function ProfileHeaderCard({ employee, dept, desig, canManage, onStatusChange, onEdit }: {
   employee: any; dept: any; desig: any; canManage: boolean;

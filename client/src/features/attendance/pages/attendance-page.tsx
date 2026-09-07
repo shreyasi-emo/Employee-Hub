@@ -19,7 +19,7 @@ export default function AttendancePage() {
         {/* One pill split 50/50 down the middle — no gap, outer corners rounded, active half fills its side. */}
         <TabsList className="w-full grid grid-cols-2 gap-0 p-0 h-12 overflow-hidden rounded-[20px] border border-white/70 shadow-[0_4px_16px_rgba(44,62,98,0.18)]">
           <TabsTrigger value="mine" style={{ borderRadius: 0, borderColor: "transparent" }} className="w-full h-full text-sm" data-testid="tab-my-attendance">My Attendance</TabsTrigger>
-          <TabsTrigger value="all" style={{ borderRadius: 0, borderColor: "transparent" }} className="w-full h-full text-sm" data-testid="tab-employee-attendance">Employee Attendance</TabsTrigger>
+          <TabsTrigger value="all" style={{ borderRadius: 0, borderColor: "transparent" }} className="w-full h-full text-sm" data-testid="tab-employee-attendance"><span className="sm:hidden">Emp. Attendance</span><span className="hidden sm:inline">Employee Attendance</span></TabsTrigger>
         </TabsList>
       </div>
       <TabsContent value="mine" className="mt-0"><MyAttendanceView /></TabsContent>

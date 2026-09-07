@@ -16,7 +16,7 @@ function OverviewStat({ icon: Icon, heading, value, sub, badge, valueClass = "te
   );
 }
 
-/** Fleet size · confirmed today · free slots this week · whether rentals are on offer. */
+/** Fleet size | confirmed today | free slots this week | whether rentals are on offer. */
 export function VehiclesOverviewStats({ vehicleCount, confirmedToday, slotsThisWeek, rentalAvailable }: {
   vehicleCount: number; confirmedToday: number; slotsThisWeek: number; rentalAvailable: boolean;
 }) {

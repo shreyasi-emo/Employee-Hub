@@ -29,7 +29,7 @@ export function EmployeeCard({ employee, departments, designations, selectionMod
   const c = avatarColor(employee.id);
   const onCardClick = () => (selectionMode ? onToggle() : onOpen ? onOpen(employee) : navigate(`/employees/${employee.id}`));
 
-  // Mobile: a compact single-row card (avatar · name/role/meta · status + chevron).
+  // Mobile: a compact single-row card (avatar | name/role/meta | status + chevron).
   if (isMobile) {
     return (
       <Card

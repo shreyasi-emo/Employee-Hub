@@ -69,7 +69,7 @@ export function InsightsPanel({ open, onOpenChange, employees, departments }: {
                   {annivs.map(({ e, d, yrs }) => (
                     <div key={e.id} className="flex items-center gap-2.5 py-2">
                       <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="text-xs" style={{ backgroundColor: `${avatarColor(e.id)}26`, color: avatarColor(e.id) }}>{initials(e.firstName, e.lastName)}</AvatarFallback></Avatar>
-                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p><p className="text-xs text-[#6A7366]">{yrs} year{yrs !== 1 ? "s" : ""} · {format(new Date(e.joinDate), "MMM d")}</p></div>
+                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p><p className="text-xs text-[#6A7366]">{yrs} year{yrs !== 1 ? "s" : ""} | {format(new Date(e.joinDate), "MMM d")}</p></div>
                       <Badge className="text-[10px] flex-shrink-0 bg-[#FFA962]/20 text-[#FFA962]">{d === 0 ? "Today" : `${d}d`}</Badge>
                     </div>
                   ))}
@@ -84,7 +84,7 @@ export function InsightsPanel({ open, onOpenChange, employees, departments }: {
                   {farewells.map(({ e, d }) => (
                     <div key={e.id} className="flex items-center gap-2.5 py-2">
                       <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="text-xs" style={{ backgroundColor: `${avatarColor(e.id)}26`, color: avatarColor(e.id) }}>{initials(e.firstName, e.lastName)}</AvatarFallback></Avatar>
-                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p><p className="text-xs text-[#6A7366]">Last day · {format(new Date(e.lastWorkingDate), "MMM d")}</p></div>
+                      <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground truncate">{e.firstName} {e.lastName}</p><p className="text-xs text-[#6A7366]">Last day | {format(new Date(e.lastWorkingDate), "MMM d")}</p></div>
                       <Badge className="text-[10px] flex-shrink-0 bg-[#6A7366]/15 text-[#6A7366]">{d === 0 ? "Today" : `${d}d`}</Badge>
                     </div>
                   ))}

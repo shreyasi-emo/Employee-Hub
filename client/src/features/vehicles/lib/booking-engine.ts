@@ -73,7 +73,7 @@ export function assignVehicles(available: any[], pax: number, seedId: string | u
   return chosen;
 }
 
-// Per-vehicle availability for the selected date: Maintenance/Unavailable (coral) · Limited Slots (amber) · Available (teal).
+// Per-vehicle availability for the selected date: Maintenance/Unavailable (coral) | Limited Slots (amber) | Available (teal).
 export function vehicleAvailability(v: any, companyBookings: any[], now: Date): { label: string; cls: string; solid: string; bookable: boolean } {
   if (v.status === "maintenance") return { label: "Maintenance", cls: "bg-[#64748B]/15 text-[#64748B]", solid: "bg-[#64748B]/70 text-white", bookable: false };
   let free = 0, total = 0;
@@ -85,7 +85,7 @@ export function vehicleAvailability(v: any, companyBookings: any[], now: Date): 
     if (!hit) free++;
   }
   if (free === 0) return { label: "Unavailable", cls: "bg-[#FF6F62]/20 text-[#FF6F62]", solid: "bg-[#FF6F62]/70 text-white", bookable: false };
-  if (free < total) return { label: "Limited Slots", cls: "bg-[#F59E0B]/20 text-[#B45309] dark:text-[#F59E0B]", solid: "bg-[#F59E0B]/70 text-white", bookable: true };
+  if (free < total) return { label: "Limited Slots", cls: "bg-[#206295]/15 text-[#206295] dark:text-[#4BDCD9]", solid: "bg-[#206295]/70 text-white", bookable: true };
   return { label: "Available", cls: "bg-[#4BDCD9]/25 text-[#0E7C7B]", solid: "bg-[#0E7C7B]/70 text-white", bookable: true };
 }
 

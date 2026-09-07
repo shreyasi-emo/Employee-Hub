@@ -95,7 +95,7 @@ export function RequestDetailModal({ detail, onClose }: { detail: { type: string
             <div className="space-y-1.5">
               {item.items.map((it: any, i: number) => (
                 <div key={i} className="bg-muted/40 rounded-[16px] p-2.5 text-xs break-words">
-                  <span className="font-medium text-foreground">{it.description}</span> · Qty {it.qty || 1}{it.estimatedCost ? ` · ${money(it.estimatedCost)}` : ""}
+                  <span className="font-medium text-foreground">{it.description}</span> | Qty {it.qty || 1}{it.estimatedCost ? ` | ${money(it.estimatedCost)}` : ""}
                   {it.link && <a href={it.link} target="_blank" rel="noreferrer" className="block text-[#206295] hover:underline mt-0.5 break-all">{it.link}</a>}
                 </div>
               ))}

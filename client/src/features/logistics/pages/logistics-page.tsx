@@ -111,7 +111,7 @@ export default function LogisticsPage() {
         />
       )}
 
-      {/* Controls — view · phase · search · type · sort */}
+      {/* Controls — view | phase | search | type | sort */}
       {/* Desktop — original inline strip (unchanged). */}
       <div className="hidden sm:flex items-center gap-3 flex-wrap">
         <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
@@ -148,7 +148,7 @@ export default function LogisticsPage() {
         </Select>
       </div>
 
-      {/* Mobile — search + Filters on one row; view · phase toggles below; Type + Sort go in a Filters sheet. */}
+      {/* Mobile — search + Filters on one row; view | phase toggles below; Type + Sort go in a Filters sheet. */}
       <div className="sm:hidden space-y-3">
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
@@ -234,7 +234,7 @@ export default function LogisticsPage() {
                     <span className="font-semibold text-[#206295] whitespace-nowrap">{r.reference}</span>
                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                       <span>{r.requestType === "inboard" ? "Inboard" : "Outboard"}</span>
-                      {r.priority === "urgent" && <span className="font-semibold text-[#C4402F]">· Urgent</span>}
+                      {r.priority === "urgent" && <span className="font-semibold text-[#C4402F]">| Urgent</span>}
                     </div>
                   </div>
                 </div>

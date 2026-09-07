@@ -60,7 +60,7 @@ export function StatCard({ title, value, icon: Icon, subtitle, color, href }: {
             {/* Label = 14px (text-sm); number = 33px */}
             <p className="text-sm text-muted-foreground">{title}</p>
             <p className="text-[33px] leading-tight font-bold text-foreground">{value}</p>
-            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+            {subtitle && <p className="hidden sm:block text-xs text-muted-foreground">{subtitle}</p>}
           </div>
           <div className={`p-2.5 rounded-lg ${color}`}>
             <Icon className="h-5 w-5" />
@@ -123,9 +123,9 @@ export function LeaveRequestCard({ request, employees, leaveTypes }: { request: 
           {emp ? `${emp.firstName} ${emp.lastName}` : "Unknown"}
         </p>
         <p className="text-xs text-muted-foreground">
-          {lt?.name} · {format(new Date(request.startDate), "MMM d")}
+          {lt?.name} | {format(new Date(request.startDate), "MMM d")}
           {request.startDate !== request.endDate && ` - ${format(new Date(request.endDate), "MMM d")}`}
-          · {request.totalDays}d
+          | {request.totalDays}d
         </p>
       </div>
       <div className="flex items-center gap-1">

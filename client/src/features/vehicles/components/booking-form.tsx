@@ -150,7 +150,7 @@ export function BookingForm({ open, onClose, prefillSlot, vehicleId: seedVehicle
 
         <ScrollArea className="flex-1 min-h-0">
           <div className="px-6 pb-6 space-y-6">
-            {/* ===== 1 · Trip Details ===== */}
+            {/* ===== 1 | Trip Details ===== */}
             <FormSection n={1} title="Trip Details">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5"><Label>Trip Type</Label>
@@ -196,7 +196,7 @@ export function BookingForm({ open, onClose, prefillSlot, vehicleId: seedVehicle
                       <Users className="h-4 w-4 text-[#FF6F62] mt-1 flex-shrink-0" />
                       <span>
                         <span className="font-semibold">{pax} passengers</span> exceed{" "}
-                        <span className="inline-block rounded-md bg-[#206295]/10 px-1.5 py-0 leading-5 font-semibold text-[#206295] whitespace-nowrap">{assignedCap} seats · {assignedVehicles.length} company {assignedVehicles.length === 1 ? "car" : "cars"}</span>. We'll book {assignedVehicles.length === 1 ? "it" : "them"} and request a{" "}
+                        <span className="inline-block rounded-md bg-[#206295]/10 px-1.5 py-0 leading-5 font-semibold text-[#206295] whitespace-nowrap">{assignedCap} seats | {assignedVehicles.length} company {assignedVehicles.length === 1 ? "car" : "cars"}</span>. We'll book {assignedVehicles.length === 1 ? "it" : "them"} and request a{" "}
                         <span className="inline-block rounded-md bg-[#FF6F62]/20 px-1.5 py-0 leading-5 font-semibold text-[#FF6F62] whitespace-nowrap">rental for {pax - assignedCap}</span>.
                       </span>
                     </p>
@@ -206,7 +206,7 @@ export function BookingForm({ open, onClose, prefillSlot, vehicleId: seedVehicle
                       <span>
                         <span className="font-semibold text-[#0E7C7B]">Available</span> — books {multi ? `${assignedVehicles.length} company cars` : "the company car"}{" "}
                         {tripType === "inter_city" ? (
-                          <>for the <span className="inline-block rounded-md bg-[#206295]/10 px-1.5 py-0 leading-5 font-semibold text-[#206295] whitespace-nowrap">whole day · 7 AM – 7 PM</span>.</>
+                          <>for the <span className="inline-block rounded-md bg-[#206295]/10 px-1.5 py-0 leading-5 font-semibold text-[#206295] whitespace-nowrap">whole day | 7 AM – 7 PM</span>.</>
                         ) : (
                           <>
                             <span className="inline-block rounded-md bg-[#206295]/10 px-1.5 py-0 leading-5 font-semibold text-[#206295] whitespace-nowrap">{format(candBlock.start, "h:mm a")} – {format(candBlock.end, "h:mm a")}</span>{" "}
@@ -222,9 +222,9 @@ export function BookingForm({ open, onClose, prefillSlot, vehicleId: seedVehicle
 
             <Separator />
 
-            {/* ===== 2 · Passengers ===== */}
+            {/* ===== 2 | Passengers ===== */}
             <FormSection n={2} title="Passengers">
-              <Label className="flex items-center gap-1.5 text-muted-foreground font-normal"><Users className="h-3.5 w-3.5" /> {pax} selected · you're always included</Label>
+              <Label className="flex items-center gap-1.5 text-muted-foreground font-normal"><Users className="h-3.5 w-3.5" /> {pax} selected | you're always included</Label>
               <EmployeePicker employees={employees} selectedIds={passengerIds}
                 onChange={(ids) => setPassengerIds(meEmpId ? Array.from(new Set([meEmpId, ...ids])) : ids)}
                 multiple buttonLabel="Add passengers" lockedIds={meEmpId ? [meEmpId] : []} modal />
@@ -232,7 +232,7 @@ export function BookingForm({ open, onClose, prefillSlot, vehicleId: seedVehicle
 
             <Separator />
 
-            {/* ===== 3 · Assigned Vehicle ===== */}
+            {/* ===== 3 | Assigned Vehicle ===== */}
             <FormSection n={3} title="Assigned Vehicle">
               {!validRange ? (
                 <p className="text-xs text-muted-foreground">Pick a date and time to see the assigned company car.</p>
@@ -285,7 +285,7 @@ export function BookingForm({ open, onClose, prefillSlot, vehicleId: seedVehicle
 
             <Separator />
 
-            {/* ===== 4 · Additional Notes ===== */}
+            {/* ===== 4 | Additional Notes ===== */}
             <FormSection n={4} title="Additional Notes">
               <Textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Anything the driver / agency should know…" data-testid="veh-notes" />
             </FormSection>

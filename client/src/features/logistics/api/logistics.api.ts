@@ -20,7 +20,7 @@ export function useCreateLogisticsRequest(opts: { onSuccess?: () => void; onErro
   });
 }
 
-/** Handler transitions: start · complete (needs proof) · cancel. */
+/** Handler transitions: start | complete (needs proof) | cancel. */
 export function useLogisticsRequestAction(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
   const qc = useQueryClient();
   return useMutation({
@@ -50,7 +50,7 @@ export function useCreateMovement(opts: { onSuccess?: () => void; onError?: (e: 
   });
 }
 
-/** Workflow transitions: accept · escalate · reject · dispatch · in-transit · deliver.
+/** Workflow transitions: accept | escalate | reject | dispatch | in-transit | deliver.
  *  The op string is the server's route segment. */
 export function useMovementAction(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
   const qc = useQueryClient();

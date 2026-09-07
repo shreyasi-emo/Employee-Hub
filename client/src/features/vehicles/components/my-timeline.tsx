@@ -14,7 +14,7 @@ import { blockOf, fmtRange } from "../lib/booking-engine";
 import { bookingVisual, statusLabel, statusBadgeClass, avatarTint, driverInitials } from "../lib/booking-visuals";
 
 // ============================ My Travel Timeline ============================
-// The current user's own bookings as a chronological timeline (past · upcoming · completed),
+// The current user's own bookings as a chronological timeline (past | upcoming | completed),
 // with a date filter (All / This Week / This Month) and a mode filter.
 export function MyTimeline({ bookings, isMine, search, vehicles, onOpenBooking }: any) {
   const [dateFilter, setDateFilter] = useState<"all" | "week" | "month">("all");
@@ -59,7 +59,7 @@ export function MyTimeline({ bookings, isMine, search, vehicles, onOpenBooking }
           <span className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${company ? "bg-[#0E7C7B]/15 text-[#0E7C7B]" : "bg-[#FF6F62]/15 text-[#FF6F62]"}`}><Car className="h-5 w-5" /></span>
           <div className="min-w-0 flex-1 pr-2">
             <p className="text-sm font-bold text-foreground truncate">{b.purpose}</p>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">{company ? "Company Car" : "Rental"}{pending ? " · Awaiting HR" : ""}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{company ? "Company Car" : "Rental"}{pending ? " | Awaiting HR" : ""}</p>
           </div>
           {/* Primary divider — thicker & darker than the inner separators */}
           <div className="self-center w-[1.4px] h-11 rounded-full bg-foreground/25 flex-shrink-0 hidden md:block" />

@@ -51,7 +51,7 @@ export function exportReimbursement(reimb: any) {
     ["", "", ""],
     ["Total", "", Number(reimb.totalAmount || 0)],
   ];
-  const title = `Reimbursement ${reimb.reference || ""}  ·  ${reimb.employeeName || ""} (${reimb.employeeCode || "—"})  ·  ${reimb.department || "—"}  ·  ${statusLabel(reimb.status)}  ·  ${fmtDate(reimb.createdAt)}`;
+  const title = `Reimbursement ${reimb.reference || ""}  |  ${reimb.employeeName || ""} (${reimb.employeeCode || "—"})  |  ${reimb.department || "—"}  |  ${statusLabel(reimb.status)}  |  ${fmtDate(reimb.createdAt)}`;
   return exportXlsx({ filename: `${reimb.reference || "reimbursement"}.xlsx`, sheet: "Expense Bill", title, headers: ["Description", "Category", "Amount (INR)"], rows });
 }
 
@@ -458,7 +458,7 @@ export function ReimbursementApprovalModal({ reimb, canAct, open, onClose, onExp
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] sm:w-[68vw] sm:max-w-[68vw] h-[85vh] p-0 overflow-hidden gap-0 rounded-2xl bg-background/85 backdrop-blur-xl !flex flex-col [&>button]:hidden">
         <DialogTitle className="sr-only">Reimbursement Details</DialogTitle>
-        {/* top-right controls: export · expand · close */}
+        {/* top-right controls: export | expand | close */}
         <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
           <button onClick={doExport} aria-label="Export details" data-testid="button-export-detail"
             className="btn-glass h-9 w-9 rounded-lg flex items-center justify-center text-[#206295] hover:opacity-90">
