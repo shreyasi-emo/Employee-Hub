@@ -44,11 +44,13 @@ export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove,
                 <span className="font-medium text-foreground truncate flex-1 text-sm">{emp ? `${emp.firstName} ${emp.lastName}` : "—"}</span>
                 <Badge className={`text-[10px] flex-shrink-0 ${sc.bg} ${sc.text}`}>{sc.label}</Badge>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1.5 flex-wrap">
-                {lt && <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />{lt.name}</span>}
-                <span className="text-border">|</span>{leaveRange(r)}<span className="text-border">|</span>{Number(r.totalDays)}d
+              <p className="text-sm mt-1.5 truncate">
+                <span className="font-semibold text-foreground">{Number(r.totalDays)} day{Number(r.totalDays) !== 1 ? "s" : ""}</span>
+                <span className="mx-1.5 text-border">|</span>
+                {lt && <span className="inline-flex items-center gap-1 text-muted-foreground align-middle"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />{lt.name}</span>}
               </p>
-              {r.reason && <p className="text-[11px] text-muted-foreground/80 mt-1 line-clamp-1" title={r.reason}>{r.reason}</p>}
+              <p className="text-[11px] text-muted-foreground mt-0.5">{leaveRange(r)}</p>
+              {r.reason && <p className="text-[11px] text-muted-foreground/70 mt-0.5 line-clamp-1" title={r.reason}>{r.reason}</p>}
               {(canAct || canCancelOwn) && (
                 <div className="flex items-center gap-2 mt-2.5">
                   {canAct && (
