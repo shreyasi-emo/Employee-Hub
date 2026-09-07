@@ -11,6 +11,7 @@ import { Plane, Clock, Search, CheckCircle2, XCircle, SlidersHorizontal, X } fro
 import { format } from "date-fns";
 import { statusOf, findCasualLeaveType, leaveTypeColor, leaveActionFor } from "../lib/leave-model";
 import { StatCard } from "./leave-ui";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 function FilterField({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -38,6 +39,7 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const isMobile = useIsMobile();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const filteredMy = myYear.filter((r: any) => {
@@ -57,7 +59,7 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Leave Balance" value={clBalance} subtitle="Casual leave available" icon={Plane} color="bg-[#4BDCD9]/25 text-[#206295]" />
+        <StatCard title="Leave Balance" value={clBalance} subtitle={isMobile ? "CL Available" : "Casual leave available"} icon={Plane} color="bg-[#4BDCD9]/25 text-[#206295]" />
         <StatCard title="Pending Requests" value={pendingCount} subtitle="Awaiting approval" icon={Clock} color="bg-[#206295]/15 text-[#206295]" />
         <StatCard title="Approved This Year" value={approvedDays} subtitle={`Days taken in ${selectedYear}`} icon={CheckCircle2} color="bg-[#4BDCD9]/25 text-[#206295]" />
         <StatCard title="Rejected Requests" value={rejectedCount} subtitle={`In ${selectedYear}`} icon={XCircle} color="bg-[#FF6F62]/20 text-[#FF6F62]" />

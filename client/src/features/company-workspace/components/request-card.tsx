@@ -14,7 +14,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { StatusBadge } from "../reimbursements/components/status-badge";
 import { statusClass, statusLabel } from "@/lib/status";
 
-// Unified enterprise request card — Identity (ref · title · date) | Approval Status | Payable.
+// Unified enterprise request card — Identity (ref | title | date) | Approval Status | Payable.
 // `readOnly` drops the click-through + overflow menu (e.g. the manager's Team Requests view);
 // `byline` shows who raised it (only meaningful when the list spans multiple requesters).
 export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { item: any; type: "purchase" | "travel" | "ticket" | "reimbursement"; onOpen?: (item: any) => void; readOnly?: boolean; byline?: string }) {
@@ -30,9 +30,9 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
   const canRevoke = !REVOCABLE_BLOCK.includes(item.status);
   const sub = submittedInfo(type, item);
   const dateLine = type === "reimbursement"
-    ? (item.periodFrom ? `Expense Period · ${formatDate(item.periodFrom)} – ${formatDate(item.periodTo || item.periodFrom)}` : "Expense Period · —")
-    : `Created · ${formatDate(item.createdAt)}`;
-  // Mobile meta uses a compact date (no "Created ·" prefix, no middot).
+    ? (item.periodFrom ? `Expense Period | ${formatDate(item.periodFrom)} – ${formatDate(item.periodTo || item.periodFrom)}` : "Expense Period | —")
+    : `Created | ${formatDate(item.createdAt)}`;
+  // Mobile meta uses a compact date (no "Created |" prefix, no middot).
   const dateShort = type === "reimbursement"
     ? (item.periodFrom ? `${formatDate(item.periodFrom)} – ${formatDate(item.periodTo || item.periodFrom)}` : "—")
     : formatDate(item.createdAt);

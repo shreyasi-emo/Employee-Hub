@@ -126,7 +126,7 @@ export function RaiseMovementDialog({ open, onOpenChange, locations }: any) {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium">Items</label>
-              <div className="text-xs text-muted-foreground">Total qty: {totalQty} · Total wt: {totalWeight.toFixed(2)} kg</div>
+              <div className="text-xs text-muted-foreground">Total qty: {totalQty} | Total wt: {totalWeight.toFixed(2)} kg</div>
             </div>
             <div className="space-y-2">
               {form.items.map((it: any, i: number) => (

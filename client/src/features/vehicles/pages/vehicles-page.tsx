@@ -239,7 +239,7 @@ export default function VehiclesPage() {
             </div>
           </div>
 
-          {/* Right 25% — selected slot · my bookings (fills) · company vehicles.
+          {/* Right 25% — selected slot | my bookings (fills) | company vehicles.
               At lg the inner stack is absolutely positioned so its content NEVER drives the grid row
               height — the row is sized purely by the LEFT column, and this wrapper is stretched to match
               it (items-stretch). Result: the right column is EXACTLY the left column's height; My Bookings

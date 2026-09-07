@@ -320,7 +320,7 @@ export default function PayrollPage() {
                       <div>
                         <p className="font-semibold text-foreground">{months[slip.month - 1]} {slip.year}</p>
                         <p className="text-xs text-muted-foreground">
-                          {slip.presentDays} days · LOP: {slip.lopDays}d
+                          {slip.presentDays} days | LOP: {slip.lopDays}d
                         </p>
                       </div>
                       <div className="flex items-center gap-6 text-sm">

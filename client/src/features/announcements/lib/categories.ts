@@ -1,5 +1,5 @@
 // Announcement categories — BRAND PALETTE ONLY (no orange on this screen):
-//   blue #206295 · teal #0E7C7B / #4BDCD9 · coral #FF6F62 / #C4402F · neutral slate #64748B.
+//   blue #206295 | teal #0E7C7B / #4BDCD9 | coral #FF6F62 / #C4402F | neutral slate #64748B.
 // (No purple / pink / orange / generic Tailwind hues — those violate the brand guidelines.)
 import { Megaphone, Users, ScrollText, Calendar, CalendarDays, Gift, AlertTriangle, Tag } from "lucide-react";
 

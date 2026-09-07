@@ -237,24 +237,25 @@ export default function MyRequestsPage() {
   );
 
   // Mobile-only clone of the phase toggle (distinct test-ids so it can coexist with the desktop one).
-  const phaseToggleMobile = (
-    <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0" data-testid="req-phase-toggle-mobile">
-      {(["active", "completed"] as const).map((p) => (
-        <button key={p} onClick={() => setPhase(p)} data-testid={`req-phase-${p}-mobile`} className={`px-3 h-full rounded-[10px] text-xs font-medium ${phase === p ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}>
-          {p === "active" ? "In Progress" : "Completed"}
-        </button>
-      ))}
-    </div>
-  );
+  // Open the "new request" form for the currently-selected tab (used by the mobile category row).
+  const openNewForTab = () => {
+    setEditingDraftId(null);
+    if (tab === "travels") { setTripInitial(null); setShowNewTravel(true); }
+    else if (tab === "tickets") { setTicketInitial(null); setTicketForceValidate(false); setShowTicketForm(true); }
+    else if (tab === "reimbursements") { setReimbInitial(null); setReimbResubmit(null); setReimbForceValidate(false); setShowReimbForm(true); }
+    else if (tab === "office-purchases") { setNewInitialData(null); setNewKind("office"); setOpNewOpen(true); }
+    else if (tab === "procurement") { setNewInitialData(null); setNewKind("procurement"); setOpNewOpen(true); }
+  };
 
-  // Shared header controls (view · phase · search · status filter · sort · primary button).
+  // Shared header controls (view | phase | search | status filter | sort | primary button).
   // Desktop keeps the original inline strip; mobile keeps toggles + New visible and folds
   // Status + Sort into a Filters bottom-sheet with dismissible active chips.
   const controls = (newBtn: React.ReactNode, showPhase = false) => {
     const filterChips: { key: string; label: string; onClear: () => void }[] = [];
     if (statusFilter !== "all") filterChips.push({ key: "status", label: STATUS_CHIP_LABELS[statusFilter] ?? statusFilter, onClear: () => setStatusFilter("all") });
     if (sortBy !== "status_change") filterChips.push({ key: "sort", label: SORT_CHIP_LABELS[sortBy] ?? sortBy, onClear: () => setSortBy("status_change") });
-    const resetFilters = () => { setStatusFilter("all"); setSortBy("status_change"); };
+    if (showPhase && phase !== "active") filterChips.push({ key: "phase", label: "Completed", onClear: () => setPhase("active") });
+    const resetFilters = () => { setStatusFilter("all"); setSortBy("status_change"); setPhase("active"); };
     return (
       <>
         {/* Desktop — original inline toolbar (unchanged). */}
@@ -293,7 +294,7 @@ export default function MyRequestsPage() {
           <div className="flex-shrink-0">{newBtn}</div>
         </div>
 
-        {/* Mobile — search + Filters on one row; view · phase toggles + New below. */}
+        {/* Mobile — search + Filters on one row; view | phase toggles + New below. */}
         <div className="sm:hidden space-y-3">
           <div className="flex items-center gap-2">
             <div className="relative flex-1 min-w-0">
@@ -322,6 +323,18 @@ export default function MyRequestsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {showPhase && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Show</p>
+                      <Select value={phase} onValueChange={(v) => setPhase(v as any)}>
+                        <SelectTrigger className="w-full" data-testid="sheet-phase"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground">Sort</p>
                     <Select value={sortBy} onValueChange={setSortBy}>
@@ -343,14 +356,7 @@ export default function MyRequestsPage() {
               </SheetContent>
             </Sheet>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="segmented-toggle inline-flex p-0.5 h-10 flex-shrink-0">
-              <button onClick={() => setView("card")} aria-label="Card view" data-testid="view-card-mobile" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "card" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
-              <button onClick={() => setView("table")} aria-label="Table view" data-testid="view-table-mobile" className={`px-3 h-full rounded-[10px] inline-flex items-center justify-center ${view === "table" ? "btn-primary-gradient text-white" : "text-muted-foreground"}`}><Table2 className="h-4 w-4" /></button>
-            </div>
-            {showPhase && phaseToggleMobile}
-            <div className="ml-auto flex-shrink-0">{newBtn}</div>
-          </div>
+          {/* Category + New + Drafts live in the mobile tab row above; phase moved into the Filters sheet. */}
           {filterChips.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
               {filterChips.map((c) => (
@@ -384,7 +390,7 @@ export default function MyRequestsPage() {
   const prPaged = usePaged(fProc);
 
   return (
-    <div className="p-6 space-y-5 max-w-[92rem] mx-auto">
+    <div className="p-4 sm:p-6 space-y-5 max-w-[92rem] mx-auto">
       <div className="flex items-center gap-3">
         <Button variant="secondary" size="icon" className="h-10 w-10 flex-shrink-0" onClick={() => navigate("/company-workspace")} aria-label="Back" data-testid="button-back">
           <ChevronLeft className="h-4 w-4" />
@@ -396,7 +402,22 @@ export default function MyRequestsPage() {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => { setTab(v); navigate(`/my-requests/${v}`); }} data-testid="tabs-my-requests">
-        <TabsList>
+        {/* Mobile: category dropdown + New + Drafts (replaces the tab strip). */}
+        <div className="sm:hidden flex items-center gap-2">
+          <Select value={tab === "drafts" ? "" : tab} onValueChange={(v) => { setTab(v); navigate(`/my-requests/${v}`); }}>
+            <SelectTrigger className="flex-1 min-w-0 h-10" data-testid="select-tab-mobile"><SelectValue placeholder="Select category" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="office-purchases">Purchases{(officePurchases as any[]).length > 0 ? ` (${(officePurchases as any[]).length})` : ""}</SelectItem>
+              <SelectItem value="procurement">Procurement{(procurement as any[]).length > 0 ? ` (${(procurement as any[]).length})` : ""}</SelectItem>
+              <SelectItem value="travels">Travel{(myTrips as any[]).length > 0 ? ` (${(myTrips as any[]).length})` : ""}</SelectItem>
+              <SelectItem value="tickets">Tickets{(tickets as any[]).length > 0 ? ` (${(tickets as any[]).length})` : ""}</SelectItem>
+              <SelectItem value="reimbursements">Reimbursements{(reimbursements as any[]).length > 0 ? ` (${(reimbursements as any[]).length})` : ""}</SelectItem>
+            </SelectContent>
+          </Select>
+          {tab !== "drafts" && <Button size="sm" className="flex-shrink-0" onClick={openNewForTab} data-testid="button-new-mobile"><Plus className="h-4 w-4 mr-1" /> New</Button>}
+          <Button size="sm" variant={tab === "drafts" ? "default" : "secondary"} className="flex-shrink-0" onClick={() => { setTab("drafts"); navigate("/my-requests/drafts"); }} data-testid="button-drafts-mobile"><FileEdit className="h-4 w-4 mr-1" /> Drafts{drafts.length > 0 ? ` (${drafts.length})` : ""}</Button>
+        </div>
+        <TabsList className="hidden sm:inline-flex sm:flex-wrap">
           <TabsTrigger value="office-purchases">
             <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
             Purchases {(officePurchases as any[]).length > 0 && `(${(officePurchases as any[]).length})`}
@@ -426,7 +447,7 @@ export default function MyRequestsPage() {
         <TabsContent value="travels" className="mt-4 space-y-5">
           {controls(
             <Button size="sm" onClick={() => { setEditingDraftId(null); setTripInitial(null); setShowNewTravel(true); }} data-testid="button-new-travel">
-              <Plus className="h-4 w-4 mr-1.5" /> New Travel Request
+              <Plus className="h-4 w-4 mr-1.5" /><span className="hidden sm:inline">New Travel Request</span><span className="sm:hidden">New</span>
             </Button>
           , true)}
           {loadTrips ? <Skeleton className="h-24 w-full" /> :
@@ -476,7 +497,7 @@ export default function MyRequestsPage() {
         <TabsContent value="reimbursements" className="mt-4 space-y-5">
           {controls(
             <Button size="sm" onClick={() => { setEditingDraftId(null); setReimbInitial(null); setReimbResubmit(null); setReimbForceValidate(false); setShowReimbForm(true); }} data-testid="button-new-reimbursement">
-              <Plus className="h-4 w-4 mr-1.5" /> New Reimbursement
+              <Plus className="h-4 w-4 mr-1.5" /><span className="hidden sm:inline">New Reimbursement</span><span className="sm:hidden">New</span>
             </Button>
           )}
           {loadReimb ? <Skeleton className="h-24 w-full" /> :
@@ -492,7 +513,7 @@ export default function MyRequestsPage() {
         <TabsContent value="office-purchases" className="mt-4 space-y-5">
           {controls(
             <Button size="sm" onClick={() => { setEditingDraftId(null); setNewInitialData(null); setNewKind("office"); setOpNewOpen(true); }} data-testid="button-new-office-purchase">
-              <Plus className="h-4 w-4 mr-1.5" /> New Office Purchase
+              <Plus className="h-4 w-4 mr-1.5" /><span className="hidden sm:inline">New Office Purchase</span><span className="sm:hidden">New</span>
             </Button>
           , true)}
           {loadOP ? <Skeleton className="h-24 w-full" /> :
@@ -529,7 +550,7 @@ export default function MyRequestsPage() {
         <TabsContent value="procurement" className="mt-4 space-y-5">
           {controls(
             <Button size="sm" onClick={() => { setEditingDraftId(null); setNewInitialData(null); setNewKind("procurement"); setOpNewOpen(true); }} data-testid="button-new-procurement">
-              <Plus className="h-4 w-4 mr-1.5" /> New Procurement
+              <Plus className="h-4 w-4 mr-1.5" /><span className="hidden sm:inline">New Procurement</span><span className="sm:hidden">New</span>
             </Button>
           , true)}
           {loadProc ? <Skeleton className="h-24 w-full" /> :

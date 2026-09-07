@@ -14,7 +14,7 @@ export function DraftCard({ draft, onEdit, onDelete, onSubmit, submitting }: { d
   const amt = draftAmount(draft);
   const isMobile = useIsMobile();
 
-  // Mobile: a compact single-row card — title + DRAFT on line 1, a |-separated category · saved ·
+  // Mobile: a compact single-row card — title + DRAFT on line 1, a |-separated category | saved |
   // amount meta line, with Edit / Submit / Delete stacked below (every action preserved).
   if (isMobile) {
     return (

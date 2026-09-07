@@ -223,7 +223,7 @@ export default function DashboardPage() {
             {greeting()}, {displayName}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {format(today, "EEEE, MMMM d, yyyy")} · {getRoleLabel(user?.role as any)}
+            {format(today, "EEEE, MMMM d, yyyy")} | {getRoleLabel(user?.role as any)}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap w-full sm:w-auto">
@@ -345,7 +345,7 @@ export default function DashboardPage() {
                       {emp.avatarUrl && <AvatarImage src={emp.avatarUrl} />}
                       <AvatarFallback className="text-lg font-bold bg-[#206295]/10 text-[#206295]">{empInitials}</AvatarFallback>
                     </Avatar>
-                    <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ backgroundColor: todayMeta.color }} title={`Today · ${todayMeta.label}`} />
+                    <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ backgroundColor: todayMeta.color }} title={`Today | ${todayMeta.label}`} />
                   </div>
 
                   {/* Name on its own line; the role badge sits below it beside the status pill,

@@ -247,7 +247,7 @@ export function ReimbursementFormDialog({ open, onClose, onSuccess, initialData,
                 <div className="space-y-1"><p className="text-xs text-muted-foreground">Amount (₹)</p><Input type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, { amount: e.target.value })} placeholder="0.00" className={`h-9 ${errCls(!(Number(it.amount) > 0))}`} data-testid={`input-amount-${i}`} />{fieldErr(!(Number(it.amount) > 0), "Enter a valid amount")}</div>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Upload Invoice <span className="opacity-70">(JPG, PNG, PDF · max 5 MB)</span></p>
+                <p className="text-xs text-muted-foreground">Upload Invoice <span className="opacity-70">(JPG, PNG, PDF | max 5 MB)</span></p>
                 {it.fileData ? (
                   <div className="flex items-center gap-2 h-10 rounded-[16px] border border-border bg-background px-3">
                     <FileText className="h-4 w-4 text-[#206295] flex-shrink-0" />

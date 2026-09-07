@@ -176,7 +176,7 @@ export function CalendarCard({ holidayDates, upcomingHolidays, employees, readOn
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{b.purpose || "Car booking"}</p>
-                        <p className="text-xs text-muted-foreground">{format(new Date(b.startTime), "EEE, d MMM · h:mm a")}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(b.startTime), "EEE, d MMM | h:mm a")}</p>
                       </div>
                     </div>
                   ))}

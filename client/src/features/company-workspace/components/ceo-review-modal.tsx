@@ -23,7 +23,7 @@ const PRI: Record<string, string> = { high: "bg-[#FF6F62]/20 text-[#C4402F]", me
 const priBadge = (p: string) => <Badge className={`text-[10px] px-2 py-0.5 capitalize font-semibold ${PRI[p] || PRI.medium}`}>{p || "medium"}</Badge>;
 
 // CEO Inbox drill modal for office purchases & procurement — runs on the shared ApprovalModal shell
-// (header · toolbar · body · footer), same as reimbursement & travel. Card view = accordion rows (open
+// (header | toolbar | body | footer), same as reimbursement & travel. Card view = accordion rows (open
 // for receipt + discussion + per-item Approve/Reject/Raise Query); table view = scannable list. Footer
 // keeps Approve-all / Reject-all; tick rows to act on a subset.
 export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void }) {

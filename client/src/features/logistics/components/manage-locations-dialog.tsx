@@ -29,7 +29,7 @@ export function ManageLocationsDialog({ open, onClose, locations = [] }: { open:
               <div className="space-y-2">
                 {locations.map((l: any) => (
                   <div key={l.id} className="rounded-lg border border-border bg-muted/20 px-3 py-2 flex items-center justify-between gap-3">
-                    <div className="min-w-0"><p className="text-sm font-medium text-foreground truncate">{l.name}</p><p className="text-xs text-muted-foreground truncate">{[l.city, l.address].filter(Boolean).join(" · ") || l.type}</p></div>
+                    <div className="min-w-0"><p className="text-sm font-medium text-foreground truncate">{l.name}</p><p className="text-xs text-muted-foreground truncate">{[l.city, l.address].filter(Boolean).join(" | ") || l.type}</p></div>
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground flex-shrink-0">{l.type}</span>
                   </div>
                 ))}

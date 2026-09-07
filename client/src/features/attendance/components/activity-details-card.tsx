@@ -5,7 +5,7 @@ import { STATE_COLOR } from "../lib/attendance-states";
 import { StatusChip } from "./attendance-ui";
 
 const MODE: Record<string, string> = {
-  present: "In office", wfh: "Work from home", on_duty: "On duty · field", half_day: "Half day",
+  present: "In office", wfh: "Work from home", on_duty: "On duty | field", half_day: "Half day",
   absent: "Not present", leave: "On leave", holiday: "Holiday", weekend: "Weekend",
 };
 
@@ -48,7 +48,7 @@ export function ActivityDetailsCard({
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-base font-semibold text-foreground">Activity Details</p>
-          <p className="text-[13px] text-muted-foreground mt-0.5">{format(selected, "EEE, d MMM yyyy")}{isSameDay(selected, now) ? " · Today" : ""}</p>
+          <p className="text-[13px] text-muted-foreground mt-0.5">{format(selected, "EEE, d MMM yyyy")}{isSameDay(selected, now) ? " | Today" : ""}</p>
         </div>
         <StatusChip s={selStatus || undefined} />
       </div>
@@ -56,7 +56,7 @@ export function ActivityDetailsCard({
 
       <div className="mt-4 space-y-3">
         <DetailRow icon={Briefcase} label="Work mode" value={MODE[selStatus || ""] || "—"} tint={c} />
-        <DetailRow icon={CalendarDays} label="Day" value={`${format(selected, "EEEE")} · ${dayType}`} tint="#425B8D" />
+        <DetailRow icon={CalendarDays} label="Day" value={`${format(selected, "EEEE")} | ${dayType}`} tint="#425B8D" />
         {selMeta && (
           <div className="rounded-xl p-3 space-y-1.5" style={{ border: `1px solid ${STATE_COLOR.on_duty}4D`, backgroundColor: `${STATE_COLOR.on_duty}0F` }}>
             {selMeta.location && <p className="text-xs text-foreground flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" /> <span>{selMeta.location}</span></p>}
@@ -67,7 +67,7 @@ export function ActivityDetailsCard({
         )}
         {selWfhMeta && (
           <div className="rounded-xl p-3 space-y-1.5" style={{ border: `1px solid ${STATE_COLOR.wfh}4D`, backgroundColor: `${STATE_COLOR.wfh}0F` }}>
-            <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: STATE_COLOR.wfh }}><Home className="h-3.5 w-3.5 flex-shrink-0" /> <span>Work From Home · {selWfhAp === "approved" ? "Approved" : selWfhAp === "rejected" ? "Rejected" : "Pending approval"}{selWfhMeta.duration && selWfhMeta.duration !== "full" ? ` · ${selWfhMeta.duration === "first_half" ? "First Half" : "Second Half"}` : ""}</span></p>
+            <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: STATE_COLOR.wfh }}><Home className="h-3.5 w-3.5 flex-shrink-0" /> <span>Work From Home | {selWfhAp === "approved" ? "Approved" : selWfhAp === "rejected" ? "Rejected" : "Pending approval"}{selWfhMeta.duration && selWfhMeta.duration !== "full" ? ` | ${selWfhMeta.duration === "first_half" ? "First Half" : "Second Half"}` : ""}</span></p>
             {selWfhMeta.reason && <p className="text-xs text-muted-foreground">{selWfhMeta.reason}</p>}
             {selWfhAp === "pending" && selWfhMeta.autoApproveAt && <p className="text-[11px] text-muted-foreground flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 flex-shrink-0" /> <span>Auto-approves {format(new Date(selWfhMeta.autoApproveAt), "d MMM, h:mm a")} if not actioned.</span></p>}
           </div>

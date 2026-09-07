@@ -7,7 +7,7 @@ import { money } from "../shared/approval-format";
 import { Check, X, MessageSquare } from "lucide-react";
 
 // ONE shell for every CEO-approval surface (reimbursement / office / procurement / travel). It owns the
-// chrome — dialog, maximisable header (icon · title · count), the toolbar row, the scrolling body and the
+// chrome — dialog, maximisable header (icon | title | count), the toolbar row, the scrolling body and the
 // footer — so the four modals are literally the same component; only the `toolbar`, `footer` and body
 // (`children`) content differ per category.
 export function ApprovalModal({ open, onClose, icon: Icon, title, count, toolbar, footer, children }: {

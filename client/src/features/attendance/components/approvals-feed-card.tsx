@@ -19,7 +19,7 @@ export function ApprovalsFeedCard() {
   const periodLabel = (it: any) => {
     const s = parseYmd(it.startDate), e = parseYmd(it.endDate);
     const base = it.startDate === it.endDate ? format(s, "EEE, d MMM") : `${format(s, "d MMM")} – ${format(e, "d MMM")}`;
-    return it.isHalfDay ? `${base} · Half day` : base;
+    return it.isHalfDay ? `${base} | Half day` : base;
   };
   const stamp = (iso: string | null) => iso ? format(new Date(iso), "d MMM, h:mm a") : "";
 
@@ -28,7 +28,7 @@ export function ApprovalsFeedCard() {
   const rows = filter === "pending" ? pending : [...pending, ...decided];
 
   const STATUS: Record<string, { label: string; bg: string; color: string }> = {
-    pending: { label: "Pending", bg: "rgba(245,158,11,0.15)", color: "#B5611A" },
+    pending: { label: "Pending", bg: "rgba(32,98,149,0.12)", color: "#206295" },
     approved: { label: "Approved", bg: "rgba(14,124,123,0.15)", color: "#0E7C7B" },
     rejected: { label: "Rejected", bg: "rgba(255,111,98,0.15)", color: "#C24A3E" },
   };
@@ -39,7 +39,7 @@ export function ApprovalsFeedCard() {
         <div className="flex flex-row items-center justify-between gap-2 h-9">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <ClipboardCheck className="h-4 w-4 text-muted-foreground" /> Approvals
-            {pending.length > 0 && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(245,158,11,0.15)", color: "#B5611A" }}>{pending.length} pending</span>}
+            {pending.length > 0 && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(32,98,149,0.12)", color: "#206295" }}>{pending.length} pending</span>}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
@@ -68,11 +68,11 @@ export function ApprovalsFeedCard() {
                       <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0">{it.kind === "wfh" ? "WFH" : "Leave"}</span>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: st.bg, color: st.color }}>{st.label}</span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{periodLabel(it)}{it.reason ? ` · ${it.reason}` : ""}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{periodLabel(it)}{it.reason ? ` | ${it.reason}` : ""}</p>
                     <p className="text-[10px] text-muted-foreground/80 mt-0.5">
                       {it.status === "pending"
                         ? `Requested ${stamp(it.requestedAt)}`
-                        : `${st.label}${it.decidedByName ? ` by ${it.decidedByName}` : ""}${it.decidedAt ? ` · ${stamp(it.decidedAt)}` : ""}`}
+                        : `${st.label}${it.decidedByName ? ` by ${it.decidedByName}` : ""}${it.decidedAt ? ` | ${stamp(it.decidedAt)}` : ""}`}
                     </p>
                   </div>
                 );

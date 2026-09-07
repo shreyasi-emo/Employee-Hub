@@ -39,7 +39,7 @@ export function HolidayCalendarView({ calMonth, onMonthChange, holidayDates, mon
         }}
       />
       <div className="mt-2 border-t border-border pt-3">
-        <p className="text-sm font-semibold text-foreground mb-2">{format(calMonth, "MMMM yyyy")} · {monthHolidays.length} holiday{monthHolidays.length !== 1 ? "s" : ""}</p>
+        <p className="text-sm font-semibold text-foreground mb-2">{format(calMonth, "MMMM yyyy")} | {monthHolidays.length} holiday{monthHolidays.length !== 1 ? "s" : ""}</p>
         {monthHolidays.length === 0 ? (
           <p className="text-sm text-muted-foreground">No holidays this month.</p>
         ) : (
@@ -53,7 +53,7 @@ export function HolidayCalendarView({ calMonth, onMonthChange, holidayDates, mon
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{h.name}</p>
-                    <p className="text-xs text-muted-foreground">{format(d, "EEEE")} · {h.location === "all" ? "All locations" : h.location}</p>
+                    <p className="text-xs text-muted-foreground">{format(d, "EEEE")} | {h.location === "all" ? "All locations" : h.location}</p>
                   </div>
                   <Badge className={`text-xs flex-shrink-0 ${h.isOptional ? "bg-[#FF6F62]/20 text-[#FF6F62]" : "bg-[#4BDCD9]/25 text-[#206295]"}`}>{h.isOptional ? "Optional" : "Mandatory"}</Badge>
                   {canManage && (
