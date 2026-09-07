@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { statusOf, avatarColor, leaveTypeColor } from "../lib/leave-model";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Human date range for a request: "Dec 20 – Dec 22, 2026" (single day → one date).
 function leaveRange(r: any) {
@@ -20,9 +21,51 @@ function leaveRange(r: any) {
 
 /** Neat, house-styled table for leave requests (Team Requests / All Requests). */
 export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove, onReject, onCancel, canApprove, myEmpId, emptyText }: any) {
+  const isMobile = useIsMobile();
   const ltById = new Map<string, any>((leaveTypes || []).map((l: any) => [l.id, l]));
   const empById = new Map<string, any>((employees || []).map((e: any) => [e.id, e]));
   const showActions = requests.some((r: any) => r.status === "pending" && (canApprove || (myEmpId && r.employeeId === myEmpId)));
+
+  // Mobile: a compact card per request instead of a sideways-scrolling table (desktop keeps the table).
+  if (isMobile) {
+    return (
+      <div className="space-y-3">
+        {requests.length === 0 ? (
+          <div className="card-surface rounded-2xl py-12 text-center"><p className="text-sm text-muted-foreground">{emptyText || "No leave requests"}</p></div>
+        ) : requests.map((r: any) => {
+          const emp = empById.get(r.employeeId); const c = avatarColor(r.employeeId);
+          const lt = ltById.get(r.leaveTypeId); const sc = statusOf(r.status);
+          const canAct = r.status === "pending" && canApprove;
+          const canCancelOwn = r.status === "pending" && !canApprove && myEmpId && r.employeeId === myEmpId;
+          return (
+            <div key={r.id} className="card-surface rounded-xl p-3" data-testid={`leave-request-card-${r.id}`}>
+              <div className="flex items-center gap-2.5">
+                <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="text-[11px] font-semibold" style={{ backgroundColor: `${c}26`, color: c }}>{emp ? `${emp.firstName[0]}${emp.lastName[0]}` : "?"}</AvatarFallback></Avatar>
+                <span className="font-medium text-foreground truncate flex-1 text-sm">{emp ? `${emp.firstName} ${emp.lastName}` : "—"}</span>
+                <Badge className={`text-[10px] flex-shrink-0 ${sc.bg} ${sc.text}`}>{sc.label}</Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1.5 flex-wrap">
+                {lt && <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: leaveTypeColor(lt) }} />{lt.name}</span>}
+                <span className="text-border">|</span>{leaveRange(r)}<span className="text-border">|</span>{Number(r.totalDays)}d
+              </p>
+              {r.reason && <p className="text-[11px] text-muted-foreground/80 mt-1 line-clamp-1" title={r.reason}>{r.reason}</p>}
+              {(canAct || canCancelOwn) && (
+                <div className="flex items-center gap-2 mt-2.5">
+                  {canAct && (
+                    <>
+                      <Button size="sm" variant="outline" className="h-8 flex-1 text-[#C4402F] border-[#C4402F]/30 text-xs" onClick={() => onReject(r.id)} data-testid={`button-reject-leave-${r.id}`}>Reject</Button>
+                      <Button size="sm" className="h-8 flex-1 text-xs" onClick={() => onApprove(r.id)} data-testid={`button-approve-leave-${r.id}`}>Approve</Button>
+                    </>
+                  )}
+                  {canCancelOwn && <Button size="sm" variant="ghost" className="h-8 ml-auto text-xs text-muted-foreground" onClick={() => onCancel(r.id)} data-testid={`button-cancel-leave-${r.id}`}>Cancel</Button>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   const columns: DataTableColumn<any>[] = [
     {
