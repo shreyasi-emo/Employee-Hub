@@ -62,6 +62,16 @@ export default function MyApprovalsPage() {
     canTravelApprove ? { key: "travel", label: "Travel", icon: Plane, count: travelPending } : null,
   ].filter(Boolean) as { key: string; label: string; icon: any; count: number }[]).sort((a, b) => b.count - a.count);
   const effectiveTab = apprTabs.some((t) => t.key === apprTab) ? apprTab : apprTabs[0]?.key;
+  // Mobile category dropdown. For Office Purchases it renders INSIDE that component's toolbar (below the
+  // phase dropdown), so it's passed down there; every other tab renders it above the content here.
+  const mobileCatSelect = (
+    <Select value={effectiveTab} onValueChange={setApprTab}>
+      <SelectTrigger className="sm:hidden w-full h-10" data-testid="select-appr-tab-mobile"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {apprTabs.map((t) => <SelectItem key={t.key} value={t.key}>{t.label}{t.count > 0 ? ` (${t.count})` : ""}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
   const headerTotal = isCeo
     ? catCards.reduce((s, c) => s + c.count, 0) + underReviewCards.reduce((s, c) => s + c.count, 0)
     : apprTabs.reduce((s, t) => s + t.count, 0);
@@ -140,13 +150,8 @@ export default function MyApprovalsPage() {
       ) : (
         <>
           {/* Non-CEO approvers: category tabs at the top, ordered by pending count, active tab highlighted. */}
-          {/* Mobile: category dropdown (matches My Requests). */}
-          <Select value={effectiveTab} onValueChange={setApprTab}>
-            <SelectTrigger className="sm:hidden w-full h-10" data-testid="select-appr-tab-mobile"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {apprTabs.map((t) => <SelectItem key={t.key} value={t.key}>{t.label}{t.count > 0 ? ` (${t.count})` : ""}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {/* Mobile: category dropdown — Office Purchases renders it inside its own toolbar (below the phase). */}
+          {effectiveTab !== "office_purchases" && mobileCatSelect}
           {/* Desktop: category button strip. */}
           <div className="hidden sm:flex gap-2 flex-wrap">
             {apprTabs.map((t) => (
@@ -161,7 +166,7 @@ export default function MyApprovalsPage() {
           ) : (
             <>
               {effectiveTab === "reimbursements" && <ReimbApprovals items={financeReimbQueue} allItems={reimb} nameByUser={nameByUser} allowBulk={canCeoReimb} showPhaseToggle />}
-              {effectiveTab === "office_purchases" && <OfficePurchaseApprovals allItems={opAll} canTriage={canOpTriage} canCeo={false} />}
+              {effectiveTab === "office_purchases" && <OfficePurchaseApprovals allItems={opAll} canTriage={canOpTriage} canCeo={false} mobileCategorySlot={mobileCatSelect} />}
               {effectiveTab === "travel" && <TravelApprovals scope="hr" />}
             </>
           )}
