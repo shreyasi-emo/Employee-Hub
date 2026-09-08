@@ -21,6 +21,7 @@ import { ReimbursementApprovalModal, exportReimbursement } from "@/features/comp
 import { ChevronLeft, Check, X, ChevronRight, CalendarClock, FileText, IndianRupee, MoreVertical, Eye, Download, Maximize2, ArrowDownUp, Building2, Clock, MousePointerClick, CheckSquare } from "lucide-react";
 import { format } from "date-fns";
 import { statusClass, statusLabel } from "@/lib/status";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Premium card-based reimbursement approvals list. Finance = individual; CEO = + bulk.
 export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBulk, showPhaseToggle = false, asModal = false, open = true, onClose }: { items: any[]; allItems?: any[]; nameByUser?: Record<string, string>; allowBulk: boolean; showPhaseToggle?: boolean; asModal?: boolean; open?: boolean; onClose?: () => void }) {
@@ -38,6 +39,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
   const [view, setView] = useState<"card" | "table">("card");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const isMobile = useIsMobile();
   const inRange = (d: any) => dayInRange(d, range);
   const approvedByName = (r: any) => nameByUser[r.approvedById] || nameByUser[r.financeApprovedById] || "—";
 
@@ -220,6 +222,32 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
         {pageItems.map((r: any) => {
           const amt = Number(r.totalAmount || 0);
           const pr = reimbPriority(amt);
+          // Mobile: compact card — reference + category, amount + priority, employee | HOD, purpose, View.
+          if (isMobile) {
+            return (
+              <div key={r.id} data-testid={`appr-reimb-${r.id}`} className={`card-surface card-hover relative p-3 cursor-pointer ${selectionMode && sel.has(r.id) ? "ring-2 ring-[#206295]" : ""}`} onClick={() => (selectionMode ? toggle(r.id) : openDetail(r))}>
+                <div className="flex items-center gap-2">
+                  {allowBulk && selectionMode && <Checkbox checked={sel.has(r.id)} onClick={(e: any) => e.stopPropagation()} onCheckedChange={() => toggle(r.id)} className="flex-shrink-0" data-testid={`select-reimb-${r.id}`} />}
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                  <span className="text-[13px] font-semibold text-foreground truncate flex-1">{r.reference}</span>
+                  <Badge className="text-[10px] px-2 py-0.5 capitalize flex-shrink-0" style={catStyle(r.category || "other")}>{r.category || "—"}</Badge>
+                </div>
+                <div className="flex items-center justify-between gap-2 mt-1.5">
+                  <span className="text-xl font-bold text-[#206295] tabular-nums leading-none">₹{amt.toLocaleString("en-IN")}</span>
+                  <Badge className={`text-[10px] flex-shrink-0 ${pr.cls}`}>{pr.label}</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground truncate mt-1">
+                  <span className="font-medium text-foreground">{r.employeeName || "Employee"}</span> ({r.employeeCode || "—"})<span className="mx-1.5 text-border">|</span>HOD: {r.hodName || "—"}
+                </p>
+                {r.businessPurpose && <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">{r.businessPurpose}</p>}
+                {!selectionMode && (
+                  <div onClick={(e) => e.stopPropagation()} className="mt-2">
+                    <Button size="sm" variant="ghost" className="h-9 w-full btn-glass text-[#206295] hover:text-[#206295]" onClick={() => openDetail(r)} data-testid={`view-reimb-${r.id}`}><Eye className="h-4 w-4 mr-1.5" /> View</Button>
+                  </div>
+                )}
+              </div>
+            );
+          }
           return (
             <div key={r.id} data-testid={`appr-reimb-${r.id}`}
               className={`group card-surface card-hover relative p-6 cursor-pointer ${selectionMode && sel.has(r.id) ? "ring-2 ring-[#206295]" : ""}`}
