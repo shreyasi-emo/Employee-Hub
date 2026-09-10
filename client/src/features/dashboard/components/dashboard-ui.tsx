@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { CheckCircle2, XCircle, AlertCircle, ArrowRight, Megaphone, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigation } from "react-day-picker";
 import { format } from "date-fns";
+import { prettyLabel } from "@/lib/format";
 
 // Small widgets shared across the dashboard grid.
 // NOTE: CalCaption duplicates the one exported by components/shared/date-range-picker.
@@ -90,7 +91,7 @@ export function AnnouncementCard({ announcement }: { announcement: any }) {
         <div className="flex items-start gap-2 flex-wrap">
           <h3 className="text-sm font-semibold text-foreground leading-snug">{announcement.title}</h3>
           {announcement.category && (
-            <Badge variant="secondary" className="text-xs capitalize">{announcement.category}</Badge>
+            <Badge variant="secondary" className="text-xs">{prettyLabel(announcement.category)}</Badge>
           )}
         </div>
         <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{announcement.content}</p>

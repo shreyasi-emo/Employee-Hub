@@ -10,8 +10,8 @@ import { EMPLOYEE_DOC_GROUPS } from "../lib/employee-constants";
 
 const MAX_DOC_MB = 5;
 const hasFile = (f: any) => !!(f && (f.fileData || f.fileUrl));
-// Profile Docs surface only collects Identity + Bank (no Previous Employment).
-const DOC_GROUPS = EMPLOYEE_DOC_GROUPS.filter((g) => g.group === "Identity" || g.group === "Bank");
+// Profile Docs surface collects Identity + Bank + Medical (the HR-only Health Card); no Previous Employment.
+const DOC_GROUPS = EMPLOYEE_DOC_GROUPS.filter((g) => g.group === "Identity" || g.group === "Bank" || g.group === "Medical");
 const DOC_TYPES = DOC_GROUPS.flatMap((g) => g.docs);
 
 // ===== Docs bento — every standard onboarding document, present or as a placeholder =====

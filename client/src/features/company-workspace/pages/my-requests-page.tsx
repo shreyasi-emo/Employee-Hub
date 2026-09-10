@@ -80,7 +80,7 @@ const DONE_STAGE: Record<string, string[]> = {
   office: ["delivered", "rejected", "cancelled"],
   procurement: ["approved", "rejected", "cancelled"],
   ticket: ["resolved", "closed"],
-  reimbursement: ["approved", "rejected"],
+  reimbursement: ["approved", "rejected", "cancelled"],
   travel: ["booked", "rejected", "cancelled"],
 };
 

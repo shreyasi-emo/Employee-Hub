@@ -158,7 +158,7 @@ export function registerProcurementRoutes(app: Express) {
     if (!body) return res.status(400).json({ error: "Write a message." });
     const comment = mkComment(req, await actorName(req), body);
     const updated = await storage.updateProcurementRequest(req.params.id, { comments: [...((r.comments as any[]) || []), comment] });
-    await notifyThread(r, req.currentUser!.id, { type: "procurement_comment", title: `New comment · ${r.reference}`, body: `${comment.authorName}: ${body.slice(0, 90)}` });
+    await notifyThread(r, req.currentUser!.id, { type: "procurement_comment", title: `New comment | ${r.reference}`, body: `${comment.authorName}: ${body.slice(0, 90)}` });
     res.json(updated);
   });
 
@@ -167,7 +167,7 @@ export function registerProcurementRoutes(app: Express) {
     if (!r || !["pending_approval", "under_review"].includes(r.status)) return null;
     const updated = await storage.updateProcurementRequest(id, { status: "under_review", comments: [...((r.comments as any[]) || []), mkComment(req, name, body, "query")] });
     await log(req, "PROCUREMENT_QUERY", "procurement", id, r, updated);
-    await notifyRequester(r.requesterId, { type: "procurement_query", title: `Query · ${r.reference}`, body: `CEO asked: ${body.slice(0, 90)}`, link: "/my-requests" });
+    await notifyRequester(r.requesterId, { type: "procurement_query", title: `Query | ${r.reference}`, body: `CEO asked: ${body.slice(0, 90)}`, link: "/my-requests" });
     return updated;
   };
   app.post("/api/procurement/:id/query", requireAuth, async (req, res) => {

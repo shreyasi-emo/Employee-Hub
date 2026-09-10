@@ -21,7 +21,7 @@ export function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: a
   const reference = item.reference || `${isProc ? "PR" : "OP"}-${String(item.id || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()}`;
   const lines = Array.isArray(item.items) ? item.items : [];
   // Heading lists the actual item names (truncates if long); the exact count rides alongside as a chip,
-  // so a multi-line order reads as "Mouse, Keyboard  ·  3 items" — never the vague "Mouse +1 more".
+  // so a multi-line order reads as "Mouse, Keyboard" with a "3 items" chip — never the vague "Mouse +1 more".
   const names = lines.map((l: any) => l?.description).filter(Boolean);
   const title = names.length ? names.join(", ") : (isProc ? "Procurement" : "Office Purchase");
   const itemCount = lines.length;

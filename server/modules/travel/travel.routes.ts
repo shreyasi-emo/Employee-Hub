@@ -220,7 +220,7 @@ export function registerTravelRoutes(app: Express) {
     if (!body) return res.status(400).json({ error: "Add a message for HR." });
     const updated = await queryOne(req, req.params.id, body, await actorName(req));
     if (!updated) return res.status(400).json({ error: "This request can no longer be queried." });
-    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_query", title: `Query · ${updated.reference}`, body: `CEO asked: ${body.slice(0, 90)}`, link: "/my-approvals" }); } catch { /* best-effort */ }
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_query", title: `Query | ${updated.reference}`, body: `CEO asked: ${body.slice(0, 90)}`, link: "/my-approvals" }); } catch { /* best-effort */ }
     res.json(updated);
   });
   app.post("/api/travel/bulk-query", requireAuth, async (req, res) => {
@@ -261,7 +261,7 @@ export function registerTravelRoutes(app: Express) {
     if (!body) return res.status(400).json({ error: "Write a message." });
     const comment = mkComment(req, await actorName(req), body);
     const updated = await storage.updateTripRequest(req.params.id, { comments: [...((r.comments as any[]) || []), comment] });
-    await notifyThread(r, req.currentUser!.id, { type: "travel_comment", title: `New comment · ${r.reference}`, body: `${comment.authorName}: ${body.slice(0, 90)}` });
+    await notifyThread(r, req.currentUser!.id, { type: "travel_comment", title: `New comment | ${r.reference}`, body: `${comment.authorName}: ${body.slice(0, 90)}` });
     res.json(updated);
   });
 

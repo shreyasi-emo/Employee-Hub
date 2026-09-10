@@ -33,6 +33,8 @@ export function sanitizeEmployeeForRole(
     firstName: emp.firstName,
     lastName: emp.lastName,
     email: emp.email,
+    // Office contact details are shared across the directory (Meet the Team) — non-sensitive by policy.
+    phone: emp.phone,
     designationId: emp.designationId,
     departmentId: emp.departmentId,
     employmentStatus: emp.employmentStatus,
@@ -41,6 +43,7 @@ export function sanitizeEmployeeForRole(
     workLocation: emp.workLocation,
     joinDate: emp.joinDate,
     profilePhoto: emp.profilePhoto,
+    avatarUrl: emp.avatarUrl,
     userId: emp.userId,
   };
 }

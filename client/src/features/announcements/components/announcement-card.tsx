@@ -8,6 +8,7 @@ import {
 import { Calendar, User, Trash2, MoreVertical } from "lucide-react";
 import { format } from "date-fns";
 import { categoryColors, catMeta, URGENT_TINT } from "../lib/categories";
+import { CommunityReactions } from "./community-reactions";
 
 const fmtDate = (d: any) => `${format(new Date(d), "MMM d, yyyy")} | ${format(new Date(d), "h:mm a")}`;
 
@@ -57,7 +58,7 @@ function MoreMenu({ id, onDelete }: { id: string; onDelete: (id: string) => void
       <DropdownMenuContent align="end" className="w-40">
         <DropdownMenuItem
           className="text-[#FF6F62] focus:text-[#FF6F62]"
-          onClick={() => { if (window.confirm("Delete this announcement?")) onDelete(id); }}
+          onClick={() => { if (window.confirm("Remove this post? This cannot be undone.")) onDelete(id); }}
           data-testid={`button-delete-announcement-${id}`}
         >
           <Trash2 className="h-4 w-4 mr-2" /> Delete
@@ -77,7 +78,7 @@ function Badges({ ann, isUrgent, isExpired }: { ann: any; isUrgent: boolean; isE
   );
 }
 
-export function AnnouncementCard({ ann, canManage, onDelete, author, view = "list", expanded = false, full = false, onToggle, onNeedFull }: {
+export function AnnouncementCard({ ann, canManage, onDelete, author, view = "list", expanded = false, full = false, onToggle, onNeedFull, meId, onReact }: {
   ann: any;
   canManage: boolean;
   onDelete: (id: string) => void;
@@ -89,7 +90,11 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
   full?: boolean;
   onToggle?: () => void;
   onNeedFull?: () => void;
+  // Community posts only: current viewer id + a react toggle. Absent → no reaction bar (announcements).
+  meId?: string;
+  onReact?: (id: string, emoji: string) => void;
 }) {
+  const showReactions = ann.kind === "community" && !!onReact;
   const meta = catMeta(ann.category);
   const Icon = meta.icon;
   const isUrgent = ann.priority === "urgent";
@@ -142,6 +147,7 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
             </button>
           )}
           <div className="mt-auto pt-3 border-t border-border flex flex-col gap-1.5 text-xs text-muted-foreground flex-shrink-0">
+            {showReactions && <div className="pb-1"><CommunityReactions reactions={ann.reactions} meId={meId} onReact={(e) => onReact!(ann.id, e)} /></div>}
             <span className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5 flex-shrink-0" /> {fmtDate(ann.createdAt)}</span>
             {author && <span className="flex items-center gap-2"><User className="h-3.5 w-3.5 flex-shrink-0" /> {author}</span>}
           </div>
@@ -173,6 +179,7 @@ export function AnnouncementCard({ ann, canManage, onDelete, author, view = "lis
         <div className="mt-1">
         <ExpandableText text={ann.content} clampLines={3} testId={`read-more-${ann.id}`} />
         </div>
+        {showReactions && <div className="mt-3"><CommunityReactions reactions={ann.reactions} meId={meId} onReact={(e) => onReact!(ann.id, e)} /></div>}
       </div>
       {canManage && <MoreMenu id={ann.id} onDelete={onDelete} />}
     </div>

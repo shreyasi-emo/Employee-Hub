@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Calendar, FileText, MoreVertical } from "lucide-react";
 import { reqYear, yearOptions } from "../lib/leave-model";
 import {
-  useLeaveRequests, useLeaveTypes, useLeaveBalances, useLeaveLedger, useUpdateLeaveStatus, useEndLeaveRequest,
+  useLeaveRequests, useLeaveTypes, useLeaveBalances, useLeaveLedger, useUpdateLeaveStatus, useEndLeaveRequest, useFlagLeaveRequest,
 } from "../api/leave.api";
 import { LeaveRequestsTable } from "../components/leave-ui";
 import { MyLeavesTab } from "../components/my-leaves-tab";
@@ -47,6 +47,8 @@ export default function LeavePage() {
 
   const myLeaveRequests = leaveRequests.filter((r: any) => r.employeeId === emp?.id);
   const teamRequests = leaveRequests.filter((r: any) => r.employeeId !== emp?.id && r.status === "pending");
+  // Team table also surfaces auto-approved team leaves so the manager can Raise Flag on them.
+  const teamTableRows = leaveRequests.filter((r: any) => r.employeeId !== emp?.id && (r.status === "pending" || (r.autoApproved && r.status === "approved")));
   const myYear = myLeaveRequests.filter((r: any) => reqYear(r) === selectedYear);
 
   const updateLeave = useUpdateLeaveStatus({
@@ -57,6 +59,15 @@ export default function LeavePage() {
     onSuccess: () => toast({ title: "Leave ended", description: "Remaining days returned to your balance." }),
     onError: (e: any) => toast({ title: "Couldn't end leave", description: e.message, variant: "destructive" }),
   });
+  const flagLeave = useFlagLeaveRequest({
+    onSuccess: () => toast({ title: "Concern raised", description: "HR has been notified about this leave." }),
+    onError: (e: any) => toast({ title: "Couldn't raise flag", description: e.message, variant: "destructive" }),
+  });
+  // Raise a manager concern on an auto-approved leave — reason is mandatory.
+  const onFlagLeave = (id: string) => {
+    const reason = window.prompt("Raise a concern about this auto-approved leave. Enter a reason (required):");
+    if (reason && reason.trim()) flagLeave.mutate({ id, reason: reason.trim() });
+  };
 
   const years = yearOptions(currentYear);
   // Executives (CEO/CTO) never apply for leave — no "My Requests"/Ledger, only the approvals view.
@@ -141,13 +152,14 @@ export default function LeavePage() {
         <Card className="border-0">
           <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">Team Leave Requests</CardTitle></CardHeader>
           <LeaveRequestsTable
-            requests={teamRequests}
+            requests={teamTableRows}
             leaveTypes={leaveTypes}
             employees={employees}
             canApprove={canApproveAny}
             emptyText="No pending team leave requests"
             onApprove={(id: string) => updateLeave.mutate({ id, status: "approved" })}
             onReject={(id: string) => updateLeave.mutate({ id, status: "rejected" })}
+            onFlag={onFlagLeave}
           />
         </Card>
       )}
@@ -167,6 +179,7 @@ export default function LeavePage() {
             emptyText="No leave requests"
             onApprove={(id: string) => updateLeave.mutate({ id, status: "approved" })}
             onReject={(id: string) => updateLeave.mutate({ id, status: "rejected" })}
+            onFlag={onFlagLeave}
           />
         </Card>
       )}

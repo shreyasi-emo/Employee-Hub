@@ -11,6 +11,7 @@ export interface CurrentUser {
   role: UserRole;
   employeeId?: string;
   isActive: boolean;
+  canPostCommunity?: boolean;
 }
 
 export interface Employee {
@@ -100,6 +101,11 @@ export function hasWorkspaceAccess(user: CurrentUser | null): boolean {
 
 export function isCEOApprover(user: CurrentUser | null): boolean {
   return hasRole(user, "super_admin", "ceo_approver");
+}
+
+/** May publish in the Community section: HR/Admin always, plus any individually-granted user. */
+export function canPostCommunity(user: CurrentUser | null): boolean {
+  return isHR(user) || !!user?.canPostCommunity;
 }
 
 /** Executive tier: CEO + CTO. They never apply for leave, approve their reporting managers'

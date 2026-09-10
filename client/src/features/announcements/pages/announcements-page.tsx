@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { motion, LayoutGroup } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth, isHR } from "@/lib/auth";
+import { useAuth, isHR, canPostCommunity } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useAnnouncements, useDeleteAnnouncement } from "../api/announcements.api";
+import { useAnnouncements, useDeleteAnnouncement, useReactToPost } from "../api/announcements.api";
 import {
   AnnouncementsHeader, AnnouncementStats, AnnouncementsToolbar,
   AnnouncementsLoading, AnnouncementsEmpty,
 } from "../components/announcements-sections";
 import { AnnouncementCard } from "../components/announcement-card";
 import { AddAnnouncementDialog } from "../components/add-announcement-dialog";
+import { ManageContributorsDialog } from "../components/manage-contributors-dialog";
+import { CommunitySection } from "../components/community-section";
 import { usePaged } from "@/components/shared/pagination";
 
 // Live column count for the grid (grid-cols-1 / md:2 / xl:3) so we can repack in JS.
@@ -56,7 +58,9 @@ const LAYOUT_TWEEN = { duration: 0.4, ease: "easeInOut" as const };
 export default function AnnouncementsPage() {
   const { data: auth } = useAuth();
   const { toast } = useToast();
-  const [showAdd, setShowAdd] = useState(false);
+  // One composer, driven by intent: null = closed; kind + optional pre-filled draft otherwise.
+  const [compose, setCompose] = useState<{ kind: "announcement" | "community"; initial?: { title: string; content: string; category: string } } | null>(null);
+  const [showContributors, setShowContributors] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sort, setSort] = useState("latest");
   const [view, setView] = useState<"list" | "grid">("list");
@@ -68,7 +72,9 @@ export default function AnnouncementsPage() {
   const cols = useGridColumns();
 
   const { data: announcements = [], isLoading } = useAnnouncements();
-  const deleteMutation = useDeleteAnnouncement({ onSuccess: () => toast({ title: "Announcement deleted" }) });
+  const deleteMutation = useDeleteAnnouncement({ onSuccess: () => toast({ title: "Post removed" }) });
+  const reactMutation = useReactToPost();
+  const meId = auth?.user?.id;
 
   // Resolve the author (publishedBy is a user id → employee name + department; omitted if not resolvable).
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], enabled: !!auth?.user });
@@ -81,12 +87,17 @@ export default function AnnouncementsPage() {
     return `${emp.firstName} ${emp.lastName}${dept ? ` (${dept})` : ""}`;
   };
 
-  const canManage = isHR(auth?.user ?? null);
-  const categories = Array.from(new Set((announcements as any[]).map((a) => a.category).filter(Boolean))) as string[];
+  const isHrUser = isHR(auth?.user ?? null);
+  const canCommunityPost = canPostCommunity(auth?.user ?? null);
+  // Same table, split by kind. Announcements are the main list; community lives in a section below.
+  const annAll = (announcements as any[]).filter((a) => a.kind !== "community");
+  const communityAll = (announcements as any[]).filter((a) => a.kind === "community");
+  // HR can delete any post; a community author can remove their own.
+  const canRemove = (ann: any) => isHrUser || (ann.kind === "community" && ann.publishedBy === meId);
 
-  const visible = categoryFilter === "all"
-    ? (announcements as any[])
-    : (announcements as any[]).filter((a) => a.category === categoryFilter);
+  const categories = Array.from(new Set(annAll.map((a) => a.category).filter(Boolean))) as string[];
+
+  const visible = categoryFilter === "all" ? annAll : annAll.filter((a) => a.category === categoryFilter);
 
   const sorted = [...visible].sort((a, b) => {
     const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -99,12 +110,15 @@ export default function AnnouncementsPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
-      <AnnouncementsHeader canManage={canManage} onNew={() => setShowAdd(true)} />
+      <AnnouncementsHeader
+        canManage={isHrUser}
+        onNew={() => setCompose({ kind: "announcement" })}
+      />
 
-      <AnnouncementStats announcements={announcements as any[]} categories={categories} />
+      <AnnouncementStats announcements={annAll} categories={categories} />
 
       <AnnouncementsToolbar
-        announcements={announcements as any[]}
+        announcements={annAll}
         categories={categories}
         categoryFilter={categoryFilter}
         onCategory={setCategoryFilter}
@@ -117,7 +131,7 @@ export default function AnnouncementsPage() {
       {isLoading ? (
         <AnnouncementsLoading />
       ) : sorted.length === 0 ? (
-        <AnnouncementsEmpty canManage={canManage} />
+        <AnnouncementsEmpty canManage={isHrUser} />
       ) : view === "grid" ? (
         // items-stretch keeps collapsed cards equal-height; the expanded card widens via col-span.
         // repack() → CSS `order` (DOM order stays STABLE so framer never loses nodes). `layout="position"`
@@ -146,7 +160,7 @@ export default function AnnouncementsPage() {
                       className={`${spanCls} min-w-0`}
                     >
                       <AnnouncementCard
-                        ann={ann} canManage={canManage} onDelete={(id) => deleteMutation.mutate(id)}
+                        ann={ann} canManage={canRemove(ann)} onDelete={(id) => deleteMutation.mutate(id)}
                         author={authorOf(ann.publishedBy)} view="grid"
                         expanded={isExp} full={expandedFull}
                         onToggle={() => openCard(ann.id)}
@@ -164,7 +178,7 @@ export default function AnnouncementsPage() {
           <CardContent className="p-0">
             <div className="divide-y divide-border">
               {paged.pageItems.map((ann: any) => (
-                <AnnouncementCard key={ann.id} ann={ann} canManage={canManage} onDelete={(id) => deleteMutation.mutate(id)} author={authorOf(ann.publishedBy)} view="list" />
+                <AnnouncementCard key={ann.id} ann={ann} canManage={canRemove(ann)} onDelete={(id) => deleteMutation.mutate(id)} author={authorOf(ann.publishedBy)} view="list" />
               ))}
             </div>
           </CardContent>
@@ -185,7 +199,26 @@ export default function AnnouncementsPage() {
         </div>
       )}
 
-      <AddAnnouncementDialog open={showAdd} onOpenChange={setShowAdd} />
+      {/* Community — same page, below the announcements. Self-hides when there's nothing to show. */}
+      {!isLoading && (
+        <CommunitySection
+          posts={communityAll}
+          employees={employees as any[]}
+          meId={meId}
+          canPost={canCommunityPost}
+          isHrUser={isHrUser}
+          authorOf={authorOf}
+          canRemove={canRemove}
+          onReact={(id, emoji) => reactMutation.mutate({ id, emoji })}
+          onDelete={(id) => deleteMutation.mutate(id)}
+          onNewPost={() => setCompose({ kind: "community" })}
+          onShare={(initial) => setCompose({ kind: "community", initial })}
+          onManageContributors={() => setShowContributors(true)}
+        />
+      )}
+
+      <AddAnnouncementDialog open={!!compose} kind={compose?.kind ?? "announcement"} initial={compose?.initial} onOpenChange={(v) => { if (!v) setCompose(null); }} />
+      <ManageContributorsDialog open={showContributors} onOpenChange={setShowContributors} />
     </div>
   );
 }

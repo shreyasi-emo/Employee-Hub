@@ -4,6 +4,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth, isHR, isAdmin } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -96,6 +97,20 @@ export default function EmployeeProfilePage() {
     onError: (e: any) => toast({ title: "Couldn't update documents", description: e.message, variant: "destructive" }),
   });
 
+  // Profile edit requests — employees see their own status; HR approves/rejects inline on the profile.
+  const { data: editRequests = [] } = useQuery<any[]>({ queryKey: [`/api/profile-edit-requests?employeeId=${empId}`], enabled: !!empId && (isSelf || isHrUser) });
+  const pendingEdits = (editRequests as any[]).filter((r) => r.status === "pending");
+  const decideEdit = useMutation({
+    mutationFn: ({ id, status, approvalNotes }: any) => apiRequest("PUT", `/api/profile-edit-requests/${id}`, { status, approvalNotes }),
+    onSuccess: (_d, v: any) => {
+      qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && ((q.queryKey[0] as string).startsWith("/api/profile-edit-requests") || (q.queryKey[0] as string).startsWith("/api/employees") || q.queryKey[0] === "/api/auth/me") });
+      toast({ title: v?.status === "approved" ? "Changes approved & applied" : "Request rejected" });
+    },
+    onError: (e: any) => toast({ title: "Couldn't update request", description: e.message, variant: "destructive" }),
+  });
+  const onApproveEdit = (id: string) => decideEdit.mutate({ id, status: "approved" });
+  const onRejectEdit = (id: string) => { if (window.confirm("Reject this change request?")) decideEdit.mutate({ id, status: "rejected" }); };
+
   if (isLoading || !empId) {
     return (
       <div className="p-6 max-w-[92rem] mx-auto space-y-4">
@@ -179,7 +194,7 @@ export default function EmployeeProfilePage() {
                   <Button variant="outline" size="sm" className="h-9 gap-1.5" data-testid="profile-actions">Actions <ChevronDown className="h-3.5 w-3.5" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem onClick={() => setShowEdit(true)} data-testid="action-edit"><Edit className="h-4 w-4 mr-2" /> Edit Details</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowEdit(true)} data-testid="action-edit"><Edit className="h-4 w-4 mr-2" /> {isSelf && !isHrUser ? "Request Changes" : "Edit Details"}</DropdownMenuItem>
                   {employee.email && (
                     <>
                       <DropdownMenuSeparator />
@@ -191,6 +206,40 @@ export default function EmployeeProfilePage() {
             )}
           </div>
         </div>
+
+        {/* Profile change requests — the employee's own pending status, or HR's inline Approve/Reject. */}
+        {pendingEdits.length > 0 && (
+          <div className="flex-shrink-0 space-y-3">
+            {pendingEdits.map((r: any) => (
+              <div key={r.id} className="rounded-2xl border border-[#206295]/30 bg-[#206295]/[0.05] p-4" data-testid={`profile-edit-request-${r.id}`}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Edit className="h-4 w-4 text-[#206295] flex-shrink-0" />
+                    <span className="text-sm font-semibold text-foreground">{isHrUser && !isSelf ? "Requested profile changes" : "Your requested profile changes"}</span>
+                    <Badge className="text-[10px] bg-[#206295]/12 text-[#206295]">{isHrUser ? "Pending your approval" : "Pending HR approval"}</Badge>
+                  </div>
+                  {isHrUser && (
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" className="h-8 text-[#C4402F] border-[#C4402F]/30 text-xs" disabled={decideEdit.isPending} onClick={() => onRejectEdit(r.id)} data-testid={`profile-edit-reject-${r.id}`}>Reject</Button>
+                      <Button size="sm" className="h-8 text-xs" disabled={decideEdit.isPending} onClick={() => onApproveEdit(r.id)} data-testid={`profile-edit-approve-${r.id}`}>Approve</Button>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2.5 grid gap-1.5">
+                  {Object.entries(r.changes || {}).map(([k, v]: any) => (
+                    <div key={k} className="text-[13px] flex items-center gap-2 flex-wrap">
+                      <span className="text-muted-foreground w-44 flex-shrink-0">{v?.label || k}</span>
+                      <span className="text-muted-foreground/70 line-through">{String(v?.old ?? "—") || "—"}</span>
+                      <span className="text-border">→</span>
+                      <span className="font-medium text-foreground">{String(v?.new ?? "—") || "—"}</span>
+                    </div>
+                  ))}
+                </div>
+                {r.reason && <p className="text-xs text-muted-foreground mt-2">Reason: {r.reason}</p>}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 3 columns — left + right fixed full-height, middle's inner container is the only scroller. */}
         {/* overflow-visible on desktop so card hover-lift + shadows aren't clipped; each column is

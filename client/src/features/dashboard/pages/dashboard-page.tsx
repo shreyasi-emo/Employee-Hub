@@ -31,7 +31,9 @@ export default function DashboardPage() {
   // Company-wide totals — only fetched for the HR/admin layout, so a plain manager's
   // browser never receives org-wide numbers (the stats grid is hidden for them anyway).
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({ queryKey: ["/api/dashboard/stats"], enabled: isHR(user!) || isExecutive(user!) });
-  const { data: announcements = [], isLoading: annLoading } = useQuery<any[]>({ queryKey: ["/api/announcements"] });
+  const { data: allAnnouncements = [], isLoading: annLoading } = useQuery<any[]>({ queryKey: ["/api/announcements"] });
+  // Dashboard widget shows announcements only — Community posts live on the Announcements → Community tab.
+  const announcements = (allAnnouncements as any[]).filter((a) => a.kind !== "community");
   const { data: leaveRequests = [] } = useQuery<any[]>({ queryKey: ["/api/leave-requests"] });
   const { data: employees = [] } = useQuery<any[]>({
     queryKey: ["/api/employees"],

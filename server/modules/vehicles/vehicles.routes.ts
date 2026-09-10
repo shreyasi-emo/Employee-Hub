@@ -152,7 +152,7 @@ export function registerVehicleRoutes(app: Express) {
         rentalLegs.push({
           ...base(freeCars[0].id), bookingType: "rental", status: "pending_hr_approval",
           passengers: remaining, attendees: attendees.slice(idx), groupId,
-          notes: `${b.notes ? b.notes + " · " : ""}Overflow from company car booking (excess passengers).`,
+          notes: `${b.notes ? b.notes + " | " : ""}Overflow from company car booking (excess passengers).`,
         });
       }
       const created = await storage.createBookingTransaction(companyLegs, rentalLegs);

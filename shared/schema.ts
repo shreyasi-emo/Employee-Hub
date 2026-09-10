@@ -11,6 +11,7 @@ import {
   jsonb,
   json,
   index,
+  uniqueIndex,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -52,6 +53,7 @@ export const employmentTypeEnum = pgEnum("employment_type", [
   "part_time",
   "intern",
   "contract",
+  "consultant",
 ]);
 
 export const employmentStatusEnum = pgEnum("employment_status", [
@@ -131,6 +133,8 @@ export const users = pgTable("users", {
   employeeId: varchar("employee_id"),
   isActive: boolean("is_active").notNull().default(true),
   accountStatus: text("account_status").notNull().default("active"),
+  // Per-user grant: allowed to publish in the Community section (HR/Admin can always post; this opens it to others).
+  canPostCommunity: boolean("can_post_community").notNull().default(false),
   inviteToken: text("invite_token"),
   inviteExpiresAt: timestamp("invite_expires_at"),
   resetToken: text("reset_token"),
@@ -297,6 +301,28 @@ export const leaveRequests = pgTable("leave_requests", {
   status: leaveStatusEnum("status").notNull().default("pending"),
   approvedBy: varchar("approved_by"),
   approvalNotes: text("approval_notes"),
+  // System auto-approved after the 7-day-post-leave window (manager never actioned it). Stays status="approved".
+  autoApproved: boolean("auto_approved").notNull().default(false),
+  // Manager concern raised on an already-approved (usually auto-approved) leave. Does not change status.
+  flagged: boolean("flagged").notNull().default(false),
+  flagNote: text("flag_note"),
+  flaggedBy: varchar("flagged_by"),
+  flaggedAt: timestamp("flagged_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Employee-initiated profile change requests — employees can no longer edit their own record directly
+// (photo excepted); a request captures the proposed field changes and HR approves/rejects it.
+export const profileEditRequests = pgTable("profile_edit_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull(),
+  // { field: { old, new }, ... } — the proposed changes, shown to HR for review.
+  changes: jsonb("changes").notNull(),
+  reason: text("reason"),
+  status: leaveStatusEnum("status").notNull().default("pending"),
+  approvedBy: varchar("approved_by"),
+  approvalNotes: text("approval_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -328,6 +354,9 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// The fixed, basic reaction set for Community posts (no comments/replies). Shared by server + client.
+export const COMMUNITY_REACTIONS = ["🎉", "❤️", "👏", "👍"] as const;
+
 // Announcements
 export const announcements = pgTable("announcements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -336,6 +365,10 @@ export const announcements = pgTable("announcements", {
   category: text("category").default("general"),
   priority: text("priority").default("normal"),
   visibleTo: text("visible_to").default("all"),
+  // "announcement" (default) or "community" (birthdays / anniversaries / community posts). Same table, one feed each.
+  kind: text("kind").notNull().default("announcement"),
+  // Community reactions: { "🎉": [userId, ...], ... }. Empty for normal announcements.
+  reactions: jsonb("reactions").notNull().default({}),
   publishedBy: varchar("published_by"),
   isActive: boolean("is_active").default(true),
   expiresAt: timestamp("expires_at"),
@@ -587,6 +620,7 @@ export const insertAttendanceSchema = createInsertSchema(attendanceRecords).omit
 export const insertRegularizationSchema = createInsertSchema(regularizationRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLeaveTypeSchema = createInsertSchema(leaveTypes).omit({ id: true, createdAt: true });
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProfileEditRequestSchema = createInsertSchema(profileEditRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertHolidaySchema = createInsertSchema(holidays).omit({ id: true, createdAt: true });
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
@@ -642,6 +676,8 @@ export type InsertLeaveLedger = z.infer<typeof insertLeaveLedgerSchema>;
 
 export type LeaveRequest = typeof leaveRequests.$inferSelect;
 export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
+export type ProfileEditRequest = typeof profileEditRequests.$inferSelect;
+export type InsertProfileEditRequest = z.infer<typeof insertProfileEditRequestSchema>;
 
 export type Holiday = typeof holidays.$inferSelect;
 export type InsertHoliday = z.infer<typeof insertHolidaySchema>;

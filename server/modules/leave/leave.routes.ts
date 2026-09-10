@@ -122,35 +122,21 @@ export function registerLeaveRoutes(app: Express) {
 
     const parsed = insertLeaveRequestSchema.safeParse({ ...req.body, employeeId: empId });
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    // Server owns the workflow state — never trust a client-sent status/approver (auto-approve below handles within-24h).
+    // Server owns the workflow state — always create as pending. Leaves are NOT auto-approved at creation;
+    // the manager has until 7 days after the leave date, after which the scheduler auto-approves (see scheduler.ts).
     const request = await storage.createLeaveRequest({ ...parsed.data, status: "pending" } as any);
 
-    // Auto-approve immediately if the leave starts within 24h (mirrors WFH). Balance was just
-    // checked above, so sufficiency holds.
-    const startMs = new Date(`${request.startDate}T00:00:00`).getTime();
-    const autoApprove = startMs - 24 * 60 * 60 * 1000 <= Date.now();
-    let finalReq: any = request;
-    if (autoApprove) {
-      finalReq = await storage.updateLeaveRequest(request.id, { status: "approved" as any, approvalNotes: "Auto-approved (starts within 24h)" });
-      await storage.deductLeaveOnApproval(request);
-    }
-
-    // Notify manager + HR (+ the employee if it was auto-approved)
+    // Notify the applicant's manager + HR.
     try {
       const employee = await storage.getEmployee(empId);
       const who = employee ? `${employee.firstName} ${employee.lastName}` : "An employee";
       const range = `${request.startDate} to ${request.endDate}`;
-      if (autoApprove) {
-        const u = (await storage.getAllUsers()).find((x) => x.employeeId === empId);
-        if (u) await storage.createNotification({ userId: u.id, type: "leave_approved", title: "Leave auto-approved", body: `Your leave (${range}) was auto-approved — it starts within 24h.`, link: "/leave" });
-      }
-      const body = `${who} ${autoApprove ? "took" : "applied for"} leave (${leaveType?.name || "leave"}) ${range}`;
-      const payload = { type: "leave_applied", title: autoApprove ? "Leave (auto-approved)" : "Leave Request", body, link: "/leave" };
+      const payload = { type: "leave_applied", title: "Leave Request", body: `${who} applied for leave (${leaveType?.name || "leave"}) ${range}`, link: "/leave" };
       if (employee?.managerId) await storage.notifyEmployee(employee.managerId, payload);
       await storage.notifyByRole(["hr_admin", "hr_executive"], payload);
     } catch {}
 
-    res.json(finalReq);
+    res.json(request);
   });
 
   app.put("/api/leave-requests/:id", requireAuth, async (req, res) => {
@@ -252,6 +238,32 @@ export function registerLeaveRoutes(app: Express) {
     }
     await log(req, "END_LEAVE", "leave_request", lr.id, lr, { endedAt: todayStr, restoreDays });
     res.json({ ok: true, restoreDays, cancelled: cancelWhole });
+  });
+
+  // Manager raises a concern on an already-approved leave (typically a system auto-approved one).
+  // Records the flag + mandatory reason; does NOT change the approval status. Surfaced to HR/Admin.
+  app.post("/api/leave-requests/:id/flag", requireAuth, async (req, res) => {
+    const id = String(req.params.id);
+    const lr = await storage.getLeaveRequest(id);
+    if (!lr) return res.status(404).json({ error: "Not found" });
+    const note = String(req.body?.reason ?? req.body?.note ?? "").trim();
+    if (!note) return res.status(400).json({ error: "A reason is required to flag this leave." });
+    if (lr.status !== "approved") return res.status(400).json({ error: "Only an approved leave can be flagged." });
+    const viewer = req.currentUser!;
+    let canFlag = viewer.role === "super_admin";
+    if (!canFlag && ["manager", "cto", "ceo_approver"].includes(viewer.role) && viewer.employeeId) {
+      const reports = await storage.getEmployeesByManager(viewer.employeeId);
+      canFlag = reports.some((e) => e.id === lr.employeeId);
+    }
+    if (!canFlag) return res.status(403).json({ error: "Only the applicant's manager or a Super Admin can flag this leave." });
+    const updated = await storage.updateLeaveRequest(id, { flagged: true, flagNote: note, flaggedBy: viewer.id, flaggedAt: new Date() } as any);
+    try {
+      const emp = await storage.getEmployee(lr.employeeId);
+      const who = emp ? `${emp.firstName} ${emp.lastName}` : "an employee";
+      await storage.notifyByRole(["super_admin", "hr_admin", "hr_executive"], { type: "leave_flagged", title: "Leave flagged by manager", body: `A manager raised a concern on ${who}'s auto-approved leave (${lr.startDate} to ${lr.endDate}): ${note.slice(0, 120)}`, link: "/leave" });
+    } catch {}
+    await log(req, "FLAG_LEAVE", "leave_request", lr.id, lr, updated);
+    res.json(updated);
   });
 
   // ===== LEAVE LEDGER =====

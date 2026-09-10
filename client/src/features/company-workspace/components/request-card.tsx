@@ -1,8 +1,7 @@
-import { formatDate, formatStatus, money, amountOf, titleOf, purposeOf, refOf, REVOCABLE_BLOCK } from "../shared/request-format";
-import { moneyShort, relDate, isJustUpdated } from "@/lib/format";
+import { formatDate, money, amountOf, titleOf, purposeOf, refOf, REVOCABLE_BLOCK } from "../shared/request-format";
+import { moneyShort, relDate, isJustUpdated, prettyLabel } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { submittedInfo } from "../shared/submitted-info";
-import { SubmittedLabel, colDivider } from "./request-ui";
+import { colDivider } from "./request-ui";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +27,6 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
   const advance = type === "reimbursement" ? Number(item.cashAdvance) || 0 : 0;
   const payable = amt - advance;
   const canRevoke = !REVOCABLE_BLOCK.includes(item.status);
-  const sub = submittedInfo(type, item);
   const dateLine = type === "reimbursement"
     ? (item.periodFrom ? `Expense Period | ${formatDate(item.periodFrom)} – ${formatDate(item.periodTo || item.periodFrom)}` : "Expense Period | —")
     : `Created | ${formatDate(item.createdAt)}`;
@@ -94,7 +92,7 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
                   className="h-5 w-5 rounded inline-flex items-center justify-center text-muted-foreground hover:text-[#206295] hover:bg-muted flex-shrink-0">
                   <Copy className="h-3 w-3" />
                 </button>
-                {category && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">{formatStatus(category)}</Badge>}
+                {category && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">{prettyLabel(category)}</Badge>}
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1 min-w-0">
                 <span className="inline-flex items-center gap-1 min-w-0 truncate"><CalendarClock className="h-3 w-3 flex-shrink-0" /><span className="truncate">{dateShort}</span></span>
@@ -131,23 +129,13 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
                   className="h-5 w-5 rounded inline-flex items-center justify-center text-muted-foreground hover:text-[#206295] hover:bg-muted">
                   <Copy className="h-3 w-3" />
                 </button>
-                {category && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">{formatStatus(category)}</Badge>}
+                {category && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">{prettyLabel(category)}</Badge>}
               </div>
               <h3 className="text-[18px] leading-tight font-semibold text-foreground tracking-tight truncate mt-0.5">{title}</h3>
               <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 flex-shrink-0" /> {dateLine}</p>
               {byline && <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5 flex-shrink-0" /> {byline}</p>}
             </div>
           </div>
-
-          {/* Submitted on / Re-submitted On — reimbursements only */}
-          {type === "reimbursement" && <>
-            {colDivider}
-            <div className="w-full lg:w-[150px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
-              <CalendarClock className="h-4 w-4 text-muted-foreground" />
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap"><SubmittedLabel info={sub} /></div>
-              <p className="text-sm font-semibold text-foreground mt-1.5 whitespace-nowrap">{formatDate(sub.date)}</p>
-            </div>
-          </>}
 
           {colDivider}
           {/* Last Updated — all tabs */}
@@ -169,21 +157,25 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
             </div>
           </div>
 
-          {colDivider}
-          {/* Payable — sized to fit ₹10,00,000 + "net of … advance" subtext */}
-          <div className="w-full lg:w-[188px] flex-shrink-0 lg:px-5 flex flex-col justify-end items-start lg:items-end text-left lg:text-right">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">Payable</p>
-            {amt > 0 ? (
-              <>
-                <p className="text-2xl font-bold text-[#206295] tracking-tight tabular-nums mt-1.5">
-                  <span className="font-semibold mr-0.5">₹</span>{payable.toLocaleString("en-IN")}
-                </p>
-                {advance > 0 && <p className="text-[11px] text-muted-foreground mt-0.5">net of {money(advance)} advance</p>}
-              </>
-            ) : (
-              <p className="text-2xl font-bold text-muted-foreground/50 mt-1.5">—</p>
-            )}
-          </div>
+          {/* Amount — tickets carry no monetary value, so the column is omitted for them entirely.
+              Labelled "Payable" only when a cash advance nets it down; otherwise "Amount" (matches the
+              office/travel cards). */}
+          {type !== "ticket" && <>
+            {colDivider}
+            <div className="w-full lg:w-[188px] flex-shrink-0 lg:px-5 flex flex-col justify-end items-start lg:items-end text-left lg:text-right">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">{advance > 0 ? "Payable" : "Amount"}</p>
+              {amt > 0 ? (
+                <>
+                  <p className="text-2xl font-bold text-[#206295] tracking-tight tabular-nums mt-1.5">
+                    <span className="font-semibold mr-0.5">₹</span>{payable.toLocaleString("en-IN")}
+                  </p>
+                  {advance > 0 && <p className="text-[11px] text-muted-foreground mt-0.5">net of {money(advance)} advance</p>}
+                </>
+              ) : (
+                <p className="text-2xl font-bold text-muted-foreground/50 mt-1.5">—</p>
+              )}
+            </div>
+          </>}
 
           {/* Overflow — hidden in read-only views (e.g. a manager's team view) */}
           {!readOnly && (

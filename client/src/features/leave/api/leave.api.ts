@@ -54,6 +54,18 @@ export function useUpdateLeaveStatus(opts: { onSuccess?: () => void; onError?: (
   });
 }
 
+/** Manager raises a concern on an already-approved (usually auto-approved) leave. Mandatory reason;
+ *  does not change the approval status — just records + surfaces the flag to HR. */
+export function useFlagLeaveRequest(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiRequest("POST", `/api/leave-requests/${id}/flag`, { reason }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/leave-requests"] }); opts.onSuccess?.(); },
+    onError: opts.onError,
+  });
+}
+
 /** End an approved leave early from today (employee back early). Trims the remaining days and
  *  restores balance server-side; refreshes leave + the attendance calendar. */
 export function useEndLeaveRequest(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {

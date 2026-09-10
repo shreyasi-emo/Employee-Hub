@@ -33,13 +33,10 @@ export function registerEmployeeRoutes(app: Express) {
   app.put("/api/employees/me", requireAuth, async (req, res) => {
     const user = req.currentUser!;
     if (!user.employeeId) return res.status(404).json({ error: "No linked employee record" });
-    // Self-service editable fields: personal details, contact, address, emergency + bank details.
-    // Statutory (PAN/Aadhaar/UAN), employment, role and status stay HR-only.
-    const allowedFields = [
-      "currentAddress", "permanentAddress", "emergencyContactName", "emergencyContactPhone", "emergencyContactRelation",
-      "phone", "avatarUrl", "dateOfBirth", "gender", "maritalStatus", "bloodGroup",
-      "bankName", "bankAccountMasked", "ifscCode",
-    ];
+    // Employees no longer edit their record directly — every detail change goes through a
+    // profile-edit REQUEST that HR approves (see /api/profile-edit-requests). The ONLY field an
+    // employee may still self-serve here is their avatar/profile photo.
+    const allowedFields = ["avatarUrl"];
     const updates: any = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) updates[field] = req.body[field];

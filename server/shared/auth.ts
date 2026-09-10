@@ -72,6 +72,13 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// Community posting: HR/Admin can always post; other individuals can be granted via users.canPostCommunity.
+export function requireCommunityPoster(req: Request, res: Response, next: NextFunction) {
+  if (!req.currentUser) return res.status(401).json({ error: "Not authenticated" });
+  if (hasRole(req, "super_admin", "hr_admin", "hr_executive") || (req.currentUser as any).canPostCommunity) return next();
+  return res.status(403).json({ error: "Community posting not allowed" });
+}
+
 // HR/Admin Workspace access (ATS, office admin, approvals inbox).
 const WORKSPACE_ROLES = ["super_admin", "hr_admin", "hr_executive", "hr_ops", "office_admin", "ceo_approver"];
 export function requireWorkspace(req: Request, res: Response, next: NextFunction) {

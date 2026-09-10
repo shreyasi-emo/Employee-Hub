@@ -8,6 +8,7 @@ import { registerAuthRoutes } from "../modules/auth/auth.routes";
 import { registerEmployeeRoutes } from "../modules/employees/employees.routes";
 import { registerAttendanceRoutes } from "../modules/attendance/attendance.routes";
 import { registerLeaveRoutes } from "../modules/leave/leave.routes";
+import { registerProfileEditRoutes } from "../modules/profile-edit/profile-edit.routes";
 import { registerHolidayRoutes } from "../modules/holidays/holidays.routes";
 import { registerAnnouncementRoutes } from "../modules/announcements/announcements.routes";
 import { registerAuditRoutes } from "../modules/audit/audit.routes";
@@ -35,6 +36,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   registerEmployeeRoutes(app);
   registerAttendanceRoutes(app);
   registerLeaveRoutes(app);
+  registerProfileEditRoutes(app);
   registerHolidayRoutes(app);
   registerAnnouncementRoutes(app);
   registerAuditRoutes(app);
