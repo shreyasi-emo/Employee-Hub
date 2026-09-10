@@ -96,8 +96,10 @@ The role enum gained one new value: **`logistics`**. Assign this to the logistic
 members so they see the logistics queue and can accept/dispatch movements.
 
 Existing roles are unchanged: `super_admin`, `hr_admin`, `hr_executive`, `finance`,
-`manager`, `employee`, `recruiter`, `hr_ops`, `office_admin`, `ceo_approver`,
-`interviewer`.
+`manager`, `employee`, `hr_ops`, `ceo_approver`.
+
+(`recruiter`, `interviewer` and `office_admin` are retired — kept in the DB enum only, not
+assignable and grant no access. Recruiting/interviewing is handled by HR via the ATS.)
 
 ---
 

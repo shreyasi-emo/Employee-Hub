@@ -61,7 +61,7 @@ rule → `lib/`.
 | Team Requests | `/team-requests` | [features/company-workspace/pages/team-requests-page](features/company-workspace/pages/team-requests-page.tsx) | 7 roles |
 | Vehicles | `/vehicles` | [features/vehicles/pages/vehicles-page](features/vehicles/pages/vehicles-page.tsx) | Everyone (12 roles) |
 | CEO Inbox | `/workspace/approvals` | [features/company-workspace/pages/my-approvals-page](features/company-workspace/pages/my-approvals-page.tsx) | super_admin |
-| ATS / Recruitment | `/workspace/ats` | [features/hr-workspace/pages/ats-page](features/hr-workspace/pages/ats-page.tsx) | super_admin, hr_admin, hr_executive, recruiter, hr_ops |
+| ATS / Recruitment | `/workspace/ats` | [features/hr-workspace/pages/ats-page](features/hr-workspace/pages/ats-page.tsx) | super_admin, hr_admin, hr_executive, hr_ops |
 | HR Ops | `/workspace/hr-ops` | [features/hr-workspace/pages/hr-ops-page](features/hr-workspace/pages/hr-ops-page.tsx) | super_admin, hr_admin, hr_executive, hr_ops |
 | Office Admin | `/workspace/office` | [features/hr-workspace/pages/office-admin-page](features/hr-workspace/pages/office-admin-page.tsx) | super_admin, hr_admin, office_admin |
 

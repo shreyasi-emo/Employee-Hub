@@ -21,6 +21,8 @@ import { ReimbursementApprovalModal, exportReimbursement } from "@/features/comp
 import { ChevronLeft, Check, X, ChevronRight, CalendarClock, FileText, IndianRupee, MoreVertical, Eye, Download, Maximize2, ArrowDownUp, Building2, Clock, MousePointerClick, CheckSquare } from "lucide-react";
 import { format } from "date-fns";
 import { statusClass, statusLabel } from "@/lib/status";
+import { relDate, isJustUpdated } from "@/lib/format";
+import { StageHeader } from "./stage-header";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // Premium card-based reimbursement approvals list. Finance = individual; CEO = + bulk.
@@ -35,7 +37,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
   const [range, setRange] = useState<{ from?: Date; to?: Date }>({});
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [catFilter, setCatFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("date_desc");
+  const [sortBy, setSortBy] = useState("updated_desc");
   const [view, setView] = useState<"card" | "table">("card");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -93,6 +95,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
   const sorted = useMemo(() => {
     const s = [...filtered];
     s.sort((a, b) => {
+      if (sortBy === "updated_desc") return +new Date(b.updatedAt || b.createdAt || 0) - +new Date(a.updatedAt || a.createdAt || 0);
       if (sortBy === "amount_desc") return Number(b.totalAmount) - Number(a.totalAmount);
       if (sortBy === "amount_asc") return Number(a.totalAmount) - Number(b.totalAmount);
       const da = +new Date(a.createdAt || 0), db = +new Date(b.createdAt || 0);
@@ -101,9 +104,28 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
     return s;
   }, [filtered, sortBy]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / REIMB_PAGE_SIZE));
+  // Pending is stage-grouped and shown whole (no paging); Completed stays a paginated flat list.
+  const grouped = phase === "pending";
+  const totalPages = grouped ? 1 : Math.max(1, Math.ceil(sorted.length / REIMB_PAGE_SIZE));
   const curPage = Math.min(page, totalPages);
-  const pageItems = sorted.slice((curPage - 1) * REIMB_PAGE_SIZE, curPage * REIMB_PAGE_SIZE);
+  const pageItems = grouped ? sorted : sorted.slice((curPage - 1) * REIMB_PAGE_SIZE, curPage * REIMB_PAGE_SIZE);
+  // Pending stage groups — one label per approver stage; a single-role queue naturally shows just one.
+  const PENDING_STAGES: { title: string; has: (s: string) => boolean; tone?: "alert" }[] = [
+    { title: "Changes requested", has: (s) => s === "under_review", tone: "alert" },
+    { title: "Awaiting finance", has: (s) => s === "submitted" },
+    { title: "Awaiting CEO", has: (s) => s === "finance_approved" },
+  ];
+  const stageGroups = (rows: any[]) => {
+    const seen = new Set<string>();
+    const groups = PENDING_STAGES.map((st) => {
+      const gi = rows.filter((r) => st.has(r.status));
+      gi.forEach((r) => seen.add(r.id));
+      return { ...st, items: gi };
+    }).filter((g) => g.items.length > 0);
+    const rest = rows.filter((r) => !seen.has(r.id));
+    if (rest.length) groups.push({ title: "In progress", has: () => true, items: rest } as any);
+    return groups;
+  };
   const allSelected = sorted.length > 0 && sorted.every((i) => sel.has(i.id));
   const selectedTotal = items.filter((i) => sel.has(i.id)).reduce((s, i) => s + Number(i.totalAmount || 0), 0);
   const toggleAll = () => setSel(allSelected ? new Set() : new Set(sorted.map((i) => i.id)));
@@ -157,6 +179,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="h-9 w-[160px] text-xs flex-shrink-0" data-testid="sort-reimb"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
           <SelectContent>
+            <SelectItem value="updated_desc">Recently updated</SelectItem>
             <SelectItem value="date_desc">Newest first</SelectItem>
             <SelectItem value="date_asc">Oldest first</SelectItem>
             <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
@@ -182,54 +205,44 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
     />
   );
 
-  const bodyNode = (
-    <>
-      {/* ===== Table view (either phase) ===== */}
-      {view === "table" && (
-        sorted.length === 0 ? (
-          <div className="card-surface rounded-2xl p-10 text-center text-sm text-muted-foreground">{phase === "pending" ? "No reimbursements awaiting your approval" : "No completed reimbursements"}{range.from || range.to ? " in this date range" : ""}.</div>
-        ) : (
-          <div className="card-surface rounded-2xl">
-            <DataTable
-              columns={[
-                ...(allowBulk && selectionMode ? [{ key: "__sel", header: "", render: (r: any) => <div onClick={(e) => e.stopPropagation()}><Checkbox checked={sel.has(r.id)} onCheckedChange={() => toggle(r.id)} data-testid={`select-reimb-row-${r.id}`} /></div> }] : []),
-                { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground" },
-                { key: "requester", header: "Requester", render: (r: any) => <span className="text-foreground">{r.employeeName || "—"}<span className="text-muted-foreground"> ({r.employeeCode || "—"})</span></span> },
-                { key: "category", header: "Category", cellClassName: "text-muted-foreground capitalize", render: (r: any) => r.category || "—" },
-                { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (r: any) => money(r.totalAmount) },
-                { key: "submitted", header: "Submitted", cellClassName: "text-muted-foreground", render: (r: any) => r.createdAt ? format(new Date(r.createdAt), "dd MMM yyyy") : "—" },
-                { key: "decision", header: "Decision Date", cellClassName: "text-muted-foreground", render: (r: any) => r.updatedAt ? format(new Date(r.updatedAt), "dd MMM yyyy") : "—" },
-                { key: "status", header: "Status", render: (r: any) => <Badge className={`text-xs ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge> },
-                { key: "approvedBy", header: "Approved By", cellClassName: "text-muted-foreground", render: (r: any) => approvedByName(r) },
-                { key: "__view", header: "View", align: "center", render: (r: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); openDetail(r); }} data-testid={`view-completed-${r.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Button> },
-              ]}
-              rows={pageItems}
-              getRowKey={(r: any) => r.id}
-              onRowClick={(r: any) => (selectionMode ? toggle(r.id) : openDetail(r))}
-              testIdPrefix="completed-reimb"
-              paginate={false}
-            />
-          </div>
-        )
-      )}
+  // Table columns — shared by the flat (Completed) and stage-grouped (pending) table renders.
+  const reimbCols = [
+    ...(allowBulk && selectionMode ? [{ key: "__sel", header: "", render: (r: any) => <div onClick={(e) => e.stopPropagation()}><Checkbox checked={sel.has(r.id)} onCheckedChange={() => toggle(r.id)} data-testid={`select-reimb-row-${r.id}`} /></div> }] : []),
+    { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground" },
+    { key: "requester", header: "Requester", render: (r: any) => <span className="text-foreground">{r.employeeName || "—"}<span className="text-muted-foreground"> ({r.employeeCode || "—"})</span></span> },
+    { key: "category", header: "Category", cellClassName: "text-muted-foreground capitalize", render: (r: any) => r.category || "—" },
+    { key: "amount", header: "Amount", align: "right" as const, cellClassName: "font-semibold text-foreground", render: (r: any) => money(r.totalAmount) },
+    { key: "submitted", header: "Submitted", cellClassName: "text-muted-foreground", render: (r: any) => r.createdAt ? format(new Date(r.createdAt), "dd MMM yyyy") : "—" },
+    { key: "decision", header: "Decision Date", cellClassName: "text-muted-foreground", render: (r: any) => r.updatedAt ? format(new Date(r.updatedAt), "dd MMM yyyy") : "—" },
+    { key: "status", header: "Status", render: (r: any) => <Badge className={`text-xs ${statusClass(r.status)}`}>{statusLabel(r.status)}</Badge> },
+    { key: "approvedBy", header: "Approved By", cellClassName: "text-muted-foreground", render: (r: any) => approvedByName(r) },
+    { key: "__view", header: "View", align: "center" as const, render: (r: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); openDetail(r); }} data-testid={`view-completed-${r.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> View</Button> },
+  ];
+  const reimbTable = (rows: any[], serialStart = 1) => (
+    <div className="card-surface rounded-2xl">
+      <DataTable columns={reimbCols} rows={rows} getRowKey={(r: any) => r.id} onRowClick={(r: any) => (selectionMode ? toggle(r.id) : openDetail(r))} testIdPrefix="completed-reimb" paginate={false} showSerial serialStart={serialStart} />
+    </div>
+  );
+  const emptyState = (kind: "card" | "table") => {
+    const msg = `${phase === "pending" ? "No reimbursements awaiting your approval" : "No completed reimbursements"}${range.from || range.to ? " in this date range" : ""}.`;
+    return kind === "table"
+      ? <div className="card-surface rounded-2xl p-10 text-center text-sm text-muted-foreground">{msg}</div>
+      : <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{msg}</p></div>;
+  };
 
-      {/* ===== Card view (either phase) ===== */}
-      {view === "card" && (
-        sorted.length === 0 ? (
-          <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{phase === "pending" ? "No reimbursements awaiting your approval" : "No completed reimbursements"}{range.from || range.to ? " in this date range" : ""}.</p></div>
-        ) : (
-      <div className="space-y-3">
-        {pageItems.map((r: any) => {
+  // A reimbursement card by id — reused for the flat list (Completed) and inside each pending stage group.
+  const reimbCard = (r: any) => {
           const amt = Number(r.totalAmount || 0);
           const pr = reimbPriority(amt);
           // Mobile: compact card — reference + category, amount + priority, employee | HOD, purpose, View.
           if (isMobile) {
             return (
-              <div key={r.id} data-testid={`appr-reimb-${r.id}`} className={`card-surface card-hover relative p-3 cursor-pointer ${selectionMode && sel.has(r.id) ? "ring-2 ring-[#206295]" : ""}`} onClick={() => (selectionMode ? toggle(r.id) : openDetail(r))}>
+              <div key={r.id} data-testid={`appr-reimb-${r.id}`} className={`card-surface card-hover relative p-3 cursor-pointer ${selectionMode && sel.has(r.id) ? "ring-2 ring-[#206295]" : isJustUpdated(r.updatedAt) ? "ring-1 ring-[#4BDCD9]/70" : ""}`} onClick={() => (selectionMode ? toggle(r.id) : openDetail(r))}>
                 <div className="flex items-center gap-2">
                   {allowBulk && selectionMode && <Checkbox checked={sel.has(r.id)} onClick={(e: any) => e.stopPropagation()} onCheckedChange={() => toggle(r.id)} className="flex-shrink-0" data-testid={`select-reimb-${r.id}`} />}
                   <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                   <span className="text-[13px] font-semibold text-foreground truncate flex-1">{r.reference}</span>
+                  <span className="text-[10px] text-muted-foreground flex-shrink-0">{relDate(r.updatedAt || r.createdAt)}</span>
                   <Badge className="text-[10px] px-2 py-0.5 capitalize flex-shrink-0" style={catStyle(r.category || "other")}>{r.category || "—"}</Badge>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-1.5">
@@ -250,7 +263,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
           }
           return (
             <div key={r.id} data-testid={`appr-reimb-${r.id}`}
-              className={`group card-surface card-hover relative p-6 cursor-pointer ${selectionMode && sel.has(r.id) ? "ring-2 ring-[#206295]" : ""}`}
+              className={`group card-surface card-hover relative p-6 cursor-pointer ${selectionMode && sel.has(r.id) ? "ring-2 ring-[#206295]" : isJustUpdated(r.updatedAt) ? "ring-1 ring-[#4BDCD9]/70" : ""}`}
               onClick={() => (selectionMode ? toggle(r.id) : openDetail(r))}>
               {/* Overflow menu — top-right corner (hidden in selection mode) */}
               {!selectionMode && (
@@ -353,8 +366,39 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
               </div>
             </div>
           );
-        })}
-      </div>
+  };
+
+  const bodyNode = (
+    <>
+      {/* ===== Table view ===== */}
+      {view === "table" && (
+        sorted.length === 0 ? emptyState("table")
+        : grouped ? (
+          <div className="space-y-6">
+            {stageGroups(sorted).map((g) => (
+              <div key={g.title} className="space-y-2.5">
+                <StageHeader label={g.title} count={g.items.length} tone={g.tone} />
+                {reimbTable(g.items)}
+              </div>
+            ))}
+          </div>
+        ) : reimbTable(pageItems, (curPage - 1) * REIMB_PAGE_SIZE + 1)
+      )}
+
+      {/* ===== Card view ===== */}
+      {view === "card" && (
+        sorted.length === 0 ? emptyState("card")
+        : grouped ? (
+          <div className="space-y-6">
+            {stageGroups(sorted).map((g) => (
+              <div key={g.title} className="space-y-3">
+                <StageHeader label={g.title} count={g.items.length} tone={g.tone} />
+                <div className="space-y-3">{g.items.map(reimbCard)}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">{pageItems.map(reimbCard)}</div>
         )
       )}
     </>
@@ -374,7 +418,7 @@ export function ReimbApprovals({ items, allItems = [], nameByUser = {}, allowBul
     return (
       <>
         <ApprovalModal open={open} onClose={() => onClose?.()} icon={FileText} title="Reimbursement approvals" count={items.length} toolbar={toolbarNode} footer={footerNode}>
-          {bodyNode}
+          <div className="space-y-4">{bodyNode}</div>
         </ApprovalModal>
         {detailNode}
       </>

@@ -46,10 +46,11 @@ export const subOf = (type: string, it: any): string =>
 export const searchText = (type: string, it: any): string =>
   [titleOf(type, it), subOf(type, it), it.status, it.reference].filter(Boolean).join(" ").toLowerCase();
 
-// First item's description as a compact headline, e.g. "Mouse +1 more" (mirrors the office/procurement card title).
+// Item names as a compact headline, e.g. "Mouse, Keyboard, Cable" (mirrors the office/procurement card title).
+// Lists the actual descriptions (truncated by the cell) rather than the vague "first item +N more".
 export const itemsHeadline = (items: any[]): string => {
-  const l = Array.isArray(items) ? items : [];
-  return l.length ? `${l[0]?.description || "Item"}${l.length > 1 ? ` +${l.length - 1} more` : ""}` : "—";
+  const names = (Array.isArray(items) ? items : []).map((i: any) => i?.description).filter(Boolean);
+  return names.length ? names.join(", ") : "—";
 };
 
 export const purposeOf = (type: string, it: any): string =>

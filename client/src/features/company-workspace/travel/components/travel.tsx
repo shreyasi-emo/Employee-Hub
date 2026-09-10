@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { statusClass, statusLabel } from "@/lib/status";
-import { money } from "@/lib/format";
+import { money, relDate, isJustUpdated } from "@/lib/format";
+import { StageHeader } from "@/features/company-workspace/components/stage-header";
 import { format } from "date-fns";
 import { Plane, Hotel, Bus, Train, Car, ChevronRight, ChevronLeft, Check, CircleCheck, X, MessageSquare, User, CalendarClock, MapPin, ArrowLeftRight, MoveRight, Repeat, Users as UsersIcon, Clock, Eye, CheckSquare, MousePointerClick, ArrowDownUp } from "lucide-react";
 import { ApprovalCard } from "@/features/company-workspace/components/approval-card";
@@ -30,6 +31,21 @@ import { RequestDialog } from "@/components/shared/request-dialog";
 import { clampEnd } from "@/lib/date-range";
 
 const invalidateTravel = (qc: ReturnType<typeof useQueryClient>) => qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/travel") });
+// HR-books-on-behalf auto-book rule, mirrored on the client for a live preview (backend is the source of truth):
+// a trip books directly only when it starts within 24h AND costs under ₹10k — otherwise it goes to the CEO.
+const AUTO_BOOK_CEILING = 10000;
+const tripStartOf = (cat: string, d: any) => cat === "flight" ? d?.departDate : cat === "stay" ? d?.checkIn : String(d?.dateTime || "").slice(0, 10);
+const startsWithin24h = (s?: string) => {
+  if (!s) return false;
+  const start = new Date(`${String(s).slice(0, 10)}T00:00:00`);
+  if (isNaN(start.getTime())) return false;
+  // "Today" in IST, matching the server, so the preview can't disagree with the actual decision.
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const sd = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const td = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const diff = Math.round((sd - td) / 86400000);
+  return diff === 0 || diff === 1;
+};
 // A trip is "resubmitted" when the latest query/resubmit marker in its thread is a resubmit (HR answered the CEO's query).
 const isResubmitted = (t: any) => { const m = ((t?.comments || []) as any[]).filter((c) => c.kind === "query" || c.kind === "resubmitted"); return m.length > 0 && m[m.length - 1].kind === "resubmitted"; };
 
@@ -95,7 +111,7 @@ const EMP_FIELDS: Record<string, F[]> = {
   ],
 };
 const HR_FIELDS: Record<string, F[]> = {
-  flight: [{ key: "airline", label: "Airline" }, { key: "flightNo", label: "Flight no." }, { key: "class", label: "Class", type: "select", options: ["Economy", "Premium", "Business"] }, { key: "departTime", label: "Departs" }, { key: "arrivalTime", label: "Arrives" }],
+  flight: [{ key: "airline", label: "Airline" }, { key: "flightNo", label: "Flight no." }, { key: "departTime", label: "Departs" }, { key: "arrivalTime", label: "Arrives" }, { key: "class", label: "Class", type: "select", options: ["Economy", "Premium", "Business"] }],
   stay: [{ key: "hotel", label: "Hotel" }, { key: "bookingRef", label: "Booking ref" }, { key: "ratePerNight", label: "Rate / night", type: "number" }, { key: "nights", label: "Nights", type: "number" }],
   transport: [{ key: "operator", label: "Operator" }, { key: "pnr", label: "PNR / ticket" }, { key: "timing", label: "Timing" }],
 };
@@ -125,6 +141,20 @@ function FieldRow({ f, value, min, onChange }: { f: F; value: any; min?: string;
   );
 }
 
+// HR booking fields in a 2-col grid; a lone last field spans the full width so nothing sits half-empty.
+function HrFieldsGrid({ category, values, onChange }: { category: string; values: any; onChange: (key: string, v: any) => void }) {
+  const fields = HR_FIELDS[category] || [];
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {fields.map((f, i) => (
+        <div key={f.key} className={i === fields.length - 1 && fields.length % 2 === 1 ? "col-span-2" : ""}>
+          <FieldRow f={f} value={values[f.key]} onChange={(v) => onChange(f.key, v)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Read-only summary grid of a details/hrDetails object using its field config.
 function SummaryGrid({ fields, data }: { fields: F[]; data: any }) {
   const shown = fields.filter((f) => data?.[f.key] !== undefined && data?.[f.key] !== "" && data?.[f.key] !== null && (!f.when || f.when(data)));
@@ -134,7 +164,7 @@ function SummaryGrid({ fields, data }: { fields: F[]; data: any }) {
       {shown.map((f) => (
         <div key={f.key} className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{f.label}</p>
-          <p className="text-sm font-semibold text-foreground mt-1 break-words capitalize">{f.type === "date" ? format(new Date(data[f.key]), "MMM d, yyyy") : String(data[f.key])}</p>
+          <p className="text-sm font-semibold text-foreground mt-1 break-words capitalize">{f.type === "date" ? format(new Date(data[f.key]), "d MMM yyyy") : String(data[f.key])}</p>
         </div>
       ))}
     </div>
@@ -159,30 +189,93 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { data: auth } = useAuth();
+  const canForOthers = canTravelHr(auth?.user?.role);   // HR / super_admin can raise + book for others
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState("flight");
   const [details, setDetails] = useState<any>({});
   const [purpose, setPurpose] = useState("");
-  const [coIds, setCoIds] = useState<string[]>([]);
+  const [coIds, setCoIds] = useState<string[]>([]);      // self mode: co-travellers | others mode: the travellers
+  const [forWhom, setForWhom] = useState<"self" | "others">("self");
+  const [amount, setAmount] = useState("");              // others mode only — HR prices while booking
+  const [hr, setHr] = useState<any>({});
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], enabled: open });
+  const bookable = employees.filter((e) => e.userId);    // must have an account to be a traveller/requester
 
   useEffect(() => {
     if (!open) return;
+    setForWhom("self"); setAmount(""); setHr({});   // drafts / catalog links are always personal
     if (initialData) { setCategory(initialData.category || "flight"); setDetails(initialData.details || {}); setPurpose(initialData.purpose || ""); setCoIds(initialData.coIds || []); setStep(1); }
     else if (initialCategory) { setCategory(initialCategory); setDetails(initialCategory === "flight" ? { tripType: "one-way" } : {}); setPurpose(""); setCoIds([]); setStep(1); }
   }, [open]);
-  const pick = (c: string) => { setCategory(c); setDetails(c === "flight" ? { tripType: "one-way" } : {}); setPurpose(""); setCoIds([]); setStep(1); };
-  const close = () => { setStep(0); setCategory("flight"); setDetails({}); setPurpose(""); setCoIds([]); onClose(); };
+  const pick = (c: string) => { setCategory(c); setDetails(c === "flight" ? { tripType: "one-way" } : {}); setPurpose(""); setCoIds([]); setHr({}); setStep(1); };
+  const close = () => { setStep(0); setCategory("flight"); setDetails({}); setPurpose(""); setCoIds([]); setForWhom("self"); setAmount(""); setHr({}); onClose(); };
 
+  const others = forWhom === "others";
   const fields = EMP_FIELDS[category] || [];
-  const valid = fields.filter((f) => !f.when || f.when(details)).every((f) => f.key === "returnDate" ? true : String(details[f.key] ?? "").trim());
+  const detailsValid = fields.filter((f) => !f.when || f.when(details)).every((f) => f.key === "returnDate" ? true : String(details[f.key] ?? "").trim());
+  // Travellers picked, resolved to accounts (the HR booker owns the trip; these are just the travellers).
+  const chosen = coIds.map((id) => employees.find((e) => e.id === id)).filter((e: any) => e && e.userId) as any[];
+  const valid = detailsValid && (!others || (chosen.length >= 1 && Number(amount) > 0));
+  const autoBook = startsWithin24h(tripStartOf(category, details)) && (Number(amount) || 0) < AUTO_BOOK_CEILING;
   const attendeesFromCo = () => employees.filter((e) => coIds.includes(e.id) && e.userId).map((e) => ({ userId: e.userId, name: `${e.firstName} ${e.lastName}`.trim() }));
 
   const submit = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/travel", { category, details, purpose: purpose.trim() || null, attendees: attendeesFromCo() }),
-    onSuccess: () => { invalidateTravel(qc); toast({ title: "Awaiting HR" }); onSubmitted?.(); close(); },
+    mutationFn: () => {
+      if (others) {
+        return apiRequest("POST", "/api/travel/on-behalf", {
+          category, details, purpose: purpose.trim() || null,
+          amount: Number(amount) || 0, hrDetails: hr,
+          travellers: chosen.map((e) => ({ userId: e.userId, name: `${e.firstName} ${e.lastName}`.trim() })),
+        });
+      }
+      return apiRequest("POST", "/api/travel", { category, details, purpose: purpose.trim() || null, attendees: attendeesFromCo() });
+    },
+    onSuccess: (created: any) => { invalidateTravel(qc); toast({ title: others ? (created?.status === "booked" ? "Booked" : "Sent for approval") : "Awaiting HR" }); onSubmitted?.(); close(); },
     onError: (e: any) => toast({ title: "Couldn't submit", description: e.message, variant: "destructive" }),
   });
+
+  // HR-only "Who is this for?" — self keeps the normal flow; someone-else swaps the co-traveller picker for a
+  // direct traveller multi-select (no implicit "you") and prices the trip inline.
+  const whoSection = (
+    <TravelSection icon={User} title="Who is this for?">
+      <div className="grid grid-cols-2 gap-3">
+        {([{ v: "self", label: "Myself", desc: "A trip for you", Icon: User }, { v: "others", label: "Someone else", desc: "Book on their behalf", Icon: UsersIcon }] as const).map(({ v, label, desc, Icon }) => {
+          const active = forWhom === v;
+          return (
+            <button key={v} type="button" onClick={() => { if (v !== forWhom) setCoIds([]); setForWhom(v); }} className={`rounded-2xl border p-3 flex items-center gap-3 text-left transition ${active ? "border-[#206295] bg-[#206295]/[0.06] ring-1 ring-[#206295]/40" : "border-border hover-elevate"}`} data-testid={`forwhom-${v}`}>
+              <span className={`h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-[#206295] text-white" : "bg-muted text-muted-foreground"}`}><Icon className="h-4 w-4" /></span>
+              <div className="min-w-0"><p className="text-sm font-semibold text-foreground leading-tight">{label}</p><p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p></div>
+            </button>
+          );
+        })}
+      </div>
+      {others && (
+        <div className="space-y-1.5">
+          <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Travellers</Label>
+          <EmployeePicker employees={bookable} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add travellers" modal />
+          {chosen.length > 0 && <p className="text-[11px] text-muted-foreground">{chosen.length} traveller{chosen.length !== 1 ? "s" : ""} on this booking.</p>}
+        </div>
+      )}
+    </TravelSection>
+  );
+
+  // Booking (someone-else only): HR prices + adds booking details. The trip books instantly when it's
+  // imminent AND under ₹10k; the ticket is attached to the trip afterwards (never here).
+  const bookingSection = (
+    <TravelSection icon={CircleCheck} title="Booking">
+      <div className="rounded-xl border border-[#206295]/30 bg-[#206295]/[0.05] p-3 space-y-3">
+        <div className="space-y-1"><Label className="text-[11px]">Amount (₹)</Label><Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className="h-9" placeholder="0" data-testid="travel-onbehalf-amount" /></div>
+        <HrFieldsGrid category={category} values={hr} onChange={(k, v) => setHr((h: any) => ({ ...h, [k]: v }))} />
+      </div>
+      {autoBook && (
+        <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] bg-[#4BDCD9]/15 text-[#0E7C7B]">
+          <Check className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>Books instantly — attach the ticket to the trip afterwards.</span>
+        </div>
+      )}
+    </TravelSection>
+  );
 
   return (
     <RequestDialog
@@ -194,8 +287,8 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
       back={step === 1 ? <Button variant="ghost" onClick={() => setStep(0)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button> : undefined}
       footer={<>
         <Button variant="outline" onClick={close}>Cancel</Button>
-        {step === 1 && onSaveDraft && <Button variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft({ category, details, purpose, coIds }); close(); }}>Save as Draft</Button>}
-        {step === 1 && <Button className="btn-primary-gradient" disabled={!valid || submit.isPending} onClick={() => submit.mutate()} data-testid="travel-submit">{submit.isPending ? "Submitting…" : "Submit Request"}</Button>}
+        {step === 1 && !others && onSaveDraft && <Button variant="secondary" className="btn-glass text-[#206295]" onClick={() => { onSaveDraft({ category, details, purpose, coIds }); close(); }}>Save as Draft</Button>}
+        {step === 1 && <Button className="btn-primary-gradient" disabled={!valid || submit.isPending} onClick={() => submit.mutate()} data-testid="travel-submit">{submit.isPending ? "Submitting…" : others ? (autoBook ? "Book now" : "Send for approval") : "Submit Request"}</Button>}
       </>}
     >
       <div className="px-6 pb-4">
@@ -210,7 +303,10 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
               </button>
             ))}
           </div>
-        ) : category === "flight" ? (
+        ) : (
+          <div className="space-y-5">
+            {canForOthers && (<>{whoSection}<Separator /></>)}
+            {category === "flight" ? (
           <div className="space-y-5">
             <TravelSection icon={Plane} title="Trip Type">
               <div className="grid grid-cols-2 gap-3">
@@ -244,13 +340,15 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
               </div>
             </TravelSection>
             <Separator />
-            <TravelSection icon={UsersIcon} title="Purpose & People">
+            <TravelSection icon={UsersIcon} title={others ? "Purpose" : "Purpose & People"}>
               <div className="space-y-1"><Label className="text-[11px]">Purpose of travel</Label><Textarea rows={3} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for this trip…" className="resize-none" data-testid="flight-purpose" /></div>
-              <div className="space-y-1.5">
-                <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
-                <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
-                <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues travelling with you." : `${coIds.length + 1} passengers (including you)`}</p>
-              </div>
+              {!others && (
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
+                  <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
+                  <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues travelling with you." : `${coIds.length + 1} passengers (including you)`}</p>
+                </div>
+              )}
             </TravelSection>
           </div>
         ) : category === "stay" ? (
@@ -270,13 +368,15 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
               </div>
             </TravelSection>
             <Separator />
-            <TravelSection icon={UsersIcon} title="Purpose & People">
+            <TravelSection icon={UsersIcon} title={others ? "Purpose" : "Purpose & People"}>
               <div className="space-y-1"><Label className="text-[11px]">Purpose of travel</Label><Textarea rows={3} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for this stay…" className="resize-none" data-testid="stay-purpose" /></div>
-              <div className="space-y-1.5">
-                <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
-                <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
-                <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues staying with you." : `${coIds.length + 1} guests (including you)`}</p>
-              </div>
+              {!others && (
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
+                  <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
+                  <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues staying with you." : `${coIds.length + 1} guests (including you)`}</p>
+                </div>
+              )}
             </TravelSection>
           </div>
         ) : category === "transport" ? (
@@ -320,13 +420,15 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
               </div>
             </TravelSection>
             <Separator />
-            <TravelSection icon={UsersIcon} title="Purpose & People">
+            <TravelSection icon={UsersIcon} title={others ? "Purpose" : "Purpose & People"}>
               <div className="space-y-1"><Label className="text-[11px]">Purpose of travel</Label><Textarea rows={3} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for this trip…" className="resize-none" data-testid="transport-purpose" /></div>
-              <div className="space-y-1.5">
-                <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
-                <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
-                <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues travelling with you." : `${coIds.length + 1} travellers (including you)`}</p>
-              </div>
+              {!others && (
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers</Label>
+                  <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
+                  <p className="text-[11px] text-muted-foreground">{coIds.length === 0 ? "Just you so far — add colleagues travelling with you." : `${coIds.length + 1} travellers (including you)`}</p>
+                </div>
+              )}
             </TravelSection>
           </div>
         ) : (
@@ -339,10 +441,15 @@ export function NewTravelDialog({ open, onClose, initialCategory, onSaveDraft, i
               {fields.filter((f) => !f.when || f.when(details)).map((f) => <FieldRow key={f.key} f={f} value={details[f.key]} min={f.min?.(details)} onChange={(v) => setDetails((d: any) => { const next = { ...d, [f.key]: v }; for (const c of f.clears ?? []) next[c] = clampEnd(v, d[c]); return next; })} />)}
             </div>
             <div className="space-y-1"><Label className="text-[11px]">Purpose</Label><Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Business reason for travel" className="h-9" /></div>
-            <div className="space-y-1">
-              <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers (optional)</Label>
-              <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
-            </div>
+            {!others && (
+              <div className="space-y-1">
+                <Label className="text-[11px] flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Co-travellers (optional)</Label>
+                <EmployeePicker employees={employees} selectedIds={coIds} onChange={setCoIds} buttonLabel="Add co-travellers" modal />
+              </div>
+            )}
+          </div>
+        )}
+            {others && bookingSection}
           </div>
         )}
       </div>
@@ -383,10 +490,14 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner", scope
   const hrScope = canAct && scope !== "ceo" && canTravelHr(role);   // HR prices + books
   const ceoScope = canAct && scope !== "hr" && canTravelCeo(role);  // CEO approves/rejects/queries
   const isHrPrice = hrScope && ["pending_hr", "pending_approval", "under_review"].includes(t.status);
-  const isHrBook = hrScope && t.status === "approved";
+  const isHrBook = hrScope && ["approved", "booked"].includes(t.status);   // booked → HR can still attach/replace the ticket
   const isCeoDecision = ceoScope && ["pending_approval", "under_review"].includes(t.status);
   const amt = Number(t.amount) || 0;
   const route = t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "") : `${t.details?.from || "?"} → ${t.details?.to || "?"}`;
+  // Travellers (attendees). Shown whenever they add info beyond the requester — i.e. a group, or an
+  // HR-booked trip where the owner (HR) isn't travelling.
+  const travellers = ((t.attendees || []) as any[]).filter((a) => a?.userId);
+  const showTravellers = travellers.length > 0 && !(travellers.length === 1 && travellers[0].userId === t.requesterId);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -405,9 +516,18 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner", scope
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2"><p className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5"><User className="h-3 w-3" /> Requester</p><p className="text-sm font-semibold text-foreground mt-1 break-words">{t.employeeName || "Employee"}</p></div>
             <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2"><p className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {t.category === "stay" ? "Location" : "Route"}</p><p className="text-sm font-semibold text-foreground mt-1 break-words">{route}</p></div>
-            <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2"><p className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5"><CalendarClock className="h-3 w-3" /> Dates</p><p className="text-sm font-semibold text-foreground mt-1 break-words">{t.startDate ? format(new Date(t.startDate), "MMM d") : "—"}{t.endDate && t.endDate !== t.startDate ? ` – ${format(new Date(t.endDate), "MMM d")}` : ""}</p></div>
+            <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2"><p className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5"><CalendarClock className="h-3 w-3" /> Dates</p><p className="text-sm font-semibold text-foreground mt-1 break-words">{t.startDate ? format(new Date(t.startDate), "d MMM") : "—"}{t.endDate && t.endDate !== t.startDate ? ` – ${format(new Date(t.endDate), "d MMM")}` : ""}</p></div>
           </div>
           {t.purpose && <div className="rounded-xl bg-muted/40 px-3 py-2.5"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Purpose</p><p className="text-sm text-foreground/90 mt-0.5 break-words">{t.purpose}</p></div>}
+
+          {showTravellers && (
+            <div>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Travellers</p>
+              <div className="flex flex-wrap gap-2">
+                {travellers.map((a) => <span key={a.userId} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground"><User className="h-3 w-3 text-muted-foreground flex-shrink-0" />{a.name || "Traveller"}</span>)}
+              </div>
+            </div>
+          )}
 
           <div><p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Trip details</p><SummaryGrid fields={EMP_FIELDS[t.category] || []} data={t.details} /></div>
 
@@ -429,14 +549,14 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner", scope
           {isHrPrice && (
             <div className="rounded-xl border border-[#206295]/30 bg-[#206295]/[0.05] p-3 space-y-3">
               <div className="space-y-1"><Label className="text-[11px]">Amount (₹)</Label><Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className="h-9" placeholder="0" /></div>
-              <div className="grid grid-cols-2 gap-2">{(HR_FIELDS[t.category] || []).map((f) => <FieldRow key={f.key} f={f} value={hr[f.key]} onChange={(v) => setHr((h: any) => ({ ...h, [f.key]: v }))} />)}</div>
+              <HrFieldsGrid category={t.category} values={hr} onChange={(k, v) => setHr((h: any) => ({ ...h, [k]: v }))} />
               <p className="text-[11px] text-muted-foreground">Trips within 24h are auto-approved; otherwise this goes to the CEO.</p>
             </div>
           )}
           {/* HR: book */}
           {isHrBook && (
             <div className="rounded-xl border border-[#206295]/30 bg-[#206295]/[0.05] p-3 space-y-3">
-              <div className="grid grid-cols-2 gap-2">{(HR_FIELDS[t.category] || []).map((f) => <FieldRow key={f.key} f={f} value={hr[f.key]} onChange={(v) => setHr((h: any) => ({ ...h, [f.key]: v }))} />)}</div>
+              <HrFieldsGrid category={t.category} values={hr} onChange={(k, v) => setHr((h: any) => ({ ...h, [k]: v }))} />
               <div className="space-y-1"><Label className="text-[11px]">Ticket / voucher (sent to the traveller)</Label><FileUpload value={doc} onChange={setDoc} label="Upload document" /></div>
             </div>
           )}
@@ -454,7 +574,7 @@ export function TravelDetailDialog({ id, open, onClose, context = "owner", scope
               <Button variant="outline" className="text-[#C4402F] border-[#FF6F62]/40" disabled={act.isPending || !note.trim()} onClick={() => act.mutate({ path: "query", body: { body: note } })}><MessageSquare className="h-4 w-4 mr-1.5" /> Raise Query</Button>
               <Button className="btn-primary-gradient" disabled={act.isPending} onClick={() => act.mutate({ path: "approve", body: { note } })}><CircleCheck className="h-4 w-4 mr-1.5" /> Approve</Button>
             </>}
-            {isHrBook && <Button className="btn-primary-gradient" disabled={act.isPending} onClick={() => act.mutate({ path: "book", body: { hrDetails: hr, document: doc } })}><Check className="h-4 w-4 mr-1.5" /> Mark booked</Button>}
+            {isHrBook && <Button className="btn-primary-gradient" disabled={act.isPending} onClick={() => act.mutate({ path: "book", body: { hrDetails: hr, document: doc } })}><Check className="h-4 w-4 mr-1.5" /> {t.status === "booked" ? "Save ticket" : "Mark booked"}</Button>}
           </div>
         )}
       </DialogContent>
@@ -471,13 +591,24 @@ export function TravelApprovals({ scope = "hr", open = true, onClose }: { scope?
   const [selectionMode, setSelectionMode] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [catFilter, setCatFilter] = useState<"all" | "flight" | "stay" | "transport">("all");
-  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "amount">("newest");
+  const [sortBy, setSortBy] = useState<"updated" | "newest" | "oldest" | "amount">("updated");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [view, setView] = useState<"card" | "table">("card");
   const { data: all = [] } = useQuery<any[]>({ queryKey: ["/api/travel"] });
   // CEO surface reviews (approve/reject/query); HR surface prices + books. Scope keeps them separate for super_admin.
   const pendingStatuses = scope === "ceo" ? ["pending_approval", "under_review"] : ["pending_hr", "approved", "under_review"];
+  // Pending is split into stage groups, most-actionable first — the same groups drive both card and table views.
+  const PENDING_STAGES: { title: string; has: (s: string) => boolean; tone?: "alert"; icon?: any }[] = scope === "ceo"
+    ? [
+        { title: "Awaiting approval", has: (s) => s === "pending_approval" },
+        { title: "Query raised", has: (s) => s === "under_review", tone: "alert", icon: MessageSquare },
+      ]
+    : [
+        { title: "Query from CEO", has: (s) => s === "under_review", tone: "alert", icon: MessageSquare },
+        { title: "Needs pricing", has: (s) => s === "pending_hr" },
+        { title: "Ready to book", has: (s) => s === "approved" },
+      ];
   const list = (all as any[])
     .filter((t) => {
       if (phase === "booked") return t.status === "booked";
@@ -488,13 +619,16 @@ export function TravelApprovals({ scope = "hr", open = true, onClose }: { scope?
     .filter((t) => { const qq = search.trim().toLowerCase(); return !qq || `${t.reference || ""} ${t.employeeName || ""} ${t.employeeCode || ""} ${t.category || ""} ${t.details?.city || ""} ${t.details?.toCity || ""} ${t.details?.fromCity || ""} ${t.details?.to || ""} ${t.details?.from || ""}`.toLowerCase().includes(qq); })
     .sort((a, b) => {
       if (sortBy === "amount") return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+      if (sortBy === "updated") return +new Date(b.updatedAt || b.createdAt || 0) - +new Date(a.updatedAt || a.createdAt || 0);
       const da = +new Date(a.createdAt || 0), db = +new Date(b.createdAt || 0);
       return sortBy === "oldest" ? da - db : db - da;
     });
   const PAGE_SIZE = 8;
-  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  // Pending is stage-grouped and shown whole (no paging); booked/completed stay paginated flat lists.
+  const grouped = phase === "pending";
+  const totalPages = grouped ? 1 : Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const curPage = Math.min(page, totalPages);
-  const paged = list.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
+  const paged = grouped ? list : list.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
 
   // CEO bulk decision — the travel API decides one trip at a time, so bulk loops the per-trip endpoints.
   const bulkApprove = useMutation({
@@ -516,10 +650,27 @@ export function TravelApprovals({ scope = "hr", open = true, onClose }: { scope?
   const listTotal = list.reduce((s, t) => s + (Number(t.amount) || 0), 0);
   const allFilteredIds = list.map((t) => t.id);
 
+  // Split the current (already filtered + sorted) pending list into its stage groups; unmatched → trailing bucket.
+  const stageGroups = (rows: any[]) => {
+    const seen = new Set<string>();
+    const groups = PENDING_STAGES.map((st) => {
+      const items = rows.filter((t) => st.has(t.status));
+      items.forEach((t) => seen.add(t.id));
+      return { ...st, items };
+    }).filter((g) => g.items.length > 0);
+    const rest = rows.filter((t) => !seen.has(t.id));
+    if (rest.length) groups.push({ title: "In progress", has: () => true, items: rest } as any);
+    return groups;
+  };
+
   const renderCard = (t: any) => {
     const cat = TRAVEL_CATS[t.category] || TRAVEL_CATS.flight;
     const amt = Number(t.amount) || 0;
     const route = t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "") : `${t.details?.from || "?"} → ${t.details?.to || "?"}`;
+    // Show who's actually travelling when it adds info beyond the requester (a group, or an HR-booked trip).
+    const travs = ((t.attendees || []) as any[]).filter((a: any) => a?.userId);
+    const showTravs = travs.length > 1 || (travs.length > 0 && !travs.some((a: any) => a.userId === t.requesterId));
+    const travNames = travs.map((a: any) => a?.name).filter(Boolean).join(", ");
     return (
       <ApprovalCard
         key={t.id}
@@ -528,13 +679,17 @@ export function TravelApprovals({ scope = "hr", open = true, onClose }: { scope?
         reference={t.reference}
         badge={<Badge className="text-[10px] px-2 py-0.5 capitalize" style={{ backgroundColor: `${cat.tint}1a`, color: cat.tint }}>{cat.label}</Badge>}
         resubmitted={isResubmitted(t)}
+        recent={isJustUpdated(t.updatedAt)}
         amount={amt}
         amountFallback="Not priced yet"
         requesterName={t.employeeName || "Employee"}
         requesterCode={t.employeeCode}
-        facts={t.purpose ? [{ label: "Purpose", value: t.purpose, muted: true, truncate: true }] : []}
+        facts={[
+          ...(showTravs && travNames ? [{ label: "Travellers", value: travNames, truncate: true }] : []),
+          ...(t.purpose ? [{ label: "Purpose", value: t.purpose, muted: true, truncate: true }] : []),
+        ]}
         meta={[
-          { icon: CalendarClock, label: "Submitted", value: t.createdAt ? format(new Date(t.createdAt), "dd MMM yyyy") : "—", width: "w-[120px]" },
+          { icon: CalendarClock, label: "Updated", value: relDate(t.updatedAt || t.createdAt), width: "w-[120px]" },
           { icon: MapPin, label: t.category === "stay" ? "Location" : "Route", value: route || "—", width: "w-[150px]" },
           { icon: Clock, label: "Status", badge: <Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge>, width: "w-[130px]" },
         ]}
@@ -552,10 +707,15 @@ export function TravelApprovals({ scope = "hr", open = true, onClose }: { scope?
   const travelCols = [
     ...(scope === "ceo" && selectionMode ? [{ key: "__sel", header: "", render: (t: any) => <div onClick={(e) => e.stopPropagation()}><Checkbox checked={sel.has(t.id)} onCheckedChange={() => toggleSel(t.id)} /></div> }] : []),
     { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (t: any) => t.reference },
-    { key: "requester", header: "Requester", render: (t: any) => <span className="text-foreground">{t.employeeName || "—"}<span className="text-muted-foreground"> ({t.employeeCode || "—"})</span></span> },
+    { key: "requester", header: "Requester", render: (t: any) => {
+      const travs = ((t.attendees || []) as any[]).filter((a: any) => a?.userId);
+      const showTravs = travs.length > 1 || (travs.length > 0 && !travs.some((a: any) => a.userId === t.requesterId));
+      const names = travs.map((a: any) => a?.name).filter(Boolean).join(", ");
+      return <div className="min-w-0"><span className="text-foreground">{t.employeeName || "—"}<span className="text-muted-foreground"> ({t.employeeCode || "—"})</span></span>{showTravs && names && <div className="text-[11px] text-muted-foreground truncate">Travellers: {names}</div>}</div>;
+    } },
     { key: "category", header: "Category", cellClassName: "capitalize text-muted-foreground", render: (t: any) => (TRAVEL_CATS[t.category] || TRAVEL_CATS.flight).label },
     { key: "route", header: "Route", cellClassName: "text-muted-foreground", render: (t: any) => t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "—") : `${t.details?.from || "?"} → ${t.details?.to || "?"}` },
-    { key: "date", header: "Submitted", cellClassName: "text-muted-foreground", render: (t: any) => t.createdAt ? format(new Date(t.createdAt), "dd MMM yyyy") : "—" },
+    { key: "date", header: "Updated", cellClassName: "text-muted-foreground", render: (t: any) => relDate(t.updatedAt || t.createdAt) },
     { key: "amount", header: "Amount", align: "right" as const, cellClassName: "font-semibold text-foreground", render: (t: any) => { const a = Number(t.amount) || 0; return a > 0 ? money(a) : "—"; } },
     { key: "status", header: "Status", render: (t: any) => <Badge className={`text-xs ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge> },
   ];
@@ -587,6 +747,7 @@ export function TravelApprovals({ scope = "hr", open = true, onClose }: { scope?
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
           <SelectTrigger className="h-9 w-[160px] text-xs flex-shrink-0" data-testid="travel-sort"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
           <SelectContent>
+            <SelectItem value="updated">Recently updated</SelectItem>
             <SelectItem value="newest">Newest first</SelectItem>
             <SelectItem value="oldest">Oldest first</SelectItem>
             <SelectItem value="amount">Amount: High → Low</SelectItem>
@@ -600,12 +761,39 @@ export function TravelApprovals({ scope = "hr", open = true, onClose }: { scope?
     />
   );
 
+  const rowClick = (t: any) => { if (scope === "ceo" && selectionMode) toggleSel(t.id); else setDetailId(t.id); };
+  const emptyBlock = <div className="card-surface rounded-2xl py-10 text-center"><Check className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" /><p className="text-sm text-muted-foreground">Nothing here.</p></div>;
   const body = view === "table" ? (
-    <div className="card-surface rounded-2xl overflow-hidden">
-      <DataTable columns={travelCols} rows={paged} getRowKey={(t: any) => t.id} paginate={false} emptyText="Nothing here." onRowClick={(t: any) => { if (scope === "ceo" && selectionMode) toggleSel(t.id); else setDetailId(t.id); }} testIdPrefix="travel" />
+    grouped ? (
+      // Table, pending: one table per stage under a full-width stage header (mirrors the cards).
+      paged.length === 0 ? emptyBlock : (
+        <div className="space-y-6">
+          {stageGroups(paged).map((g) => (
+            <div key={g.title} className="space-y-2.5">
+              <StageHeader label={g.title} count={g.items.length} tone={g.tone} icon={g.icon} />
+              <div className="card-surface rounded-2xl overflow-hidden">
+                <DataTable columns={travelCols} rows={g.items} getRowKey={(t: any) => t.id} paginate={false} emptyText="Nothing here." onRowClick={rowClick} testIdPrefix="travel" showSerial />
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    ) : (
+      <div className="card-surface rounded-2xl overflow-hidden">
+        <DataTable columns={travelCols} rows={paged} getRowKey={(t: any) => t.id} paginate={false} emptyText="Nothing here." onRowClick={rowClick} testIdPrefix="travel" showSerial serialStart={(curPage - 1) * PAGE_SIZE + 1} />
+      </div>
+    )
+  ) : paged.length === 0 ? emptyBlock
+  : grouped ? (
+    // Cards, pending: grouped by stage.
+    <div className="space-y-6">
+      {stageGroups(paged).map((g) => (
+        <div key={g.title} className="space-y-3">
+          <StageHeader label={g.title} count={g.items.length} tone={g.tone} icon={g.icon} />
+          <div className="space-y-3">{g.items.map(renderCard)}</div>
+        </div>
+      ))}
     </div>
-  ) : paged.length === 0 ? (
-    <div className="card-surface rounded-2xl py-10 text-center"><Check className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" /><p className="text-sm text-muted-foreground">Nothing here.</p></div>
   ) : (
     <div className="space-y-3">{paged.map(renderCard)}</div>
   );
@@ -633,7 +821,7 @@ export function TravelApprovals({ scope = "hr", open = true, onClose }: { scope?
             />
           }
         >
-          {body}
+          <div className="space-y-3">{body}</div>
         </ApprovalModal>
         {detail}
       </>

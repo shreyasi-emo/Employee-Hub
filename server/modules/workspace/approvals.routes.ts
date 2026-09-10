@@ -113,7 +113,7 @@ export function registerWorkspaceApprovalsRoutes(app: Express) {
         let actionLink = "/workspace/office";
 
         if (entityType === "requisition" || entityType === "offer") {
-          recipientRoles = ["hr_admin", "recruiter", "super_admin"];
+          recipientRoles = ["hr_admin", "hr_executive", "super_admin"];
           actionLink = "/workspace/ats";
         } else if (entityType === "purchase_request" || entityType === "travel_request" || entityType === "payment") {
           recipientRoles = ["hr_admin", "office_admin", "super_admin"];

@@ -44,6 +44,7 @@ export function OfficePurchaseBatchModal({ items, open, onClose }: { items: any[
             rows={items}
             getRowKey={(o: any) => o.id}
             testIdPrefix="batch-row"
+            showSerial
           />
         </div>
         <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Decision note (optional)" className="h-9" />

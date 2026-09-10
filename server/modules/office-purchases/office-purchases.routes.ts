@@ -79,7 +79,7 @@ export function registerOfficePurchaseRoutes(app: Express) {
       await storage.notifyByRole([...HR_ROLES, "super_admin"], {
         type: "office_purchase_submitted", title: "New Office Purchase Request",
         body: `${created.reference} — ${ctx.employeeName || "An employee"} requested ${items.length} item${items.length > 1 ? "s" : ""}.`,
-        link: "/company-workspace",
+        link: "/my-approvals",
       });
     } catch { /* best-effort */ }
     res.json(created);
@@ -167,7 +167,7 @@ export function registerOfficePurchaseRoutes(app: Express) {
     const updated = await storage.updateOfficePurchase(id, { status: "approved", approvedById: req.currentUser!.id, decisionNote: note, decidedAt: new Date(), ...(isVendor ? { paymentStatus: "pending" } : {}) });
     // #5: on approval HR is notified to place the order (NOT the requester). Vendor purchases also flag Finance to pay.
     try {
-      await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_approved", title: "Approved — place the order", body: `${r.reference} (${r.employeeName || "Employee"}) was approved.${isVendor ? " Vendor purchase — Finance will pay via the proforma." : ""}`, link: "/company-workspace" });
+      await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_approved", title: "Approved — place the order", body: `${r.reference} (${r.employeeName || "Employee"}) was approved.${isVendor ? " Vendor purchase — Finance will pay via the proforma." : ""}`, link: "/my-approvals" });
       if (isVendor) await storage.notifyByRole(["finance", "super_admin"], { type: "office_purchase_payment", title: "Vendor payment needed", body: `${r.reference} — pay ${r.vendorName || "the vendor"} ₹${Number(r.totalAmount || 0).toLocaleString("en-IN")} (proforma attached).`, link: "/reimbursements" });
     } catch { /* best-effort */ }
     return { updated };
@@ -244,7 +244,7 @@ export function registerOfficePurchaseRoutes(app: Express) {
     if (r.paymentStatus !== "pending") return res.status(400).json({ error: "No payment is pending for this purchase." });
     const updated = await storage.updateOfficePurchase(req.params.id, { paymentStatus: "paid", paidById: req.currentUser!.id, paidAt: new Date(), paymentRef: req.body?.paymentRef || null });
     await log(req, "OFFICE_PURCHASE_PAY", "office_purchase", r.id, r, updated);
-    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_paid", title: "Vendor paid", body: `${r.reference} — Finance recorded the payment${req.body?.paymentRef ? ` (ref ${req.body.paymentRef})` : ""}.`, link: "/company-workspace" }); } catch { /* best-effort */ }
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_paid", title: "Vendor paid", body: `${r.reference} — Finance recorded the payment${req.body?.paymentRef ? ` (ref ${req.body.paymentRef})` : ""}.`, link: "/my-approvals" }); } catch { /* best-effort */ }
     res.json(updated);
   });
 
@@ -330,7 +330,7 @@ export function registerOfficePurchaseRoutes(app: Express) {
     if (!body) return res.status(400).json({ error: "Add a message for HR." });
     const updated = await queryOne(req, req.params.id, body, await actorName(req));
     if (!updated) return res.status(400).json({ error: "This request can no longer be queried." });
-    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_query", title: `Query · ${updated.reference}`, body: `CEO asked: ${body.slice(0, 90)}`, link: "/company-workspace" }); } catch { /* best-effort */ }
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_query", title: `Query · ${updated.reference}`, body: `CEO asked: ${body.slice(0, 90)}`, link: "/my-approvals" }); } catch { /* best-effort */ }
     res.json(updated);
   });
   app.post("/api/office-purchases/bulk-query", requireAuth, async (req, res) => {
@@ -341,7 +341,7 @@ export function registerOfficePurchaseRoutes(app: Express) {
     const name = await actorName(req);
     const results: any[] = [];
     for (const id of ids) { const u = await queryOne(req, id, body, name); if (u) results.push(u); }
-    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_query", title: "CEO raised a query", body: `${results.length} request${results.length !== 1 ? "s" : ""}: ${body.slice(0, 90)}`, link: "/company-workspace" }); } catch { /* best-effort */ }
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "office_purchase_query", title: "CEO raised a query", body: `${results.length} request${results.length !== 1 ? "s" : ""}: ${body.slice(0, 90)}`, link: "/my-approvals" }); } catch { /* best-effort */ }
     res.json({ queried: results.length, items: results });
   });
 }

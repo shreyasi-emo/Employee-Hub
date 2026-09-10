@@ -51,8 +51,6 @@ export const SYSTEM_ROLES = [
   { value: "hr_executive", label: "HR Executive" },
   { value: "hr_admin", label: "HR Admin" },
   { value: "hr_ops", label: "HR Ops" },
-  { value: "recruiter", label: "Recruiter" },
-  { value: "interviewer", label: "Interviewer" },
   { value: "finance", label: "Finance" },
   { value: "ceo_approver", label: "CEO Approver" },
   { value: "cto", label: "CTO" },

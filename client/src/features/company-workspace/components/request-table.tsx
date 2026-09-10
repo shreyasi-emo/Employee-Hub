@@ -24,6 +24,7 @@ export function RequestTable({ type, items, onOpen }: { type: string; items: any
         onRowClick={(it: any) => onOpen(it)}
         rowClassName={(it: any) => it.status === "changes_requested" ? "bg-[#FF6F62]/[0.06]" : ""}
         testIdPrefix={`row-${type}`}
+        showSerial
       />
     </div>
   );

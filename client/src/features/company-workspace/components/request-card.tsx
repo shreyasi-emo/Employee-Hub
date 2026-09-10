@@ -1,5 +1,5 @@
 import { formatDate, formatStatus, money, amountOf, titleOf, purposeOf, refOf, REVOCABLE_BLOCK } from "../shared/request-format";
-import { moneyShort } from "@/lib/format";
+import { moneyShort, relDate, isJustUpdated } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { submittedInfo } from "../shared/submitted-info";
 import { SubmittedLabel, colDivider } from "./request-ui";
@@ -71,7 +71,7 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
   // on line 2, a |-separated date + payable meta line; the overflow menu keeps every action.
   if (isMobile) {
     return (
-      <Card data-testid={`card-request-${item.id}`} className={`border-0 ${readOnly ? "" : "hover-elevate active-elevate-2 cursor-pointer"} ${item.status === "changes_requested" ? "ring-1 ring-[#FF6F62]/50 bg-[#FF6F62]/[0.04]" : ""}`} onClick={readOnly ? undefined : () => onOpen?.(item)}>
+      <Card data-testid={`card-request-${item.id}`} className={`border-0 ${readOnly ? "" : "hover-elevate active-elevate-2 cursor-pointer"} ${item.status === "changes_requested" ? "ring-1 ring-[#FF6F62]/50 bg-[#FF6F62]/[0.04]" : isJustUpdated(item.updatedAt) ? "ring-1 ring-[#4BDCD9]/70" : ""}`} onClick={readOnly ? undefined : () => onOpen?.(item)}>
         <CardContent className="p-3">
           <div className="flex items-start gap-3">
             <div className="h-8 w-8 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -114,7 +114,7 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
   }
 
   return (
-    <Card data-testid={`card-request-${item.id}`} className={`border-0 ${readOnly ? "" : "hover-elevate active-elevate-2 cursor-pointer"} ${item.status === "changes_requested" ? "ring-1 ring-[#FF6F62]/50 bg-[#FF6F62]/[0.04]" : ""}`} onClick={readOnly ? undefined : () => onOpen?.(item)}>
+    <Card data-testid={`card-request-${item.id}`} className={`border-0 ${readOnly ? "" : "hover-elevate active-elevate-2 cursor-pointer"} ${item.status === "changes_requested" ? "ring-1 ring-[#FF6F62]/50 bg-[#FF6F62]/[0.04]" : isJustUpdated(item.updatedAt) ? "ring-1 ring-[#4BDCD9]/70" : ""}`} onClick={readOnly ? undefined : () => onOpen?.(item)}>
       <CardContent className="p-[17px]">
         <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-0">
           {/* Identity */}
@@ -154,7 +154,7 @@ export function RequestCard({ item, type, onOpen, readOnly = false, byline }: { 
           <div className="w-full lg:w-[150px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
             <History className="h-4 w-4 text-muted-foreground" />
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Last Updated</p>
-            <p className="text-sm font-semibold text-foreground mt-1.5 whitespace-nowrap">{item.updatedAt ? formatDate(item.updatedAt) : "—"}</p>
+            <p className="text-sm font-semibold text-foreground mt-1.5 whitespace-nowrap">{relDate(item.updatedAt || item.createdAt)}</p>
           </div>
 
           {colDivider}

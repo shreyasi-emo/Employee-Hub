@@ -62,6 +62,8 @@ export function CompletedApprovals({ rows }: { rows: Row[] }) {
           emptyText="No completed approvals match your filters."
           testIdPrefix="completed"
           paginate={false}
+          showSerial
+          serialStart={(curPage - 1) * PAGE + 1}
         />
       </div>
     </div>

@@ -14,6 +14,8 @@ export function registerTravelRoutes(app: Express) {
   const isCeo = (r: Request) => hasRole(r, "super_admin", ...CEO_ROLES);
   const isApprover = (r: Request) => hasRole(r, "super_admin", ...HR_ROLES, ...CEO_ROLES, "finance");
   const CAT_LABEL: Record<string, string> = { flight: "Flight", stay: "Stay", transport: "Transport" };
+  // An HR-on-behalf trip auto-books (skips the CEO) only when it's BOTH imminent (<24h) AND under this cap.
+  const AUTO_BOOK_CEILING = 10000;
 
   const dateOnly = (v: any) => (v ? String(v).slice(0, 10) : null);
   // Normalize each category's dates for the calendar + the <24h auto-approve rule.
@@ -28,7 +30,9 @@ export function registerTravelRoutes(app: Express) {
     if (!startDate) return false;
     const start = new Date(`${String(startDate).slice(0, 10)}T00:00:00`);
     if (isNaN(start.getTime())) return false;
-    const now = new Date();
+    // Compare "today" in IST, not the server's timezone (Vercel runs UTC), so the boundary
+    // matches the user's calendar day and can't disagree with the client-side preview.
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
     const todayDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const diffDays = Math.round((startDay - todayDay) / 86400000);
@@ -88,7 +92,47 @@ export function registerTravelRoutes(app: Express) {
       details, attendees, startDate, endDate, notes: req.body?.notes || null, status: "pending_hr",
     });
     await log(req, "TRAVEL_CREATE", "trip", created.id, null, created);
-    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_submitted", title: `New ${CAT_LABEL[category]} request`, body: `${created.reference} — ${ctx.employeeName || "An employee"}.`, link: "/company-workspace" }); } catch { /* best-effort */ }
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_submitted", title: `New ${CAT_LABEL[category]} request`, body: `${created.reference} — ${ctx.employeeName || "An employee"}.`, link: "/my-approvals" }); } catch { /* best-effort */ }
+    res.json(created);
+  });
+
+  // ----- HR: create + book on an employee's behalf (no request was raised) -----
+  // The HR who books is the requester (owner); the selected people are the travellers (attendees).
+  // The ticket is attached at/after booking, never here. Auto-books only when imminent (<24h) AND under ₹10k;
+  // otherwise it goes to the CEO for approval.
+  app.post("/api/travel/on-behalf", requireAuth, async (req, res) => {
+    if (!isHrTriage(req)) return res.status(403).json({ error: "HR only" });
+    const category = ["flight", "stay", "transport"].includes(req.body?.category) ? req.body.category : null;
+    if (!category) return res.status(400).json({ error: "Pick a travel type." });
+    const travellersIn = Array.isArray(req.body?.travellers) ? req.body.travellers : [];
+    const attendees = travellersIn.filter((a: any) => a?.userId).map((a: any) => ({ userId: String(a.userId), name: String(a.name || "") }));
+    if (!attendees.length) return res.status(400).json({ error: "Pick at least one traveller." });
+    const amountNum = Number(req.body?.amount) || 0;
+    if (amountNum <= 0) return res.status(400).json({ error: "Enter the trip amount." });
+    const ctx = await requesterContext(req.currentUser!.id, req.currentUser!.username);   // the HR booker owns the request
+    const details = req.body?.details || {};
+    const { startDate, endDate } = normDates(category, details);
+    const amount = String(amountNum);
+    const auto = within24h(startDate) && amountNum < AUTO_BOOK_CEILING;   // books directly only when imminent AND under the cap
+    const now = new Date();
+    const created = await storage.createTripRequest({
+      requesterId: req.currentUser!.id, ...ctx, category, purpose: req.body?.purpose || null,
+      details, attendees, startDate, endDate, notes: req.body?.notes || null,
+      amount, hrDetails: req.body?.hrDetails || {}, reviewedById: req.currentUser!.id, reviewedAt: now,
+      ...(auto
+        ? { status: "booked", autoApproved: true, approvedById: req.currentUser!.id, decidedAt: now, decisionNote: "Auto-booked — within 24h, under ₹10k", bookedById: req.currentUser!.id, bookedAt: now }
+        : { status: "pending_approval", autoApproved: false }),
+    });
+    await log(req, "TRAVEL_ON_BEHALF", "trip", created.id, null, created);
+    const who = attendees.map((a: any) => a.name).filter(Boolean).join(", ") || "an employee";
+    try {
+      if (auto) {
+        for (const a of attendees) await notifyRequester(a.userId, { type: "travel_booked", title: `${CAT_LABEL[category]} booked`, body: `${created.reference} was booked for you — the ticket will be added to your request.`, link: "/my-requests" });
+      } else {
+        for (const a of attendees) await notifyRequester(a.userId, { type: "travel_submitted", title: `${CAT_LABEL[category]} request raised for you`, body: `${created.reference} — pending approval.`, link: "/my-requests" });
+        await storage.notifyByRole([...CEO_ROLES, "super_admin"], { type: "travel_pending", title: "Travel — Approval Needed", body: `${created.reference} (${who}, ₹${amountNum.toLocaleString("en-IN")}) needs your approval.`, link: "/my-approvals" });
+      }
+    } catch { /* best-effort */ }
     res.json(created);
   });
 
@@ -110,7 +154,7 @@ export function registerTravelRoutes(app: Express) {
     });
     await log(req, "TRAVEL_PRICE", "trip", r.id, r, updated);
     try {
-      if (auto) await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_approved", title: "Auto-approved — book it", body: `${r.reference} starts within 24h — approved automatically, please book.`, link: "/company-workspace" });
+      if (auto) await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_approved", title: "Auto-approved — book it", body: `${r.reference} starts within 24h — approved automatically, please book.`, link: "/my-approvals" });
       else await storage.notifyByRole([...CEO_ROLES, "super_admin"], { type: "travel_pending", title: wasQueried ? "Travel — Resubmitted for approval" : "Travel — Approval Needed", body: `${r.reference} (${r.employeeName || "Employee"}, ₹${(Number(req.body?.amount) || 0).toLocaleString("en-IN")}) ${wasQueried ? "was updated and resent." : "needs your approval."}`, link: "/my-approvals" });
     } catch { /* best-effort */ }
     res.json(updated);
@@ -122,7 +166,7 @@ export function registerTravelRoutes(app: Express) {
     if (!r) return { error: 404 as const };
     if (!["pending_approval", "under_review"].includes(r.status)) return { error: 400 as const, msg: `Cannot approve a request in '${r.status}' state` };
     const updated = await storage.updateTripRequest(id, { status: "approved", approvedById: req.currentUser!.id, decisionNote: note, decidedAt: new Date() });
-    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_approved", title: "Approved — book it", body: `${r.reference} (${r.employeeName || "Employee"}) was approved.`, link: "/company-workspace" }); } catch { /* best-effort */ }
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_approved", title: "Approved — book it", body: `${r.reference} (${r.employeeName || "Employee"}) was approved.`, link: "/my-approvals" }); } catch { /* best-effort */ }
     return { updated };
   };
   const rejectOne = async (req: Request, id: string, note: string | null) => {
@@ -176,7 +220,7 @@ export function registerTravelRoutes(app: Express) {
     if (!body) return res.status(400).json({ error: "Add a message for HR." });
     const updated = await queryOne(req, req.params.id, body, await actorName(req));
     if (!updated) return res.status(400).json({ error: "This request can no longer be queried." });
-    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_query", title: `Query · ${updated.reference}`, body: `CEO asked: ${body.slice(0, 90)}`, link: "/company-workspace" }); } catch { /* best-effort */ }
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_query", title: `Query · ${updated.reference}`, body: `CEO asked: ${body.slice(0, 90)}`, link: "/my-approvals" }); } catch { /* best-effort */ }
     res.json(updated);
   });
   app.post("/api/travel/bulk-query", requireAuth, async (req, res) => {
@@ -187,16 +231,17 @@ export function registerTravelRoutes(app: Express) {
     const name = await actorName(req);
     const results: any[] = [];
     for (const id of ids) { const u = await queryOne(req, id, body, name); if (u) results.push(u); }
-    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_query", title: "CEO raised a query", body: `${results.length} request${results.length !== 1 ? "s" : ""}: ${body.slice(0, 90)}`, link: "/company-workspace" }); } catch { /* best-effort */ }
+    try { await storage.notifyByRole([...HR_ROLES, "super_admin"], { type: "travel_query", title: "CEO raised a query", body: `${results.length} request${results.length !== 1 ? "s" : ""}: ${body.slice(0, 90)}`, link: "/my-approvals" }); } catch { /* best-effort */ }
     res.json({ queried: results.length, items: results });
   });
 
   // ----- HR: book (final details + document) → booked; notify every traveller -----
+  // Also accepts an already-booked trip, so HR can attach/replace the ticket after an auto-booking.
   app.post("/api/travel/:id/book", requireAuth, async (req, res) => {
     if (!isHrTriage(req)) return res.status(403).json({ error: "HR only" });
     const r = await storage.getTripRequest(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    if (r.status !== "approved") return res.status(400).json({ error: `Cannot book a request in '${r.status}' state` });
+    if (!["approved", "booked"].includes(r.status)) return res.status(400).json({ error: `Cannot book a request in '${r.status}' state` });
     const updated = await storage.updateTripRequest(req.params.id, {
       status: "booked", hrDetails: req.body?.hrDetails || r.hrDetails || {}, document: req.body?.document ?? r.document ?? null,
       bookedById: req.currentUser!.id, bookedAt: new Date(),
