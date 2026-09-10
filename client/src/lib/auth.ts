@@ -34,13 +34,14 @@ export interface AuthState {
 
 // Roles that can be ASSIGNED. Not the same as the DB enum:
 //  - "logistics" is the Logistics Manager role — sees & processes all logistics requests.
-//  - "office_admin" is retired. It stays in the DB enum (Postgres cannot drop an enum value)
-//    and keeps its label + colour below so historical rows still render — it simply cannot be
-//    handed out any more. Its module now belongs to super_admin / hr_admin / hr_executive.
-//    To bring it back: add it here and to ROLE_OPTIONS in features/employees/lib/employee-constants.
+//  - "office_admin", "recruiter" and "interviewer" are retired. They stay in the DB enum
+//    (Postgres cannot drop an enum value) and keep their label + colour below so any historical
+//    row still renders — but they are removed from the app everywhere else: they cannot be
+//    assigned, grant no access, and appear in no menu. Recruiting/interviewing is handled by
+//    super_admin / hr_admin / hr_executive / hr_ops through the ATS.
 export const ALL_ROLES: UserRole[] = [
   "super_admin", "hr_admin", "hr_executive", "finance", "manager", "employee",
-  "recruiter", "hr_ops", "ceo_approver", "cto", "interviewer", "logistics",
+  "hr_ops", "ceo_approver", "cto", "logistics",
 ];
 
 export function useAuth() {
@@ -94,7 +95,7 @@ export function isManager(user: CurrentUser | null): boolean {
 }
 
 export function hasWorkspaceAccess(user: CurrentUser | null): boolean {
-  return hasRole(user, "super_admin", "hr_admin", "hr_executive", "recruiter", "hr_ops", "ceo_approver");
+  return hasRole(user, "super_admin", "hr_admin", "hr_executive", "hr_ops", "ceo_approver");
 }
 
 export function isCEOApprover(user: CurrentUser | null): boolean {

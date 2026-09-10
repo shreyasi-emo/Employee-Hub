@@ -412,7 +412,8 @@ export function OfficePurchaseDetailDialog({ id, open, onClose, onPriced, contex
             </DialogTitle>
             {ownerCanCancel && (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 -mt-1 flex-shrink-0 text-muted-foreground" data-testid="op-more"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                {/* -mt-3.5 lines the kebab's icon centre up with the Dialog's built-in ✕ (absolute top-4). */}
+                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 -mt-3.5 flex-shrink-0 text-muted-foreground" data-testid="op-more"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">
                   <DropdownMenuItem className="text-[#FF6F62] focus:text-[#FF6F62]" disabled={act.isPending} onClick={() => { if (window.confirm("Cancel this request? This cannot be undone.")) act.mutate({ path: "cancel" }); }}>Cancel request</DropdownMenuItem>
                 </DropdownMenuContent>

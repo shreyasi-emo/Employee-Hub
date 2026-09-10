@@ -39,8 +39,11 @@ type DataTableProps<T> = {
    *  is rendered beneath it holding `renderExpanded(row)`. Pair with `onRowClick` to toggle. */
   renderExpanded?: (row: T, index: number) => React.ReactNode;
   isExpanded?: (row: T) => boolean;
-  /** Prepend a left "S.No." column numbering rows across pages. */
+  /** Prepend a left "S.No." column numbering rows. */
   showSerial?: boolean;
+  /** S.No. of the first row in `rows` (default 1). Pass the page offset when the caller paginates externally
+   *  so the count stays continuous across pages; leave unset for a self-contained list that starts at 1. */
+  serialStart?: number;
   /** Use `table-fixed` so column widths obey headClassName/cellClassName exactly —
    *  needed when several sibling tables must line up column-for-column. */
   fixedLayout?: boolean;
@@ -64,6 +67,7 @@ export function DataTable<T>({
   renderExpanded,
   isExpanded,
   showSerial,
+  serialStart,
   fixedLayout,
 }: DataTableProps<T>) {
   // A touch more breathing room on the outer edges of the table.
@@ -127,7 +131,7 @@ export function DataTable<T>({
                     className={cn("hover-elevate", onRowClick && "cursor-pointer", expanded && "bg-muted/20", rowClassName?.(row))}
                     data-testid={`${testIdPrefix}-${rowKey}`}
                   >
-                    {showSerial && <td className="p-3 pl-6 pr-2 whitespace-nowrap text-xs text-muted-foreground tabular-nums w-14 align-middle">{firstShown + ri}</td>}
+                    {showSerial && <td className="p-3 pl-6 pr-2 whitespace-nowrap text-xs text-muted-foreground tabular-nums w-14 align-middle">{(serialStart ?? firstShown) + ri}</td>}
                     {columns.map((c, i) => (
                       <td
                         key={c.key}

@@ -23,7 +23,7 @@ export function ApprovalCard({
   requesterName, requesterCode, facts = [], meta = [],
   selectable, selected, selectionMode, checkboxAlways, onToggleSelect,
   onView, viewLabel = "View", menu = [], testId,
-  expandable, expanded, onToggleExpand, children,
+  expandable, expanded, onToggleExpand, children, recent,
 }: {
   icon?: any; reference: ReactNode; badge?: ReactNode; resubmitted?: boolean;
   amount?: number | string; amountFallback?: string;
@@ -31,6 +31,8 @@ export function ApprovalCard({
   selectable?: boolean; selected?: boolean; selectionMode?: boolean; checkboxAlways?: boolean; onToggleSelect?: () => void;
   onView?: () => void; viewLabel?: string; menu?: ApprovalMenuItem[]; testId?: string;
   expandable?: boolean; expanded?: boolean; onToggleExpand?: () => void; children?: ReactNode;
+  /** Subtle teal ring for a just-updated item, so it stands out after you act on it. */
+  recent?: boolean;
 }) {
   const amt = Number(amount) || 0;
   const showCheckbox = selectable && (selectionMode || checkboxAlways);
@@ -49,7 +51,7 @@ export function ApprovalCard({
     return (
       <div
         data-testid={testId}
-        className={`group card-surface card-hover relative overflow-hidden cursor-pointer ${selectionMode && selected ? "ring-2 ring-[#206295]" : ""}`}
+        className={`group card-surface card-hover relative overflow-hidden cursor-pointer ${selectionMode && selected ? "ring-2 ring-[#206295]" : recent ? "ring-1 ring-[#4BDCD9]/70" : ""}`}
         onClick={handleCardClick}
       >
         <div className="p-4">
@@ -147,7 +149,7 @@ export function ApprovalCard({
   return (
     <div
       data-testid={testId}
-      className={`group card-surface card-hover relative overflow-hidden cursor-pointer ${selectionMode && selected ? "ring-2 ring-[#206295]" : ""}`}
+      className={`group card-surface card-hover relative overflow-hidden cursor-pointer ${selectionMode && selected ? "ring-2 ring-[#206295]" : recent ? "ring-1 ring-[#4BDCD9]/70" : ""}`}
       onClick={handleCardClick}
     >
       {/* Overflow menu — top-right (hidden in selection mode) */}

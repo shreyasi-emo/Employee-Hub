@@ -17,21 +17,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetTrigger } from "@/components/ui/sheet";
 import { NewRequestDialog, OfficePurchaseDetailDialog } from "@/features/company-workspace/office-purchases/components/office-purchase";
-import { NewTravelDialog, TravelDetailDialog, TRAVEL_CATS } from "@/features/company-workspace/travel/components/travel";
+import { NewTravelDialog, TravelDetailDialog } from "@/features/company-workspace/travel/components/travel";
 import { ProcurementDetailDialog } from "@/features/company-workspace/procurement/components/procurement";
 import { useToast } from "@/hooks/use-toast";
 import { DateInput } from "@/components/shared/datetime-field";
 import { Plus, ShoppingCart, Car, TicketIcon, Receipt, ChevronLeft, Package, Trash2, Search, LayoutGrid, Table2, ArrowDownUp, Save, FileEdit, SlidersHorizontal, X } from "lucide-react";
-import { format } from "date-fns";
 import { ReimbursementFormDialog, reimbDraftComplete } from "@/features/company-workspace/reimbursements/components/reimbursement-form";
 import { statusClass, statusLabel } from "@/lib/status";
 import { formatDate, money, matchesFilter, amountOf, searchText, itemsHeadline, DONE_STATUS } from "../shared/request-format";
+import { relDate } from "@/lib/format";
 import { readDrafts, writeDrafts, newDraftId, type Draft } from "../shared/drafts";
 import { TicketForm } from "../tickets/components/ticket-form";
 import { RequestTable } from "../components/request-table";
 import { RequestDetailModal } from "../components/request-detail-modal";
 import { RequestCard } from "../components/request-card";
 import { PurchaseRequestCard } from "../components/purchase-request-card";
+import { TravelRequestCard } from "../components/travel-request-card";
 import { DraftCard } from "../components/draft-card";
 import { ReimbCardView } from "../reimbursements/components/reimb-card-view";
 
@@ -41,6 +42,58 @@ const SORT_CHIP_LABELS: Record<string, string> = {
   status_change: "Latest Status Change", date_desc: "Newest", date_asc: "Oldest",
   amount_desc: "Amount: High → Low", amount_asc: "Amount: Low → High",
 };
+
+// In-Progress stage buckets per request type — the list groups under these full-width headers
+// (most-actionable first); every terminal status lives under the Completed toggle (DONE_STAGE).
+type StageDef = { key: string; label: string; has: (s: string) => boolean };
+const STAGE_DEFS: Record<string, StageDef[]> = {
+  office: [
+    { key: "hr", label: "Awaiting HR", has: (s) => s === "pending_hr" },
+    { key: "query", label: "Needs your reply", has: (s) => s === "under_review" },
+    { key: "approval", label: "Awaiting approval", has: (s) => ["priced", "pending_approval"].includes(s) },
+    { key: "order", label: "Approved", has: (s) => s === "approved" },
+    { key: "ordered", label: "Ordered", has: (s) => s === "ordered" },
+  ],
+  procurement: [
+    { key: "approval", label: "Awaiting approval", has: (s) => s === "pending_approval" },
+    { key: "query", label: "Needs your reply", has: (s) => s === "under_review" },
+  ],
+  ticket: [
+    { key: "open", label: "Open", has: (s) => s === "open" },
+    { key: "progress", label: "In progress", has: (s) => s === "in_progress" },
+    { key: "info", label: "Needs your info", has: (s) => s === "need_info" },
+  ],
+  reimbursement: [
+    { key: "changes", label: "Changes requested", has: (s) => s === "changes_requested" },
+    { key: "finance", label: "Awaiting finance", has: (s) => s === "submitted" },
+    { key: "ceo", label: "Awaiting CEO", has: (s) => s === "finance_approved" },
+    { key: "query", label: "Under review", has: (s) => s === "under_review" },
+  ],
+  travel: [
+    { key: "hr", label: "Awaiting HR", has: (s) => s === "pending_hr" },
+    { key: "approval", label: "Awaiting approval", has: (s) => ["pending_approval", "under_review"].includes(s) },
+    { key: "book", label: "Awaiting booking", has: (s) => s === "approved" },
+  ],
+};
+// Terminal statuses shown under the Completed toggle.
+const DONE_STAGE: Record<string, string[]> = {
+  office: ["delivered", "rejected", "cancelled"],
+  procurement: ["approved", "rejected", "cancelled"],
+  ticket: ["resolved", "closed"],
+  reimbursement: ["approved", "rejected"],
+  travel: ["booked", "rejected", "cancelled"],
+};
+
+// Full-width stage header: label + count + a hairline rule filling the row. Wraps cleanly on phone.
+function StageHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center gap-2.5 pt-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-muted text-[10px] font-bold text-muted-foreground flex-shrink-0">{count}</span>
+      <span className="h-px flex-1 bg-border/70 rounded-full" />
+    </div>
+  );
+}
 
 export default function MyRequestsPage() {
   const { data: auth } = useAuth();
@@ -203,6 +256,35 @@ export default function MyRequestsPage() {
   const renderEmpty = (msg: string) => (
     <Card className="py-12"><CardContent className="text-center text-sm text-muted-foreground">{msg}</CardContent></Card>
   );
+
+  // Split a list into full-width stage sections (most-actionable first); `renderGroup` draws each
+  // section's body — a list of cards for card view, or one DataTable for table view.
+  const renderStageSections = (items: any[], type: string, renderGroup: (groupItems: any[]) => React.ReactNode, emptyMsg: string) => {
+    const defs = STAGE_DEFS[type] || [];
+    const seen = new Set<string>();
+    const groups = defs.map((st) => {
+      const gi = items.filter((x) => st.has(x.status));
+      gi.forEach((x) => seen.add(x.id));
+      return { key: st.key, label: st.label, items: gi };
+    }).filter((g) => g.items.length > 0);
+    const rest = items.filter((x) => !seen.has(x.id));   // any status not mapped to a stage — never drop it
+    if (rest.length) groups.push({ key: "other", label: "In progress", items: rest });
+    if (groups.length === 0) return renderEmpty(emptyMsg);
+    return (
+      <div className="space-y-6">
+        {groups.map((g) => (
+          <div key={g.key} className="space-y-3">
+            <StageHeader label={g.label} count={g.items.length} />
+            {renderGroup(g.items)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+  // Card view: one card per item within each stage section.
+  const renderStageGroups = (items: any[], type: string, renderCard: (x: any) => React.ReactNode, emptyMsg: string) =>
+    renderStageSections(items, type, (gi) => gi.map(renderCard), emptyMsg);
+  const isDoneStage = (type: string, status: string) => (DONE_STAGE[type] || []).includes(status);
 
   // status filter -> search -> sort, applied per tab.
   const refine = (list: any[], type: string) => {
@@ -374,6 +456,11 @@ export default function MyRequestsPage() {
 
   const fTickets = refine(tickets as any[], "ticket");
   const fReimb = refine(reimbursements as any[], "reimbursement");
+  // Active (In Progress) vs terminal (Completed) split, per the phase toggle.
+  const tkActive = fTickets.filter((t) => !isDoneStage("ticket", t.status));
+  const tkDone = fTickets.filter((t) => isDoneStage("ticket", t.status));
+  const rbActive = fReimb.filter((r) => !isDoneStage("reimbursement", r.status));
+  const rbDone = fReimb.filter((r) => isDoneStage("reimbursement", r.status));
   const opQuery = search.trim().toLowerCase();
   const fOP = (officePurchases as any[]).filter((o) =>
     matchesFilter(o.status, statusFilter) &&
@@ -384,8 +471,8 @@ export default function MyRequestsPage() {
     (opQuery === "" || `${o.reference || ""} ${(o.items || []).map((i: any) => i.description).join(" ")}`.toLowerCase().includes(opQuery))
   );
   // 15-per-page pagination for the card views (table views paginate via DataTable).
-  const tkPaged = usePaged(fTickets);
-  const rbPaged = usePaged(fReimb);
+  const tkPaged = usePaged(tkDone);
+  const rbPaged = usePaged(rbDone);
   const opPaged = usePaged(fOP);
   const prPaged = usePaged(fProc);
 
@@ -453,25 +540,11 @@ export default function MyRequestsPage() {
           {loadTrips ? <Skeleton className="h-24 w-full" /> :
             (myTrips as any[]).length === 0 ? renderEmpty("No travel requests yet.") :
             (() => {
-              const tripCard = (t: any) => {
-                const c = TRAVEL_CATS[t.category] || TRAVEL_CATS.flight;
-                const route = t.category === "flight" ? `${t.details?.fromCity || "?"} → ${t.details?.toCity || "?"}` : t.category === "stay" ? (t.details?.city || "") : `${t.details?.from || "?"} → ${t.details?.to || "?"}`;
-                return (
-                  <div key={t.id} className="card-surface card-hover p-3 sm:p-4 flex items-center gap-3 sm:gap-4 cursor-pointer" onClick={() => setTravelDetailId(t.id)} data-testid={`trip-${t.id}`}>
-                    <span className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${c.tint}1a`, color: c.tint }}><c.icon className="h-4 w-4" /></span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-semibold text-foreground truncate">{t.reference}</span><Badge className={`text-[10px] ${statusClass(t.status)}`}>{statusLabel(t.status)}</Badge></div>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{c.label} | {route}{t.startDate ? ` | ${format(new Date(t.startDate), "MMM d, yyyy")}` : ""}</p>
-                    </div>
-                    {Number(t.amount) > 0 && <span className="text-sm font-bold text-[#206295] tabular-nums flex-shrink-0">₹{Number(t.amount).toLocaleString("en-IN")}</span>}
-                  </div>
-                );
-              };
-              const done = (myTrips as any[]).filter((t) => DONE_STATUS.trip.includes(t.status));
-              const active = (myTrips as any[]).filter((t) => !DONE_STATUS.trip.includes(t.status));
-              const shown = phase === "active" ? active : done;
-              if (shown.length === 0) return renderEmpty(phase === "active" ? "No trips in progress." : "No completed trips.");
-              return <div className="space-y-3">{shown.map(tripCard)}</div>;
+              const active = (myTrips as any[]).filter((t) => !isDoneStage("travel", t.status));
+              const done = (myTrips as any[]).filter((t) => isDoneStage("travel", t.status)).sort((a, b) => +new Date(b.updatedAt || b.createdAt || 0) - +new Date(a.updatedAt || a.createdAt || 0));
+              const card = (t: any) => <TravelRequestCard key={t.id} item={t} onOpen={setTravelDetailId} />;
+              if (phase === "active") return renderStageGroups(active, "travel", card, "No trips in progress.");
+              return done.length === 0 ? renderEmpty("No completed trips.") : <div className="space-y-3">{done.map(card)}</div>;
             })()
           }
         </TabsContent>
@@ -481,10 +554,14 @@ export default function MyRequestsPage() {
             <Button size="sm" onClick={() => { setEditingDraftId(null); setTicketInitial(null); setTicketForceValidate(false); setShowTicketForm(true); }} data-testid="button-new-ticket">
               <Plus className="h-4 w-4 mr-1.5" /> Raise Ticket
             </Button>
-          )}
+          , true)}
           {loadTickets ? <Skeleton className="h-24 w-full" /> :
             fTickets.length === 0 ? renderEmpty((tickets as any[]).length === 0 ? "No tickets yet." : "No tickets match this filter.") :
-            view === "table" ? <RequestTable type="ticket" items={fTickets} onOpen={(it) => setDetail({ type: "ticket", item: it })} /> :
+            view === "table" ? (phase === "active"
+              ? renderStageSections(tkActive, "ticket", (gi) => <RequestTable type="ticket" items={gi} onOpen={(it) => setDetail({ type: "ticket", item: it })} />, "No tickets in progress.")
+              : <RequestTable type="ticket" items={tkDone} onOpen={(it) => setDetail({ type: "ticket", item: it })} />) :
+            phase === "active" ? renderStageGroups(tkActive, "ticket", (t: any) => <RequestCard key={t.id} item={t} type="ticket" onOpen={(it) => setDetail({ type: "ticket", item: it })} />, "No tickets in progress.") :
+            tkDone.length === 0 ? renderEmpty("No completed tickets.") :
             <div className="space-y-3">
               {tkPaged.pageItems.map(t => (
                 <RequestCard key={t.id} item={t} type="ticket" onOpen={(it) => setDetail({ type: "ticket", item: it })} />
@@ -499,10 +576,14 @@ export default function MyRequestsPage() {
             <Button size="sm" onClick={() => { setEditingDraftId(null); setReimbInitial(null); setReimbResubmit(null); setReimbForceValidate(false); setShowReimbForm(true); }} data-testid="button-new-reimbursement">
               <Plus className="h-4 w-4 mr-1.5" /><span className="hidden sm:inline">New Reimbursement</span><span className="sm:hidden">New</span>
             </Button>
-          )}
+          , true)}
           {loadReimb ? <Skeleton className="h-24 w-full" /> :
             fReimb.length === 0 ? renderEmpty((reimbursements as any[]).length === 0 ? "No reimbursements yet." : "No reimbursements match this filter.") :
-            view === "table" ? <RequestTable type="reimbursement" items={fReimb} onOpen={openReimb} /> :
+            view === "table" ? (phase === "active"
+              ? renderStageSections(rbActive, "reimbursement", (gi) => <RequestTable type="reimbursement" items={gi} onOpen={openReimb} />, "No reimbursements in progress.")
+              : <RequestTable type="reimbursement" items={rbDone} onOpen={openReimb} />) :
+            phase === "active" ? renderStageGroups(rbActive, "reimbursement", (r: any) => <RequestCard key={r.id} item={r} type="reimbursement" onOpen={openReimb} />, "No reimbursements in progress.") :
+            rbDone.length === 0 ? renderEmpty("No completed reimbursements.") :
             <div className="space-y-5">
               <ReimbCardView items={rbPaged.pageItems} onOpen={openReimb} />
               <PaginationBar page={rbPaged.page} totalPages={rbPaged.totalPages} count={rbPaged.count} size={rbPaged.size} onPage={rbPaged.setPage} />
@@ -521,28 +602,19 @@ export default function MyRequestsPage() {
             (() => {
               const done = fOP.filter((o: any) => DONE_STATUS.office.includes(o.status));
               const active = fOP.filter((o: any) => !DONE_STATUS.office.includes(o.status));
-              const shown = phase === "active" ? active : done;
-              if (shown.length === 0) return renderEmpty(phase === "active" ? "Nothing in progress." : "Nothing completed yet.");
-              return view === "table" ? (
-                <Card className="border-0"><CardContent className="p-0">
-                  <DataTable
-                    columns={[
-                      { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
-                      { key: "item", header: "Item", cellClassName: "text-foreground max-w-[20rem] truncate", render: (o: any) => itemsHeadline(o.items) },
-                      { key: "priority", header: "Priority", cellClassName: "capitalize text-muted-foreground", render: (o: any) => o.priority || "medium" },
-                      { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
-                      { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
-                      { key: "created", header: "Created", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? formatDate(o.createdAt) : "—" },
-                    ]}
-                    rows={shown}
-                    getRowKey={(o: any) => o.id}
-                    onRowClick={(o: any) => setOpDetailId(o.id)}
-                    testIdPrefix="op-row"
-                  />
-                </CardContent></Card>
-              ) : (
-                <div className="space-y-3">{shown.map((o: any) => <PurchaseRequestCard key={o.id} item={o} kind="office" onOpen={setOpDetailId} />)}</div>
-              );
+              if ((phase === "active" ? active : done).length === 0) return renderEmpty(phase === "active" ? "Nothing in progress." : "Nothing completed yet.");
+              const opCols = [
+                { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
+                { key: "item", header: "Item", cellClassName: "text-foreground max-w-[20rem] truncate", render: (o: any) => itemsHeadline(o.items) },
+                { key: "priority", header: "Priority", cellClassName: "capitalize text-muted-foreground", render: (o: any) => o.priority || "medium" },
+                { key: "amount", header: "Amount", align: "right" as const, cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
+                { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
+                { key: "updated", header: "Last Updated", cellClassName: "text-muted-foreground", render: (o: any) => relDate(o.updatedAt || o.createdAt) },
+              ];
+              const opTable = (rows: any[]) => <Card className="border-0"><CardContent className="p-0"><DataTable columns={opCols} rows={rows} getRowKey={(o: any) => o.id} onRowClick={(o: any) => setOpDetailId(o.id)} testIdPrefix="op-row" showSerial /></CardContent></Card>;
+              const opCard = (o: any) => <PurchaseRequestCard key={o.id} item={o} kind="office" onOpen={setOpDetailId} />;
+              if (view === "table") return phase === "active" ? renderStageSections(active, "office", opTable, "Nothing in progress.") : opTable(done);
+              return phase === "active" ? renderStageGroups(active, "office", opCard, "Nothing in progress.") : <div className="space-y-3">{done.map(opCard)}</div>;
             })()
           }
         </TabsContent>
@@ -558,27 +630,18 @@ export default function MyRequestsPage() {
             (() => {
               const done = fProc.filter((o: any) => DONE_STATUS.procurement.includes(o.status));
               const active = fProc.filter((o: any) => !DONE_STATUS.procurement.includes(o.status));
-              const shown = phase === "active" ? active : done;
-              if (shown.length === 0) return renderEmpty(phase === "active" ? "Nothing in progress." : "Nothing completed yet.");
-              return view === "table" ? (
-                <Card className="border-0"><CardContent className="p-0">
-                  <DataTable
-                    columns={[
-                      { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
-                      { key: "item", header: "Item", cellClassName: "text-foreground max-w-[20rem] truncate", render: (o: any) => itemsHeadline(o.items) },
-                      { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
-                      { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
-                      { key: "created", header: "Created", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? formatDate(o.createdAt) : "—" },
-                    ]}
-                    rows={shown}
-                    getRowKey={(o: any) => o.id}
-                    onRowClick={(o: any) => setProcDetailId(o.id)}
-                    testIdPrefix="proc-row"
-                  />
-                </CardContent></Card>
-              ) : (
-                <div className="space-y-3">{shown.map((o: any) => <PurchaseRequestCard key={o.id} item={o} kind="procurement" onOpen={setProcDetailId} />)}</div>
-              );
+              if ((phase === "active" ? active : done).length === 0) return renderEmpty(phase === "active" ? "Nothing in progress." : "Nothing completed yet.");
+              const prCols = [
+                { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground", render: (o: any) => o.reference },
+                { key: "item", header: "Item", cellClassName: "text-foreground max-w-[20rem] truncate", render: (o: any) => itemsHeadline(o.items) },
+                { key: "amount", header: "Amount", align: "right" as const, cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
+                { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
+                { key: "updated", header: "Last Updated", cellClassName: "text-muted-foreground", render: (o: any) => relDate(o.updatedAt || o.createdAt) },
+              ];
+              const prTable = (rows: any[]) => <Card className="border-0"><CardContent className="p-0"><DataTable columns={prCols} rows={rows} getRowKey={(o: any) => o.id} onRowClick={(o: any) => setProcDetailId(o.id)} testIdPrefix="proc-row" showSerial /></CardContent></Card>;
+              const prCard = (o: any) => <PurchaseRequestCard key={o.id} item={o} kind="procurement" onOpen={setProcDetailId} />;
+              if (view === "table") return phase === "active" ? renderStageSections(active, "procurement", prTable, "Nothing in progress.") : prTable(done);
+              return phase === "active" ? renderStageGroups(active, "procurement", prCard, "Nothing in progress.") : <div className="space-y-3">{done.map(prCard)}</div>;
             })()
           }
         </TabsContent>

@@ -226,6 +226,8 @@ export function CeoReviewModal({ cfg, onClose }: { cfg: any; onClose: () => void
             rows={pagedRows}
             getRowKey={(r: any) => r.id}
             paginate={false}
+            showSerial
+            serialStart={(curPage - 1) * pageSize + 1}
             emptyText="Nothing pending here."
             onRowClick={(r: any) => { if (selectionMode) toggleSel(r.id); else { setView("card"); setExpanded(r.id); } }}
             testIdPrefix={`ceo-${cfg.kind}`}

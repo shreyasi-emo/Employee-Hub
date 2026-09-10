@@ -22,7 +22,7 @@ export function registerUserRoutes(app: Express) {
 
   app.get("/api/workspace/users", requireAuth, requireWorkspace, async (req, res) => {
     const allUsers = await storage.getAllUsers();
-    const workspaceRoles = ["super_admin", "hr_admin", "hr_executive", "recruiter", "hr_ops", "office_admin", "ceo_approver"];
+    const workspaceRoles = ["super_admin", "hr_admin", "hr_executive", "hr_ops", "office_admin", "ceo_approver"];
     res.json(allUsers.filter((u: any) => workspaceRoles.includes(u.role)).map((u: any) => ({ id: u.id, username: u.username, role: u.role })));
   });
 

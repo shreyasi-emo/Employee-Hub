@@ -16,6 +16,8 @@ import { exportXlsx } from "@/lib/export-xlsx";
 import { OfficePurchaseDetailDialog } from "@/features/company-workspace/office-purchases/components/office-purchase";
 import { ShoppingCart, ArrowRight, ChevronLeft, Check, ChevronRight, MessageSquare, CalendarClock, IndianRupee, Eye, Download, ArrowDownUp, Building2, Clock, CheckSquare, CheckCircle2, Layers, SlidersHorizontal, X } from "lucide-react";
 import { statusClass, statusLabel } from "@/lib/status";
+import { relDate, isJustUpdated } from "@/lib/format";
+import { StageHeader } from "../../components/stage-header";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCategorySlot }: { allItems: any[]; canTriage: boolean; canCeo: boolean; mobileCategorySlot?: ReactNode }) {
@@ -27,7 +29,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
   const [range, setRange] = useState<{ from?: Date; to?: Date }>({});
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("date_desc");
+  const [sortBy, setSortBy] = useState("updated_desc");
   const [view, setView] = useState<"card" | "table">("card");
   const [filterSheet, setFilterSheet] = useState(false);
   const [selMode, setSelMode] = useState(false);
@@ -51,6 +53,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
   const sorted = useMemo(() => {
     const s = [...filtered];
     s.sort((a, b) => {
+      if (sortBy === "updated_desc") return +new Date(b.updatedAt || b.createdAt || 0) - +new Date(a.updatedAt || a.createdAt || 0);
       if (sortBy === "amount_desc") return Number(b.totalAmount) - Number(a.totalAmount);
       if (sortBy === "amount_asc") return Number(a.totalAmount) - Number(b.totalAmount);
       const da = +new Date(a.createdAt || 0), db = +new Date(b.createdAt || 0);
@@ -109,25 +112,26 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
   );
 
   // Mobile: filters live in a bottom sheet; this counts the active (non-default) ones for the badge/chips.
-  const opActiveFilters = (statusFilter !== "all" ? 1 : 0) + (priorityFilter !== "all" ? 1 : 0) + (sortBy !== "date_desc" ? 1 : 0) + ((range.from || range.to) ? 1 : 0);
-  const resetOpFilters = () => { setStatusFilter("all"); setPriorityFilter("all"); setSortBy("date_desc"); setRange({}); setPage(1); };
+  const opActiveFilters = (statusFilter !== "all" ? 1 : 0) + (priorityFilter !== "all" ? 1 : 0) + (sortBy !== "updated_desc" ? 1 : 0) + ((range.from || range.to) ? 1 : 0);
+  const resetOpFilters = () => { setStatusFilter("all"); setPriorityFilter("all"); setSortBy("updated_desc"); setRange({}); setPage(1); };
 
   // ---- card renderers ----
   const singleCard = (o: any) => {
     const amt = Number(o.totalAmount || 0);
     const pr = OP_PRIORITY[o.priority || "medium"] || OP_PRIORITY.medium;
     const lines = Array.isArray(o.items) ? o.items : [];
-    const summary = lines.length ? `${lines[0]?.description || "Item"}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}` : "—";
+    const summary = lines.length ? lines.map((i: any) => i?.description).filter(Boolean).join(", ") || "—" : "—";
     const selectable = selMode && o.status === "priced";
     const checked = sel.has(o.id);
     // Mobile: a compact card — only the essentials (ref + status, amount + priority, requester | items, Review).
     if (isMobile) {
       return (
-        <div key={o.id} data-testid={`appr-op-${o.id}`} className={`card-surface card-hover relative p-3 cursor-pointer ${selectable && checked ? "ring-2 ring-[#206295]" : ""} ${selMode && !selectable ? "opacity-60" : ""}`} onClick={() => (selectable ? toggleSel(o.id) : selMode ? undefined : setDetailId(o.id))}>
+        <div key={o.id} data-testid={`appr-op-${o.id}`} className={`card-surface card-hover relative p-3 cursor-pointer ${selectable && checked ? "ring-2 ring-[#206295]" : isJustUpdated(o.updatedAt) ? "ring-1 ring-[#4BDCD9]/70" : ""} ${selMode && !selectable ? "opacity-60" : ""}`} onClick={() => (selectable ? toggleSel(o.id) : selMode ? undefined : setDetailId(o.id))}>
           <div className="flex items-center gap-2">
             {selMode && <Checkbox checked={checked} disabled={!selectable} onClick={(e: any) => e.stopPropagation()} onCheckedChange={() => selectable && toggleSel(o.id)} className="flex-shrink-0" />}
             <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
             <span className="text-[13px] font-semibold text-foreground truncate flex-1">{o.reference}</span>
+            <span className="text-[10px] text-muted-foreground flex-shrink-0">{relDate(o.updatedAt || o.createdAt)}</span>
             <Badge className={`text-[10px] flex-shrink-0 ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge>
           </div>
           <div className="flex items-center justify-between gap-2 mt-1.5">
@@ -148,7 +152,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
       );
     }
     return (
-      <div key={o.id} data-testid={`appr-op-${o.id}`} className={`group card-surface card-hover relative p-4 cursor-pointer ${selectable && checked ? "ring-2 ring-[#206295]" : ""} ${selMode && !selectable ? "opacity-60" : ""}`} onClick={() => (selectable ? toggleSel(o.id) : selMode ? undefined : setDetailId(o.id))}>
+      <div key={o.id} data-testid={`appr-op-${o.id}`} className={`group card-surface card-hover relative p-4 cursor-pointer ${selectable && checked ? "ring-2 ring-[#206295]" : isJustUpdated(o.updatedAt) ? "ring-1 ring-[#4BDCD9]/70" : ""} ${selMode && !selectable ? "opacity-60" : ""}`} onClick={() => (selectable ? toggleSel(o.id) : selMode ? undefined : setDetailId(o.id))}>
         <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-5">
           {selMode && <Checkbox checked={checked} disabled={!selectable} onClick={(e: any) => e.stopPropagation()} onCheckedChange={() => selectable && toggleSel(o.id)} className="flex-shrink-0" />}
           <div className="flex-1 min-w-0 pr-4">
@@ -169,8 +173,8 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
           <div className="flex flex-wrap lg:flex-nowrap items-stretch gap-4 flex-shrink-0">
             <div className="w-[104px]">
               <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Submitted</p>
-              <p className="text-sm font-semibold text-foreground mt-1">{o.createdAt ? fmtDate(o.createdAt) : "—"}</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">Updated</p>
+              <p className="text-sm font-semibold text-foreground mt-1">{relDate(o.updatedAt || o.createdAt)}</p>
             </div>
             <div className="hidden lg:block w-px self-stretch bg-border rounded-full flex-shrink-0" />
             <div className="w-[104px]">
@@ -228,19 +232,40 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
     );
   };
 
-  // Pending is split into HR-stage sections (reimbursement-style) — each shown only if it has items.
-  const SECTION_CAP = 5;  // render the first N of each pending section, "Show all" reveals the rest (keeps the page light)
+  // Pending is split into HR-stage sections (reimbursement-style), most-actionable first — the same
+  // stage groups drive both the card view and the table view so the two read identically.
+  const PENDING_STAGES: { title: string; has: (s: string) => boolean; tone?: "alert"; Icon?: any }[] = [
+    { title: "Query from CEO", has: (s) => s === "under_review", tone: "alert", Icon: MessageSquare },
+    { title: "Needs pricing", has: (s) => s === "pending_hr" },
+    { title: "Ready to group & send", has: (s) => s === "priced" },
+    { title: "Ready to order", has: (s) => s === "approved" },
+    { title: "Awaiting CEO", has: (s) => s === "pending_approval" },
+  ];
+  // Split the current pending list into those stages; anything unmatched falls into a trailing bucket so nothing is dropped.
+  const pendingStageGroups = (rows: any[]) => {
+    const seen = new Set<string>();
+    const groups = PENDING_STAGES.map((st) => {
+      const items = rows.filter((o) => st.has(o.status));
+      items.forEach((o) => seen.add(o.id));
+      return { ...st, items };
+    }).filter((g) => g.items.length > 0);
+    const rest = rows.filter((o) => !seen.has(o.id));
+    if (rest.length) groups.push({ title: "In progress", has: () => true, items: rest } as any);
+    return groups;
+  };
+  // Full-width stage header shared with My Requests (alert tone + icon for CEO queries) — used by card + table.
+  const opStageHeader = (title: string, count: number, tone?: "alert", Icon?: any) => (
+    <StageHeader label={title} count={count} tone={tone} icon={Icon} />
+  );
+
+  const SECTION_CAP = 5;  // render the first N cards of each pending section, "Show all" reveals the rest (keeps the page light)
   const opSection = (title: string, items: any[], tone?: "alert", Icon?: any) => {
     if (items.length === 0) return null;
     const open = openSecs.has(title);
     const shown = open ? items : items.slice(0, SECTION_CAP);
     return (
       <div className="space-y-2.5" key={title}>
-        <div className="flex items-center gap-2">
-          {Icon && <Icon className={`h-3.5 w-3.5 ${tone === "alert" ? "text-[#C4402F]" : "text-muted-foreground"}`} />}
-          <span className={`text-xs font-semibold uppercase tracking-wide ${tone === "alert" ? "text-[#C4402F]" : "text-muted-foreground"}`}>{title}</span>
-          <span className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${tone === "alert" ? "bg-[#FF6F62]/20 text-[#C4402F]" : "bg-muted text-muted-foreground"}`}>{items.length}</span>
-        </div>
+        {opStageHeader(title, items.length, tone, Icon)}
         {shown.map((o) => singleCard(o))}
         {items.length > SECTION_CAP && (
           <button type="button" onClick={() => setOpenSecs((prev) => { const n = new Set(prev); open ? n.delete(title) : n.add(title); return n; })} className="text-xs font-medium text-[#206295] hover:underline" data-testid={`op-section-more-${title}`}>
@@ -250,6 +275,18 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
       </div>
     );
   };
+
+  // Table columns — shared by the flat (ordered/completed) and stage-grouped (pending) table renders.
+  const opColumns = [
+    { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground" },
+    { key: "requester", header: "Requester", render: (o: any) => <span className="text-foreground">{o.employeeName || "—"}<span className="text-muted-foreground"> ({o.employeeCode || "—"})</span></span> },
+    { key: "items", header: "Items", cellClassName: "text-muted-foreground", render: (o: any) => `${(o.items || []).length} item${(o.items || []).length !== 1 ? "s" : ""}` },
+    { key: "amount", header: "Amount", align: "right" as const, cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
+    { key: "priority", header: "Priority", render: (o: any) => { const pr = OP_PRIORITY[o.priority || "medium"] || OP_PRIORITY.medium; return <Badge className={`text-[10px] font-semibold ${pr.cls}`}>{pr.label}</Badge>; } },
+    { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
+    { key: "updated", header: "Updated", cellClassName: "text-muted-foreground", render: (o: any) => relDate(o.updatedAt || o.createdAt) },
+    { key: "__view", header: "", align: "center" as const, render: (o: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); setDetailId(o.id); }} data-testid={`view-op-${o.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> {phase === "pending" ? "Review" : "View"}</Button> },
+  ];
 
   return (
     <div className="space-y-4">
@@ -276,8 +313,9 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
             </SelectContent>
           </Select>
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="h-9 w-[160px] text-xs" data-testid="sort-op"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 w-[170px] text-xs" data-testid="sort-op"><ArrowDownUp className="h-3.5 w-3.5 mr-1 text-muted-foreground" /><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="updated_desc">Recently updated</SelectItem>
               <SelectItem value="date_desc">Newest first</SelectItem>
               <SelectItem value="date_asc">Oldest first</SelectItem>
               <SelectItem value="amount_desc">Amount: High → Low</SelectItem>
@@ -289,7 +327,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
           {canGroup && !selMode && <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelMode(true)} data-testid="op-group"><Layers className="h-4 w-4 mr-1.5" /> Group &amp; send</Button>}
           <ApprovalDateRange value={range} onChange={(v) => { setRange(v); setPage(1); }} />
           {phase === "completed" && <Button variant="secondary" size="sm" className="h-9" disabled={sorted.length === 0} onClick={doExport} data-testid="op-export"><Download className="h-4 w-4 mr-1.5" /> Export ({sorted.length})</Button>}
-          {!(phase === "pending" && view === "card") && (
+          {phase !== "pending" && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} data-testid="page-prev"><ChevronLeft className="h-4 w-4" /></Button>
               <span className="px-1 tabular-nums">{curPage} / {totalPages}</span>
@@ -338,7 +376,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
                   <p className="text-xs font-medium text-muted-foreground">Sort</p>
                   <Select value={sortBy} onValueChange={setSortBy}>
                     <SelectTrigger className="w-full" data-testid="sheet-op-sort"><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="date_desc">Newest first</SelectItem><SelectItem value="date_asc">Oldest first</SelectItem><SelectItem value="amount_desc">Amount: High → Low</SelectItem><SelectItem value="amount_asc">Amount: Low → High</SelectItem></SelectContent>
+                    <SelectContent><SelectItem value="updated_desc">Recently updated</SelectItem><SelectItem value="date_desc">Newest first</SelectItem><SelectItem value="date_asc">Oldest first</SelectItem><SelectItem value="amount_desc">Amount: High → Low</SelectItem><SelectItem value="amount_asc">Amount: Low → High</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
@@ -357,7 +395,7 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
           <div className="flex items-center gap-2">
             {canGroup && !selMode && <Button variant="secondary" size="sm" className="h-9" onClick={() => setSelMode(true)} data-testid="op-group-mobile"><Layers className="h-4 w-4 mr-1.5" /> Group &amp; send</Button>}
             {phase === "completed" && <Button variant="secondary" size="sm" className="h-9" disabled={sorted.length === 0} onClick={doExport} data-testid="op-export-mobile"><Download className="h-4 w-4 mr-1.5" /> Export ({sorted.length})</Button>}
-            {!(phase === "pending" && view === "card") && totalPages > 1 && (
+            {phase !== "pending" && totalPages > 1 && (
               <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
                 <Button variant="outline" size="icon" className="h-8 w-8" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)} data-testid="page-prev-mobile"><ChevronLeft className="h-4 w-4" /></Button>
                 <span className="px-1 tabular-nums">{curPage} / {totalPages}</span>
@@ -393,32 +431,28 @@ export function OfficePurchaseApprovals({ allItems, canTriage, canCeo, mobileCat
       {sorted.length === 0 ? (
         <div className="card-surface rounded-2xl py-16 text-center"><Check className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">{phase === "pending" ? "No office purchases awaiting your action" : phase === "ordered" ? "No orders in transit" : "No completed office purchases"}{hasRange ? " in this date range" : ""}.</p></div>
       ) : view === "table" ? (
-        <div className="card-surface rounded-2xl">
-          <DataTable
-            columns={[
-              { key: "reference", header: "Reference", cellClassName: "font-medium text-foreground" },
-              { key: "requester", header: "Requester", render: (o: any) => <span className="text-foreground">{o.employeeName || "—"}<span className="text-muted-foreground"> ({o.employeeCode || "—"})</span></span> },
-              { key: "items", header: "Items", cellClassName: "text-muted-foreground", render: (o: any) => `${(o.items || []).length} item${(o.items || []).length !== 1 ? "s" : ""}` },
-              { key: "amount", header: "Amount", align: "right", cellClassName: "font-semibold text-foreground", render: (o: any) => Number(o.totalAmount) > 0 ? money(o.totalAmount) : "—" },
-              { key: "priority", header: "Priority", render: (o: any) => { const pr = OP_PRIORITY[o.priority || "medium"] || OP_PRIORITY.medium; return <Badge className={`text-[10px] font-semibold ${pr.cls}`}>{pr.label}</Badge>; } },
-              { key: "status", header: "Status", render: (o: any) => <Badge className={`text-xs ${statusClass(o.status)}`}>{statusLabel(o.status)}</Badge> },
-              { key: "created", header: "Submitted", cellClassName: "text-muted-foreground", render: (o: any) => o.createdAt ? fmtDate(o.createdAt) : "—" },
-              { key: "__view", header: "", align: "center", render: (o: any) => <Button size="sm" variant="ghost" className="h-8 text-[#206295]" onClick={(e) => { e.stopPropagation(); setDetailId(o.id); }} data-testid={`view-op-${o.id}`}><Eye className="h-3.5 w-3.5 mr-1" /> {phase === "pending" ? "Review" : "View"}</Button> },
-            ]}
-            rows={pageItems}
-            getRowKey={(o: any) => o.id}
-            onRowClick={(o: any) => setDetailId(o.id)}
-            testIdPrefix="op-row"
-          />
-        </div>
+        phase === "pending" && !selMode ? (
+          // Table view, pending: same stage groups as the cards — a stage header over each stage's own table.
+          <div className="space-y-6">
+            {pendingStageGroups(sorted).map((g) => (
+              <div key={g.title} className="space-y-2.5">
+                {opStageHeader(g.title, g.items.length, g.tone, g.Icon)}
+                <div className="card-surface rounded-2xl">
+                  <DataTable columns={opColumns} rows={g.items} getRowKey={(o: any) => o.id} onRowClick={(o: any) => setDetailId(o.id)} testIdPrefix="op-row" paginate={false} showSerial />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="card-surface rounded-2xl">
+            <DataTable columns={opColumns} rows={pageItems} getRowKey={(o: any) => o.id} onRowClick={(o: any) => setDetailId(o.id)} testIdPrefix="op-row" showSerial serialStart={(curPage - 1) * LIST_PAGE_SIZE + 1} />
+          </div>
+        )
       ) : phase === "pending" ? (
         selMode
           ? <div className="space-y-2.5">{sorted.filter((o) => o.status === "priced").map((o) => singleCard(o))}</div>
           : <div className="space-y-6">
-              {opSection("Query from CEO", sorted.filter((o) => o.status === "under_review"), "alert", MessageSquare)}
-              {opSection("Needs pricing", sorted.filter((o) => o.status === "pending_hr"))}
-              {opSection("Ready to group & send", sorted.filter((o) => o.status === "priced"))}
-              {opSection("Ready to order", sorted.filter((o) => o.status === "approved"))}
+              {pendingStageGroups(sorted).map((g) => opSection(g.title, g.items, g.tone, g.Icon))}
             </div>
       ) : (
         <div className="space-y-2.5">

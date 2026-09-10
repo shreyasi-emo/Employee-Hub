@@ -46,9 +46,12 @@ export default function LogisticsPage() {
   const routeOf = (r: any) => `${r.fromLocationText || locName(r.fromLocationId) || ""} ${r.toLocationText || locName(r.toLocationId) || ""}`;
 
   const me = auth?.user?.id;
-  // Handlers get two surfaces: their own requests (Mine) and others' awaiting action (To Process).
+  // Handlers get two surfaces: their own requests (Mine) and the full queue awaiting action
+  // (To Process). To Process deliberately includes the handler's OWN requests — flagged "Yours"
+  // on the row — because there may be only one logistics handler, and excluding them left a
+  // request they raised with nobody able to process it.
   const mineAll = requests.filter((r) => r.requesterId === me);
-  const processAll = isHandler ? requests.filter((r) => r.requesterId !== me) : [];
+  const processAll = isHandler ? requests : [];
   const activeTab = isHandler ? tab : "mine";
   const base = activeTab === "process" ? processAll : mineAll;
   const activeCount = base.filter((r) => ACTIVE.includes(r.status)).length;
@@ -57,7 +60,7 @@ export default function LogisticsPage() {
   const processActive = processAll.filter((r) => ACTIVE.includes(r.status)).length;
 
   const rows = useMemo(() => {
-    const source = activeTab === "process" ? requests.filter((r) => r.requesterId !== me) : requests.filter((r) => r.requesterId === me);
+    const source = activeTab === "process" ? requests : requests.filter((r) => r.requesterId === me);
     const q = search.trim().toLowerCase();
     let list = source.filter((r) => (phase === "active" ? ACTIVE.includes(r.status) : !ACTIVE.includes(r.status)));
     if (typeFilter !== "all") list = list.filter((r) => r.requestType === typeFilter);
@@ -241,7 +244,12 @@ export default function LogisticsPage() {
               ) },
               { key: "requester", header: "Requester", cellClassName: "", render: (r: any) => (
                 <div className="min-w-0 max-w-[12rem]">
-                  <p className="font-medium text-foreground truncate">{r.requesterName || "Unassigned"}</p>
+                  <p className="font-medium text-foreground truncate inline-flex items-center gap-1.5">
+                    {r.requesterName || "Unassigned"}
+                    {activeTab === "process" && r.requesterId === me && (
+                      <Badge className="text-[10px] px-1.5 py-0 flex-shrink-0 bg-[#206295]/12 text-[#206295]">Yours</Badge>
+                    )}
+                  </p>
                   {r.requesterDept && <p className="text-xs text-muted-foreground truncate">{r.requesterDept}</p>}
                 </div>
               ) },
@@ -291,7 +299,7 @@ export default function LogisticsPage() {
                   prev = u;
                 }
               }
-              out.push(<LogisticsRequestCard key={r.id} r={r} locName={locName} onOpen={setDetail} />);
+              out.push(<LogisticsRequestCard key={r.id} r={r} locName={locName} onOpen={setDetail} mine={activeTab === "process" && r.requesterId === me} />);
             });
             return out;
           })()}
