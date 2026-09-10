@@ -12,6 +12,14 @@
 
 import { format } from "date-fns";
 
+// Title-case a label (category, type, etc.) but keep common acronyms upper-cased — so "hr" → "HR"
+// and "it" → "IT" instead of the wrong "Hr"/"It". Handles multi-word / underscored / hyphenated input.
+const LABEL_ACRONYMS = new Set(["hr", "it", "ceo", "cto", "hod", "pf", "esi", "uan", "pan", "ifsc", "id", "qa", "ui", "ux", "hrms", "hris"]);
+export const prettyLabel = (s?: string | null): string =>
+  (s ?? "").split(/[\s_/-]+/).filter(Boolean)
+    .map((w) => (LABEL_ACRONYMS.has(w.toLowerCase()) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+
 /** Rupees, no decimals — the default for amounts across the request screens. */
 export const money = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 

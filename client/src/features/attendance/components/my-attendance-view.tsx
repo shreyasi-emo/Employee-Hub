@@ -6,7 +6,7 @@ import {
   parseMeta, buildWfhApproval, buildEffectiveStatus, monthStats, travelDaysFrom,
 } from "../lib/my-attendance-model";
 import {
-  useMyAttendanceMonth, useTodayAttendanceList, useEndOnDuty, useEndLeave,
+  useMyAttendanceMonth, useTodayAttendanceList, useEndOnDuty, useEndLeave, useRegularizations,
 } from "../api/attendance.api";
 import { MyAttendanceHeader, MyAttendanceStats } from "./my-attendance-sections";
 import { MyAttendanceCalendar } from "./my-attendance-calendar";
@@ -14,6 +14,17 @@ import { ActivityDetailsCard } from "./activity-details-card";
 import { TodaysAttendanceCard } from "./todays-attendance-card";
 import { MarkOnDutyDialog } from "./mark-on-duty-dialog";
 import { ApplyWfhDialog } from "./apply-wfh-dialog";
+import { RequestOverrideDialog } from "./request-override-dialog";
+import { Badge } from "@/components/ui/badge";
+import { CalendarClock } from "lucide-react";
+
+// Brand-safe status tints for an employee's own override requests (pending is blue, never orange).
+const OVR_BADGE: Record<string, string> = {
+  pending: "bg-[#206295]/12 text-[#206295]",
+  approved: "bg-[#4BDCD9]/25 text-[#0E7C7B]",
+  rejected: "bg-[#FF6F62]/20 text-[#C4402F]",
+  cancelled: "bg-[#64748B]/15 text-[#64748B]",
+};
 
 export function MyAttendanceView() {
   const now = new Date();
@@ -23,11 +34,13 @@ export function MyAttendanceView() {
   const [calFilter, setCalFilter] = useState<string>("all");
   const [dutyOpen, setDutyOpen] = useState(false);
   const [wfhOpen, setWfhOpen] = useState(false);
-  // Deep-link support: /attendance?action=on-duty | wfh (used by the dashboard's header buttons) opens the dialog.
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  // Deep-link support: /attendance?action=on-duty | wfh | override opens the matching dialog.
   useEffect(() => {
     const action = new URLSearchParams(window.location.search).get("action");
     if (action === "on-duty") setDutyOpen(true);
     else if (action === "wfh") setWfhOpen(true);
+    else if (action === "override") setOverrideOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const { toast } = useToast();
@@ -47,6 +60,7 @@ export function MyAttendanceView() {
   const { data: myEmp } = useQuery<any>({ queryKey: ["/api/employees/me"] });
   const { data: todayList = [] } = useTodayAttendanceList();
   const { data: myTrips = [] } = useQuery<any[]>({ queryKey: ["/api/travel?mine=true"] });
+  const { data: myOverrides = [] } = useRegularizations();
 
   const dstr = (d: Date) => format(d, "yyyy-MM-dd");
   const byDate = useMemo(() => { const map: Record<string, any> = {}; (records as any[]).forEach((r) => { map[r.date] = r; }); return map; }, [records]);
@@ -82,6 +96,7 @@ export function MyAttendanceView() {
       <MyAttendanceHeader
         onApplyWfh={() => setWfhOpen(true)}
         onMarkOnDuty={() => todayOnDuty ? toast({ title: "On Duty already marked for today" }) : setDutyOpen(true)}
+        onRequestOverride={() => setOverrideOpen(true)}
       />
 
       <MyAttendanceStats stats={stats} />
@@ -118,8 +133,27 @@ export function MyAttendanceView() {
         </div>
       </div>
 
+      {/* Employee's own attendance-override requests + their status (past-date corrections go to HR). */}
+      {(myOverrides as any[]).length > 0 && (
+        <div className="card-surface rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3"><CalendarClock className="h-4 w-4 text-muted-foreground" /><h3 className="text-sm font-semibold text-foreground">My Attendance Override Requests</h3></div>
+          <div className="divide-y divide-border">
+            {(myOverrides as any[]).map((r) => (
+              <div key={r.id} className="flex items-center gap-3 py-2 text-sm" data-testid={`override-row-${r.id}`}>
+                <span className="font-medium text-foreground w-28 flex-shrink-0">{r.attendanceDate}</span>
+                <span className="text-muted-foreground capitalize flex-shrink-0">→ {String(r.requestedStatus || "present").replace(/_/g, " ")}</span>
+                <span className="text-muted-foreground truncate flex-1 min-w-0" title={r.reason}>{r.reason}</span>
+                {r.approvalNotes && <span className="text-[11px] text-muted-foreground/70 truncate max-w-[10rem] hidden sm:block" title={r.approvalNotes}>{r.approvalNotes}</span>}
+                <Badge className={`text-[10px] flex-shrink-0 ${OVR_BADGE[r.status] || OVR_BADGE.pending}`}>{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <MarkOnDutyDialog open={dutyOpen} onClose={() => setDutyOpen(false)} />
       <ApplyWfhDialog open={wfhOpen} onClose={() => setWfhOpen(false)} />
+      <RequestOverrideDialog open={overrideOpen} onClose={() => setOverrideOpen(false)} />
     </div>
   );
 }

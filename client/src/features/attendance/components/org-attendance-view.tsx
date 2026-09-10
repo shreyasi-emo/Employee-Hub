@@ -14,6 +14,7 @@ import { downloadEmployeeReport } from "../lib/attendance-export";
 import { useAttendanceRange, useAttendanceReport } from "../api/attendance.api";
 import { OrgAttendanceHeader, OrgAttendanceStats } from "./org-attendance-sections";
 import { WfhApprovalsCard } from "./wfh-approvals-card";
+import { OverrideApprovalsCard } from "./override-approvals-card";
 import { ApprovalsFeedCard } from "./approvals-feed-card";
 import { HeadcountChartCard, TodayDonutCard } from "./attendance-charts";
 import { AttendanceSummaryTable } from "./attendance-summary-table";
@@ -145,6 +146,7 @@ export function OrgAttendanceView() {
       />
 
       <WfhApprovalsCard />
+      <OverrideApprovalsCard />
 
       {/* Main row — a DEFINITE height so each h-full card gets a definite height and its inner
           ScrollArea can cap itself. Without this the tallest card (e.g. a long Approvals feed)

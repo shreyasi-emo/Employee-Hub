@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/shared/data-table";
 import { Plane, Clock, Search, CheckCircle2, XCircle, SlidersHorizontal, X } from "lucide-react";
 import { format } from "date-fns";
-import { statusOf, findCasualLeaveType, leaveTypeColor, leaveActionFor } from "../lib/leave-model";
+import { leaveBadge, findCasualLeaveType, leaveTypeColor, leaveActionFor } from "../lib/leave-model";
 import { StatCard } from "./leave-ui";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -171,7 +171,7 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
       ) : isMobile ? (
         <div className="space-y-3">
           {filteredMy.map((r: any) => {
-            const lt = leaveTypes.find((l: any) => l.id === r.leaveTypeId); const sc = statusOf(r.status); const a = leaveActionFor(r);
+            const lt = leaveTypes.find((l: any) => l.id === r.leaveTypeId); const sc = leaveBadge(r); const a = leaveActionFor(r);
             return (
               <div key={r.id} className="card-surface rounded-xl p-3" data-testid={`leave-row-card-${r.id}`}>
                 <div className="flex items-center gap-2">
@@ -198,7 +198,7 @@ export function MyLeavesTab({ myYear, leaveTypes, leaveBalances, selectedYear, i
               { key: "dates", header: "Dates", cellClassName: "text-muted-foreground", render: (r: any) => <>{format(new Date(r.startDate), "MMM d")}{r.startDate !== r.endDate ? ` – ${format(new Date(r.endDate), "MMM d, yyyy")}` : `, ${format(new Date(r.startDate), "yyyy")}`}</> },
               { key: "days", header: "Days", cellClassName: "text-muted-foreground", render: (r: any) => `${r.totalDays}d` },
               { key: "reason", header: "Reason", cellClassName: "text-muted-foreground max-w-[16rem] truncate", render: (r: any) => r.reason || "—" },
-              { key: "status", header: "Status", render: (r: any) => { const sc = statusOf(r.status); return <Badge className={`text-xs ${sc.bg} ${sc.text}`}>{sc.label}</Badge>; } },
+              { key: "status", header: "Status", render: (r: any) => { const sc = leaveBadge(r); return <Badge className={`text-xs ${sc.bg} ${sc.text}`}>{sc.label}</Badge>; } },
               { key: "action", header: "Action", align: "right", render: (r: any) => {
                 const a = leaveActionFor(r);
                 if (!a) return <span className="text-xs text-muted-foreground">—</span>;

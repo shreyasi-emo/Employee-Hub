@@ -135,7 +135,7 @@ export default function EmployeesPage() {
       )}
 
       <EmployeeFormDialog open={showAdd} onOpenChange={setShowAdd} departments={departments} designations={designations} employees={allEmployees} knownLocations={allLocations} />
-      <ImportEmployeesDialog open={showImport} onOpenChange={setShowImport} departments={departments} designations={designations} />
+      <ImportEmployeesDialog open={showImport} onOpenChange={setShowImport} departments={departments} designations={designations} employees={allEmployees} />
       <InsightsPanel open={showInsights} onOpenChange={setShowInsights} employees={allEmployees} departments={departments} />
       <BulkUpdateDialog open={showBulk} onOpenChange={setShowBulk} ids={[...selected]} departments={departments} locations={allLocations} onDone={() => setSelected(new Set())} />
       <JoinersReportDialog open={showExport} onOpenChange={setShowExport} allEmployees={allEmployees} departments={departments} designations={designations} />
