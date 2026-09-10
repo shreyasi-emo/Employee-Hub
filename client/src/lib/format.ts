@@ -36,6 +36,39 @@ export const formatDate = (d?: string | null) => {
   try { return d ? format(new Date(d), "MMM d, yyyy") : ""; } catch { return ""; }
 };
 
+/** Relative, scan-friendly date for approval lists: "just now" / "12m ago" / "3h ago" /
+ *  "Yesterday" / "4d ago" / "12 Sep". Feed it updatedAt so a just-touched item reads "just now". */
+export const relDate = (d?: string | number | Date | null) => {
+  if (!d) return "—";
+  const t = new Date(d).getTime();
+  if (isNaN(t)) return "—";
+  const min = (Date.now() - t) / 60000;
+  if (min < 0) return "just now";
+  if (min < 2) return "just now";
+  if (min < 60) return `${Math.floor(min)}m ago`;
+  const dayStart = (x: number) => { const dt = new Date(x); dt.setHours(0, 0, 0, 0); return dt.getTime(); };
+  const days = Math.round((dayStart(Date.now()) - dayStart(t)) / 86400000);
+  if (days <= 0) return `${Math.floor(min / 60)}h ago`;
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return format(new Date(t), "d MMM");
+};
+
+/** True when the date falls on the local calendar's today — for a "Today" quick filter. */
+export const isToday = (d?: string | number | Date | null) => {
+  if (!d) return false;
+  const t = new Date(d); if (isNaN(t.getTime())) return false;
+  const n = new Date();
+  return t.getFullYear() === n.getFullYear() && t.getMonth() === n.getMonth() && t.getDate() === n.getDate();
+};
+
+/** True for the first few minutes after a change — drives the "just updated" highlight. */
+export const isJustUpdated = (d?: string | number | Date | null) => {
+  if (!d) return false;
+  const t = new Date(d).getTime();
+  return !isNaN(t) && Date.now() - t < 3 * 60000;
+};
+
 /** snake_case -> spaced words, for raw status strings. */
 export const formatStatus = (s: string) => s?.replace(/_/g, " ") || "";
 

@@ -23,7 +23,7 @@ export const navItems: NavItem[] = [
   { title: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "hr_admin", "hr_executive"] },
   // A manager is scoped to their own team — direct reports only, no org-wide directory or dept filter.
   { title: "My Team", href: "/my-team", icon: Users, roles: ["manager"] },
-  { title: "My Profile", href: "/employees/me", icon: Users, roles: ["employee", "recruiter", "interviewer"] },
+  { title: "My Profile", href: "/employees/me", icon: Users, roles: ["employee"] },
   { title: "Attendance", href: "/attendance", icon: Clock },
   { title: "Leave", href: "/leave", icon: Plane },
   { title: "Holidays", href: "/holidays", icon: Calendar },
@@ -54,7 +54,7 @@ export const companyItems: NavItem[] = [
 ];
 
 export const workspaceItems: NavItem[] = [
-  { title: "ATS / Recruitment", href: "/workspace/ats", icon: Briefcase, roles: ["super_admin", "hr_admin", "hr_executive", "recruiter", "hr_ops"] },
+  { title: "ATS / Recruitment", href: "/workspace/ats", icon: Briefcase, roles: ["super_admin", "hr_admin", "hr_executive", "hr_ops"] },
   { title: "HR Ops", href: "/workspace/hr-ops", icon: CheckSquare, roles: ["super_admin", "hr_admin", "hr_executive", "hr_ops"] },
   { title: "CEO Inbox", href: "/workspace/approvals", icon: Inbox, roles: ["super_admin"] },
 ];

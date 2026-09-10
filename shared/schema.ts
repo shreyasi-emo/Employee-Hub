@@ -28,6 +28,9 @@ export const session = pgTable("session", {
 }));
 
 // Enums
+// NOTE: "recruiter", "interviewer" and "office_admin" are RETIRED. They remain in this enum only
+// because Postgres cannot drop an enum value without recreating the type — they are removed from the
+// app everywhere else (unassignable, grant no access, in no menu). Do not reuse them.
 export const roleEnum = pgEnum("role", [
   "super_admin",
   "hr_admin",

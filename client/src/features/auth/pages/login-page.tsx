@@ -17,8 +17,6 @@ const DEV_PROFILES = [
   { role: "HR Admin", name: "Priya Nair", username: "priya.nair" },
   { role: "HR Executive", name: "Ananya Reddy", username: "ananya.reddy" },
   { role: "HR Ops", name: "Sameer Joshi", username: "hrops@emoenergy.in" },
-  { role: "Recruiter", name: "Riya Kapoor", username: "recruiter@emoenergy.in" },
-  { role: "Interviewer", name: "Karan Malhotra", username: "interviewer@emoenergy.in" },
   { role: "Finance", name: "Neha Verma", username: "finance@emoenergy.in" },
   { role: "CEO Approver", name: "Rajesh Khanna", username: "ceo@emoenergy.in" },
   { role: "CTO", name: "Arjun Sharma", username: "arjun.sharma" },

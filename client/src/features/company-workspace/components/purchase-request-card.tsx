@@ -1,5 +1,5 @@
 import { formatDate } from "../shared/request-format";
-import { moneyShort } from "@/lib/format";
+import { moneyShort, relDate, isJustUpdated } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { colDivider } from "./request-ui";
 import { useMutation } from "@tanstack/react-query";
@@ -20,7 +20,12 @@ export function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: a
   const basePath = isProc ? "/api/procurement" : "/api/office-purchases";
   const reference = item.reference || `${isProc ? "PR" : "OP"}-${String(item.id || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()}`;
   const lines = Array.isArray(item.items) ? item.items : [];
-  const title = lines.length ? `${lines[0]?.description || "Item"}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}` : (isProc ? "Procurement" : "Office Purchase");
+  // Heading lists the actual item names (truncates if long); the exact count rides alongside as a chip,
+  // so a multi-line order reads as "Mouse, Keyboard  ·  3 items" — never the vague "Mouse +1 more".
+  const names = lines.map((l: any) => l?.description).filter(Boolean);
+  const title = names.length ? names.join(", ") : (isProc ? "Procurement" : "Office Purchase");
+  const itemCount = lines.length;
+  const countChip = itemCount > 1 ? <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex-shrink-0 whitespace-nowrap">{itemCount} items</Badge> : null;
   const amt = Number(item.totalAmount) || 0;
   // Office can be cancelled pre-CEO (pending_hr / pending_approval); procurement only while pending_approval.
   const canCancel = isProc ? item.status === "pending_approval" : ["pending_hr", "pending_approval"].includes(item.status);
@@ -45,7 +50,7 @@ export function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: a
   // on line 2, a |-separated date + amount meta line; the overflow menu keeps View / Cancel.
   if (isMobile) {
     return (
-      <Card data-testid={`card-${kind}-${item.id}`} className="border-0 hover-elevate active-elevate-2 cursor-pointer" onClick={() => onOpen(item.id)}>
+      <Card data-testid={`card-${kind}-${item.id}`} className={`border-0 hover-elevate active-elevate-2 cursor-pointer ${isJustUpdated(item.updatedAt) ? "ring-1 ring-[#4BDCD9]/70" : ""}`} onClick={() => onOpen(item.id)}>
         <CardContent className="p-3">
           <div className="flex items-start gap-3">
             <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isProc ? "bg-[#0E7C7B]/10 text-[#0E7C7B]" : "bg-[#206295]/10 text-[#206295]"}`}>{isProc ? <Package className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}</div>
@@ -58,9 +63,10 @@ export function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: a
                 <span className="text-[11px] font-semibold text-muted-foreground tracking-wide truncate">{reference}</span>
                 <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(reference); toast({ title: "Reference copied" }); }} aria-label="Copy reference" className="h-5 w-5 rounded inline-flex items-center justify-center text-muted-foreground hover:text-[#206295] hover:bg-muted flex-shrink-0"><Copy className="h-3 w-3" /></button>
                 {!isProc && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">{item.priority || "medium"}</Badge>}
+                {countChip}
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1 min-w-0">
-                <span className="inline-flex items-center gap-1 min-w-0 truncate"><CalendarClock className="h-3 w-3 flex-shrink-0" /><span className="truncate">{formatDate(item.createdAt)}</span></span>
+                <span className="inline-flex items-center gap-1 min-w-0 truncate"><CalendarClock className="h-3 w-3 flex-shrink-0" /><span className="truncate">{relDate(item.updatedAt || item.createdAt)}</span></span>
                 <span className="text-border flex-shrink-0">|</span>
                 {amt > 0
                   ? <span className="flex-shrink-0 font-bold text-[#206295] tabular-nums">{moneyShort(amt)}</span>
@@ -75,7 +81,7 @@ export function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: a
   }
 
   return (
-    <Card data-testid={`card-${kind}-${item.id}`} className="border-0 hover-elevate active-elevate-2 cursor-pointer" onClick={() => onOpen(item.id)}>
+    <Card data-testid={`card-${kind}-${item.id}`} className={`border-0 hover-elevate active-elevate-2 cursor-pointer ${isJustUpdated(item.updatedAt) ? "ring-1 ring-[#4BDCD9]/70" : ""}`} onClick={() => onOpen(item.id)}>
       <CardContent className="p-[17px]">
         <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-0">
           <div className="flex-1 min-w-0 flex items-start gap-3 lg:pr-5">
@@ -85,6 +91,7 @@ export function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: a
                 <span className="text-xs font-semibold text-muted-foreground tracking-wide">{reference}</span>
                 <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(reference); toast({ title: "Reference copied" }); }} aria-label="Copy reference" className="h-5 w-5 rounded inline-flex items-center justify-center text-muted-foreground hover:text-[#206295] hover:bg-muted"><Copy className="h-3 w-3" /></button>
                 {!isProc && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">{item.priority || "medium"}</Badge>}
+                {countChip}
               </div>
               <h3 className="text-[18px] leading-tight font-semibold text-foreground tracking-tight truncate mt-0.5">{title}</h3>
               <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 flex-shrink-0" /> Created | {formatDate(item.createdAt)}</p>
@@ -95,7 +102,7 @@ export function PurchaseRequestCard({ item, onOpen, kind = "office" }: { item: a
           <div className="w-full lg:w-[150px] flex-shrink-0 lg:px-5 flex flex-col justify-end">
             <History className="h-4 w-4 text-muted-foreground" />
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1.5 whitespace-nowrap">Last Updated</p>
-            <p className="text-sm font-semibold text-foreground mt-1.5 whitespace-nowrap">{item.updatedAt ? formatDate(item.updatedAt) : "—"}</p>
+            <p className="text-sm font-semibold text-foreground mt-1.5 whitespace-nowrap">{relDate(item.updatedAt || item.createdAt)}</p>
           </div>
 
           {colDivider}

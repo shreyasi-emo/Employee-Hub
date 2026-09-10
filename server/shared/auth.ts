@@ -84,7 +84,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 // HR/Admin Workspace access (ATS, office admin, approvals inbox).
-const WORKSPACE_ROLES = ["super_admin", "hr_admin", "hr_executive", "recruiter", "hr_ops", "office_admin", "ceo_approver"];
+const WORKSPACE_ROLES = ["super_admin", "hr_admin", "hr_executive", "hr_ops", "office_admin", "ceo_approver"];
 export function requireWorkspace(req: Request, res: Response, next: NextFunction) {
   if (!WORKSPACE_ROLES.includes(req.currentUser?.role as string)) {
     return res.status(403).json({ error: "Workspace access denied" });

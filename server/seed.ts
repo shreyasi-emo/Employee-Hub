@@ -384,9 +384,7 @@ export async function seed() {
   // Remaining role profiles so every role has a quick login
   const opsDeptForRoles = (await storage.getDepartments());
   const extraRoleProfiles = [
-    { code: "EMO0R1", role: "recruiter", first: "Riya", last: "Kapoor", username: "recruiter@emoenergy.in", dept: "Human Resources" },
     { code: "EMO0O1", role: "hr_ops", first: "Sameer", last: "Joshi", username: "hrops@emoenergy.in", dept: "Human Resources" },
-    { code: "EMO0I1", role: "interviewer", first: "Karan", last: "Malhotra", username: "interviewer@emoenergy.in", dept: "Engineering" },
   ];
   const extraEmps: any[] = [];
   for (const p of extraRoleProfiles) {

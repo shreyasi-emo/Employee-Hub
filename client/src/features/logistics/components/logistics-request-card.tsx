@@ -24,9 +24,15 @@ function Endpoint({ label, loc, date }: { label: string; loc: string; date: any 
   );
 }
 
+// Marks a row in the handler's To Process queue that the handler raised themselves — they still
+// have to process it (there may be only one logistics handler), but it shouldn't read as someone else's.
+const YoursTag = () => (
+  <Badge className="text-[10px] px-1.5 py-0 flex-shrink-0 bg-[#206295]/12 text-[#206295]">Yours</Badge>
+);
+
 // Logistics request card — single row: requester + cargo | route (pickup → drop) | status | action.
-export function LogisticsRequestCard({ r, locName, onOpen }: {
-  r: any; locName: (id: string) => string | undefined; onOpen: (r: any) => void;
+export function LogisticsRequestCard({ r, locName, onOpen, mine }: {
+  r: any; locName: (id: string) => string | undefined; onOpen: (r: any) => void; mine?: boolean;
 }) {
   const isMobile = useIsMobile();
   const isInboard = r.requestType === "inboard";
@@ -46,7 +52,10 @@ export function LogisticsRequestCard({ r, locName, onOpen }: {
             <span className="h-11 w-11 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Truck className="h-5 w-5" /></span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-bold text-foreground truncate">{r.requesterName || "Unassigned"}</span>
+                <span className="inline-flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm font-bold text-foreground truncate">{r.requesterName || "Unassigned"}</span>
+                  {mine && <YoursTag />}
+                </span>
                 <Badge className={`gap-1 text-[10px] flex-shrink-0 ${statusClass(r.status)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" /> {statusLabel(r.status)}</Badge>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
@@ -78,6 +87,7 @@ export function LogisticsRequestCard({ r, locName, onOpen }: {
             <div className="min-w-0">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-[15px] font-bold text-foreground truncate">{r.requesterName || "Unassigned"}</span>
+                {mine && <YoursTag />}
                 {r.requesterDept && <><Sep /><span className="text-sm text-muted-foreground truncate">{r.requesterDept}</span></>}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">

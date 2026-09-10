@@ -18,7 +18,7 @@ const ROUTE_ROLES: Record<string, string[]> = {
   "/audit": ["super_admin", "hr_admin"],
   "/team-requests": ["super_admin", "hr_admin", "hr_executive", "manager", "hr_ops", "ceo_approver"],
   "/approval-notes": ["super_admin", "ceo_approver", "hr_admin", "hr_executive", "hr_ops", "logistics", "finance"],
-  "/workspace/ats": ["super_admin", "hr_admin", "hr_executive", "recruiter", "hr_ops"],
+  "/workspace/ats": ["super_admin", "hr_admin", "hr_executive", "hr_ops"],
   "/workspace/hr-ops": ["super_admin", "hr_admin", "hr_executive", "hr_ops"],
   "/workspace/approvals": ["super_admin"],
 };
