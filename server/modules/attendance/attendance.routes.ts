@@ -442,7 +442,7 @@ export function registerAttendanceRoutes(app: Express) {
         const nm = `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "A team member";
         await storage.notifyEmployee(emp.managerId, {
           type: "info", title: "Team member on duty",
-          body: `${nm} marked On Duty — ${meta.purpose}${meta.location ? " · " + meta.location : ""}.`,
+          body: `${nm} marked On Duty — ${meta.purpose}${meta.location ? " | " + meta.location : ""}.`,
           link: "/attendance",
         });
       }

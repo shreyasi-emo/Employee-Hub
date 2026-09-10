@@ -30,6 +30,10 @@ export const useWfhPending = () =>
 export const useApprovalsFeed = () =>
   useQuery<any[]>({ queryKey: ["/api/approvals/feed"] });
 
+// Attendance-override (regularization) requests — own list for employees, pending queue for approvers.
+export const useRegularizations = (status?: string) =>
+  useQuery<any[]>({ queryKey: [status ? `/api/regularizations?status=${status}` : "/api/regularizations"] });
+
 export const fetchAttendanceStreak = (employeeId: string) =>
   apiRequest("GET", `/api/attendance/streak?employeeId=${employeeId}`);
 
@@ -66,6 +70,35 @@ export function useOverrideAttendance(opts: { onSuccess?: () => void; onError?: 
       qc.invalidateQueries({ queryKey: ["/api/leave-requests"] });
       opts.onSuccess?.();
     },
+    onError: opts.onError,
+  });
+}
+
+/** Refresh attendance + regularization queries together (an override write changes both). */
+function useInvalidateAttendanceAndRegs() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({
+    predicate: (q) => typeof q.queryKey[0] === "string"
+      && ((q.queryKey[0] as string).startsWith("/api/attendance") || (q.queryKey[0] as string).startsWith("/api/regularizations")),
+  });
+}
+
+/** Employee requests an attendance override for a PAST date (mandatory reason). Goes to HR/manager. */
+export function useRequestOverride(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
+  const invalidate = useInvalidateAttendanceAndRegs();
+  return useMutation({
+    mutationFn: (payload: any) => apiRequest("POST", "/api/regularizations", payload),
+    onSuccess: () => { invalidate(); opts.onSuccess?.(); },
+    onError: opts.onError,
+  });
+}
+
+/** HR/manager decision on a pending attendance-override request — approve writes the corrected day. */
+export function useDecideOverride(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
+  const invalidate = useInvalidateAttendanceAndRegs();
+  return useMutation({
+    mutationFn: ({ id, ...body }: any) => apiRequest("PUT", `/api/regularizations/${id}`, body),
+    onSuccess: () => { invalidate(); opts.onSuccess?.(); },
     onError: opts.onError,
   });
 }

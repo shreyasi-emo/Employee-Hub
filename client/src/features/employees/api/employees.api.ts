@@ -110,17 +110,20 @@ export function useBulkUpdateEmployees() {
   };
 }
 
-/** CSV import — one POST per row, tallying successes and skips. */
+/** Bulk import — one POST per (already-validated) payload; returns per-row server failures too. */
 export function useImportEmployees() {
   const qc = useQueryClient();
   return async (payloads: any[]) => {
-    let ok = 0, fail = 0;
+    let ok = 0;
+    const failures: { label: string; message: string }[] = [];
     for (const payload of payloads) {
-      if (!payload.firstName || !payload.lastName || !payload.email) { fail++; continue; }
-      try { await apiRequest("POST", "/api/employees", payload); ok++; } catch { fail++; }
+      const label = `${payload.firstName || ""} ${payload.lastName || ""}`.trim() || payload.email || "Row";
+      if (!payload.firstName || !payload.lastName || !payload.email) { failures.push({ label, message: "Missing required fields" }); continue; }
+      try { await apiRequest("POST", "/api/employees", payload); ok++; }
+      catch (e: any) { failures.push({ label, message: e?.message || "Server rejected the row" }); }
     }
     await qc.invalidateQueries({ queryKey: ["/api/employees"] });
-    return { ok, fail };
+    return { ok, fail: failures.length, failures };
   };
 }
 

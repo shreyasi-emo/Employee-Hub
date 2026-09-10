@@ -2,7 +2,7 @@ import { db } from "./db";
 import { eq, and, desc, sql, gte, lte, like, or, isNull, asc } from "drizzle-orm";
 import {
   users, employees, departments, designations,
-  salaryStructures, attendanceRecords, regularizationRequests,
+  salaryStructures, attendanceRecords, regularizationRequests, profileEditRequests,
   leaveTypes, leaveBalances, leaveLedger, leaveRequests,
   holidays, payrollRuns, payslips, statutoryConfig,
   documents, announcements, assets, auditLogs,
@@ -23,6 +23,7 @@ import {
   type SalaryStructure, type InsertSalaryStructure,
   type AttendanceRecord, type InsertAttendance,
   type RegularizationRequest, type InsertRegularization,
+  type InsertProfileEditRequest,
   type LeaveType, type InsertLeaveType,
   type LeaveBalance, type InsertLeaveBalance,
   type LeaveLedgerEntry, type InsertLeaveLedger,
@@ -337,6 +338,34 @@ export const storage = {
     return req;
   },
 
+  // ====== PROFILE EDIT REQUESTS (employee → HR approval) ======
+  async getProfileEditRequests(employeeId?: string, status?: string) {
+    const conditions = [];
+    if (employeeId) conditions.push(eq(profileEditRequests.employeeId, employeeId));
+    if (status) conditions.push(eq(profileEditRequests.status, status as any));
+    return db.select().from(profileEditRequests)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(profileEditRequests.createdAt));
+  },
+
+  async getProfileEditRequest(id: string) {
+    const [r] = await db.select().from(profileEditRequests).where(eq(profileEditRequests.id, id));
+    return r;
+  },
+
+  async createProfileEditRequest(data: InsertProfileEditRequest) {
+    const [r] = await db.insert(profileEditRequests).values(data).returning();
+    return r;
+  },
+
+  async updateProfileEditRequest(id: string, data: Partial<InsertProfileEditRequest>) {
+    const [r] = await db.update(profileEditRequests)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(profileEditRequests.id, id))
+      .returning();
+    return r;
+  },
+
   // ====== LEAVE TYPES ======
   async getLeaveTypes() {
     return db.select().from(leaveTypes).where(eq(leaveTypes.isActive, true)).orderBy(leaveTypes.name);
@@ -604,9 +633,14 @@ export const storage = {
     }
   },
 
-  // ====== ANNOUNCEMENTS ======
+  // ====== ANNOUNCEMENTS (+ Community, same table via `kind`) ======
   async getAnnouncements() {
     return db.select().from(announcements).where(eq(announcements.isActive, true)).orderBy(desc(announcements.createdAt));
+  },
+
+  async getAnnouncement(id: string) {
+    const [a] = await db.select().from(announcements).where(eq(announcements.id, id));
+    return a;
   },
 
   async createAnnouncement(data: InsertAnnouncement) {
@@ -621,6 +655,23 @@ export const storage = {
 
   async deleteAnnouncement(id: string) {
     await db.delete(announcements).where(eq(announcements.id, id));
+  },
+
+  // Toggle one user's reaction (emoji) on a post. Reactions are { emoji: [userId, ...] }.
+  async toggleAnnouncementReaction(id: string, userId: string, emoji: string) {
+    const [row] = await db.select().from(announcements).where(eq(announcements.id, id));
+    if (!row) return undefined;
+    const reactions: Record<string, string[]> = { ...((row.reactions as any) || {}) };
+    const arr = Array.isArray(reactions[emoji]) ? reactions[emoji] : [];
+    reactions[emoji] = arr.includes(userId) ? arr.filter((u) => u !== userId) : [...arr, userId];
+    if (reactions[emoji].length === 0) delete reactions[emoji];
+    const [updated] = await db.update(announcements).set({ reactions }).where(eq(announcements.id, id)).returning();
+    return updated;
+  },
+
+  async setUserCommunityPermission(userId: string, canPost: boolean) {
+    const [u] = await db.update(users).set({ canPostCommunity: canPost }).where(eq(users.id, userId)).returning();
+    return u;
   },
 
   // ====== ASSETS ======
@@ -675,6 +726,15 @@ export const storage = {
       .where(and(eq(notifications.userId, userId), gte(notifications.createdAt, since)))
       .orderBy(desc(notifications.createdAt))
       .limit(limit);
+  },
+
+  // True if a notification of this type already exists for the user since `since` — used to dedupe
+  // periodic reminders (e.g. one manager pending-leave reminder per day).
+  async hasNotificationSince(userId: string, type: string, since: Date) {
+    const rows = await db.select({ id: notifications.id }).from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.type, type), gte(notifications.createdAt, since)))
+      .limit(1);
+    return rows.length > 0;
   },
 
   async markNotificationRead(id: string, userId: string) {

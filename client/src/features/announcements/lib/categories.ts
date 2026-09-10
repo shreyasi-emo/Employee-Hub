@@ -1,7 +1,7 @@
 // Announcement categories — BRAND PALETTE ONLY (no orange on this screen):
 //   blue #206295 | teal #0E7C7B / #4BDCD9 | coral #FF6F62 / #C4402F | neutral slate #64748B.
 // (No purple / pink / orange / generic Tailwind hues — those violate the brand guidelines.)
-import { Megaphone, Users, ScrollText, Calendar, CalendarDays, Gift, AlertTriangle, Tag } from "lucide-react";
+import { Megaphone, Users, ScrollText, Calendar, CalendarDays, Gift, AlertTriangle, Tag, Cake, PartyPopper, Heart } from "lucide-react";
 
 const TINT = {
   blue: "bg-[#206295]/15 text-[#206295]",
@@ -21,7 +21,16 @@ export const categoryMeta: Record<string, { icon: any; tile: string; desc: strin
   event: { icon: CalendarDays, tile: TINT.tealL, desc: "Events" },
   benefits: { icon: Gift, tile: TINT.tealL, desc: "Benefits" },
   urgent: { icon: AlertTriangle, tile: TINT.coral, desc: "Urgent notices" },
+  // Community categories (birthdays / anniversaries / general community posts).
+  birthday: { icon: Cake, tile: TINT.tealL, desc: "Birthdays" },
+  anniversary: { icon: PartyPopper, tile: TINT.blue, desc: "Work anniversaries" },
+  community: { icon: Heart, tile: TINT.teal, desc: "Community" },
 };
+
+// Which categories each feed's composer offers. Kept explicit so community categories don't leak
+// into the announcement composer (and vice-versa) even though both share `categoryMeta`.
+export const ANNOUNCEMENT_CATEGORIES = ["general", "hr", "policy", "holiday", "event", "benefits", "urgent"];
+export const COMMUNITY_CATEGORIES = ["community", "birthday", "anniversary", "event"];
 export const defaultCatMeta = { icon: Tag, tile: TINT.slate, desc: "Updates" };
 export const catMeta = (c: string) => categoryMeta[c] || defaultCatMeta;
 

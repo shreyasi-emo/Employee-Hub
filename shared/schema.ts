@@ -11,6 +11,7 @@ import {
   jsonb,
   json,
   index,
+  uniqueIndex,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -52,6 +53,7 @@ export const employmentTypeEnum = pgEnum("employment_type", [
   "part_time",
   "intern",
   "contract",
+  "consultant",
 ]);
 
 export const employmentStatusEnum = pgEnum("employment_status", [
@@ -161,6 +163,8 @@ export const users = pgTable("users", {
   employeeId: varchar("employee_id"),
   isActive: boolean("is_active").notNull().default(true),
   accountStatus: text("account_status").notNull().default("active"),
+  // Per-user grant: allowed to publish in the Community section (HR/Admin can always post; this opens it to others).
+  canPostCommunity: boolean("can_post_community").notNull().default(false),
   inviteToken: text("invite_token"),
   inviteExpiresAt: timestamp("invite_expires_at"),
   resetToken: text("reset_token"),
@@ -350,6 +354,28 @@ export const leaveRequests = pgTable("leave_requests", {
   status: leaveStatusEnum("status").notNull().default("pending"),
   approvedBy: varchar("approved_by"),
   approvalNotes: text("approval_notes"),
+  // System auto-approved after the 7-day-post-leave window (manager never actioned it). Stays status="approved".
+  autoApproved: boolean("auto_approved").notNull().default(false),
+  // Manager concern raised on an already-approved (usually auto-approved) leave. Does not change status.
+  flagged: boolean("flagged").notNull().default(false),
+  flagNote: text("flag_note"),
+  flaggedBy: varchar("flagged_by"),
+  flaggedAt: timestamp("flagged_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Employee-initiated profile change requests — employees can no longer edit their own record directly
+// (photo excepted); a request captures the proposed field changes and HR approves/rejects it.
+export const profileEditRequests = pgTable("profile_edit_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull(),
+  // { field: { old, new }, ... } — the proposed changes, shown to HR for review.
+  changes: jsonb("changes").notNull(),
+  reason: text("reason"),
+  status: leaveStatusEnum("status").notNull().default("pending"),
+  approvedBy: varchar("approved_by"),
+  approvalNotes: text("approval_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -452,6 +478,9 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// The fixed, basic reaction set for Community posts (no comments/replies). Shared by server + client.
+export const COMMUNITY_REACTIONS = ["🎉", "❤️", "👏", "👍"] as const;
+
 // Announcements
 export const announcements = pgTable("announcements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -460,6 +489,10 @@ export const announcements = pgTable("announcements", {
   category: text("category").default("general"),
   priority: text("priority").default("normal"),
   visibleTo: text("visible_to").default("all"),
+  // "announcement" (default) or "community" (birthdays / anniversaries / community posts). Same table, one feed each.
+  kind: text("kind").notNull().default("announcement"),
+  // Community reactions: { "🎉": [userId, ...], ... }. Empty for normal announcements.
+  reactions: jsonb("reactions").notNull().default({}),
   publishedBy: varchar("published_by"),
   isActive: boolean("is_active").default(true),
   expiresAt: timestamp("expires_at"),
@@ -1068,6 +1101,7 @@ export const insertAttendanceSchema = createInsertSchema(attendanceRecords).omit
 export const insertRegularizationSchema = createInsertSchema(regularizationRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLeaveTypeSchema = createInsertSchema(leaveTypes).omit({ id: true, createdAt: true });
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProfileEditRequestSchema = createInsertSchema(profileEditRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertHolidaySchema = createInsertSchema(holidays).omit({ id: true, createdAt: true });
 export const insertPayrollRunSchema = createInsertSchema(payrollRuns).omit({ id: true, createdAt: true, updatedAt: true, lockedAt: true });
 export const insertPayslipSchema = createInsertSchema(payslips).omit({ id: true, createdAt: true, updatedAt: true });
@@ -1153,6 +1187,8 @@ export type InsertLeaveLedger = z.infer<typeof insertLeaveLedgerSchema>;
 
 export type LeaveRequest = typeof leaveRequests.$inferSelect;
 export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
+export type ProfileEditRequest = typeof profileEditRequests.$inferSelect;
+export type InsertProfileEditRequest = z.infer<typeof insertProfileEditRequestSchema>;
 
 export type Holiday = typeof holidays.$inferSelect;
 export type InsertHoliday = z.infer<typeof insertHolidaySchema>;
@@ -1625,3 +1661,240 @@ export type RequestComment = typeof requestComments.$inferSelect;
 export type CeoApprovalNote = typeof ceoApprovalNotes.$inferSelect;
 export type ReferenceDoc = typeof referenceDocs.$inferSelect;
 export type ZohoSyncJob = typeof zohoSyncJobs.$inferSelect;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// PAYROLL (rebuilt)
+//
+// New tables rather than a migration of the originals. The old `salaryStructures` / `payslips` /
+// `payrollRuns` / `statutoryConfig` are LEFT IN PLACE because the employee profile's Salary tab still
+// reads `salaryStructures`, and because their historical rows carry the double-LOP and wrong-PT bugs —
+// those must never flow into a year-to-date total. Cut over from a clean month.
+//
+// The computation engine lives in shared/payroll/* and is imported by BOTH the client (for preview)
+// and the server (authoritative). A payslip is a line-item document, not a fixed set of columns, so a
+// configurable CTC, FBP, arrears and reimbursements all fit without a schema change.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** Component master. `code` is referenced by formulas and by every past payslip line — never rename. */
+export const salaryComponents = pgTable("salary_components", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  type: text("type").notNull(),                    // earning | deduction | employer_contribution | reimbursement
+  calcType: text("calc_type").notNull(),           // fixed | percent_of | balance | statutory | input
+  percentOf: text("percent_of"),                   // a component code, or CTC_MONTHLY
+  percentValue: numeric("percent_value", { precision: 6, scale: 3 }),
+  taxable: boolean("taxable").notNull().default(true),
+  pfApplicable: boolean("pf_applicable").notNull().default(false),
+  esiApplicable: boolean("esi_applicable").notNull().default(false),
+  ptApplicable: boolean("pt_applicable").notNull().default(true),
+  prorate: boolean("prorate").notNull().default(true),
+  showOnPayslip: boolean("show_on_payslip").notNull().default(true),
+  displayOrder: integer("display_order").notNull().default(100),
+  active: boolean("active").notNull().default(true),
+  /** Set once a cycle has computed against it — blocks destructive edits. */
+  inUse: boolean("in_use").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** An employee's structure, effective-dated. `lines` is [{componentCode, monthly}]. */
+export const employeeSalaryStructures = pgTable("employee_salary_structures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull(),
+  effectiveFrom: date("effective_from").notNull(),
+  effectiveTo: date("effective_to"),
+  ctcAnnual: numeric("ctc_annual", { precision: 14, scale: 2 }).notNull(),
+  lines: jsonb("lines").notNull().default([]),
+  revisionReason: text("revision_reason"),
+  /** Set when a retrospective revision needs arrears raising for past months. */
+  arrearsFromMonth: date("arrears_from_month"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  employeeIdx: index("ess_employee_idx").on(t.employeeId),
+}));
+
+/** Effective-dated statutory rates. Insert-only: a change closes the open row and adds a new one. */
+export const statutoryProfiles = pgTable("statutory_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  label: text("label").notNull(),
+  financialYear: text("financial_year").notNull(),
+  effectiveFrom: date("effective_from").notNull(),
+  effectiveTo: date("effective_to"),
+  pf: jsonb("pf").notNull(),                       // PfConfig
+  esi: jsonb("esi").notNull(),                     // EsiConfig
+  pt: jsonb("pt").notNull().default([]),           // PtStateRule[]
+  lwf: jsonb("lwf").notNull().default([]),         // LwfStateRule[]
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/** Singleton policy row: paid-days basis, rounding, LOP basis, default state. */
+export const payrollSettings = pgTable("payroll_settings", {
+  id: varchar("id").primaryKey().default("singleton"),
+  paidDaysBasis: text("paid_days_basis").notNull().default("calendar_days"),
+  rounding: text("rounding").notNull().default("nearest_rupee"),
+  lopBasis: text("lop_basis").notNull().default("gross"),
+  defaultState: text("default_state").notNull().default("KA"),
+  fyStartMonth: integer("fy_start_month").notNull().default(4),
+  updatedBy: varchar("updated_by"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/**
+ * A monthly payroll run.
+ *   draft -> computed -> pending_approval -> approved -> paid
+ * Editable only in draft/computed. `approved` onward is immutable; reopening needs a reason, clears
+ * the approval, unpublishes payslips and forces a recompute.
+ */
+export const payrollCycles = pgTable("payroll_cycles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+  status: text("status").notNull().default("draft"),
+  /** Policy + rates snapshotted at compute time so a past cycle stays reproducible. */
+  settingsSnapshot: jsonb("settings_snapshot"),
+  statutoryProfileId: varchar("statutory_profile_id"),
+
+  totalEmployees: integer("total_employees").notNull().default(0),
+  totalGross: numeric("total_gross", { precision: 16, scale: 2 }).notNull().default("0"),
+  totalDeductions: numeric("total_deductions", { precision: 16, scale: 2 }).notNull().default("0"),
+  totalEmployerCost: numeric("total_employer_cost", { precision: 16, scale: 2 }).notNull().default("0"),
+  totalNetPay: numeric("total_net_pay", { precision: 16, scale: 2 }).notNull().default("0"),
+
+  computedBy: varchar("computed_by"), computedAt: timestamp("computed_at"),
+  /** Maker. Segregation of duties: submittedBy / computedBy may not approve. */
+  submittedBy: varchar("submitted_by"), submittedAt: timestamp("submitted_at"),
+  approvedBy: varchar("approved_by"), approvedAt: timestamp("approved_at"),
+  paidBy: varchar("paid_by"), paidAt: timestamp("paid_at"),
+  /** Employees see a payslip only once this is set. */
+  payslipsPublishedAt: timestamp("payslips_published_at"), publishedBy: varchar("published_by"),
+
+  reopenReason: text("reopen_reason"), reopenedBy: varchar("reopened_by"), reopenedAt: timestamp("reopened_at"),
+  notes: text("notes"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  periodIdx: uniqueIndex("payroll_cycle_period_idx").on(t.month, t.year),
+}));
+
+/** Line-item payslip. earnings / deductions / employerContributions are PayslipLine[]. */
+export const payrollPayslips = pgTable("payroll_payslips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cycleId: varchar("cycle_id").notNull(),
+  employeeId: varchar("employee_id").notNull(),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+
+  paidDaysBasis: integer("paid_days_basis").notNull().default(30),
+  paidDays: numeric("paid_days", { precision: 6, scale: 2 }).notNull().default("0"),
+  lopDays: numeric("lop_days", { precision: 6, scale: 2 }).notNull().default("0"),
+  eligibleDays: integer("eligible_days").notNull().default(0),
+
+  earnings: jsonb("earnings").notNull().default([]),
+  deductions: jsonb("deductions").notNull().default([]),
+  employerContributions: jsonb("employer_contributions").notNull().default([]),
+
+  grossEarnings: numeric("gross_earnings", { precision: 14, scale: 2 }).notNull().default("0"),
+  totalDeductions: numeric("total_deductions", { precision: 14, scale: 2 }).notNull().default("0"),
+  totalEmployerCost: numeric("total_employer_cost", { precision: 14, scale: 2 }).notNull().default("0"),
+  netPay: numeric("net_pay", { precision: 14, scale: 2 }).notNull().default("0"),
+
+  /** Append-only corrections. A computed line is never edited in place. */
+  adjustments: jsonb("adjustments").notNull().default([]),
+  /** The tax working behind the TDS line, so an employee query can be answered. */
+  taxSnapshot: jsonb("tax_snapshot"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  cycleIdx: index("payslip_cycle_idx").on(t.cycleId),
+  employeeIdx: index("payslip_employee_idx").on(t.employeeId),
+  cycleEmployeeIdx: uniqueIndex("payslip_cycle_employee_idx").on(t.cycleId, t.employeeId),
+}));
+
+/** Per-cycle additions: bonus, arrears, advances, reimbursements, and the manual LOP override. */
+export const payrollInputs = pgTable("payroll_inputs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cycleId: varchar("cycle_id").notNull(),
+  employeeId: varchar("employee_id").notNull(),
+  kind: text("kind").notNull(),                    // one_time_payment | arrears | advance_recovery | lop_override | reimbursement | other_deduction
+  componentCode: text("component_code"),
+  label: text("label").notNull(),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  days: numeric("days", { precision: 6, scale: 2 }),
+  taxable: boolean("taxable"),
+  reason: text("reason"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  cycleIdx: index("payroll_input_cycle_idx").on(t.cycleId),
+}));
+
+/** Compute-time findings. `block` severity gates submission for approval. */
+export const payrollExceptions = pgTable("payroll_exceptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cycleId: varchar("cycle_id").notNull(),
+  employeeId: varchar("employee_id").notNull(),
+  severity: text("severity").notNull(),            // block | warn
+  code: text("code").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  cycleIdx: index("payroll_exception_cycle_idx").on(t.cycleId),
+}));
+
+/** Employee tax declaration for a financial year. Amounts become deductions only once verified. */
+export const itDeclarations = pgTable("it_declarations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull(),
+  financialYear: text("financial_year").notNull(),
+  regime: text("regime").notNull().default("new"), // new | old
+  items: jsonb("items").notNull().default([]),     // ITDeclarationItem[]
+  rentPaidMonthly: numeric("rent_paid_monthly", { precision: 12, scale: 2 }),
+  rentCityMetro: boolean("rent_city_metro").default(false),
+  landlordPan: text("landlord_pan"),
+  status: text("status").notNull().default("open"), // open | submitted | locked | verified
+  submittedAt: timestamp("submitted_at"),
+  lockedAt: timestamp("locked_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  employeeFyIdx: uniqueIndex("it_decl_employee_fy_idx").on(t.employeeId, t.financialYear),
+}));
+
+/** Flexible Benefit Plan allocations for a financial year. */
+export const fbpDeclarations = pgTable("fbp_declarations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull(),
+  financialYear: text("financial_year").notNull(),
+  allocations: jsonb("allocations").notNull().default([]),
+  walletAnnual: numeric("wallet_annual", { precision: 14, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("open"), // open | submitted | locked
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  employeeFyIdx: uniqueIndex("fbp_employee_fy_idx").on(t.employeeId, t.financialYear),
+}));
+
+export const insertSalaryComponentSchema = createInsertSchema(salaryComponents).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEmployeeSalaryStructureSchema = createInsertSchema(employeeSalaryStructures).omit({ id: true, createdAt: true });
+export const insertStatutoryProfileSchema = createInsertSchema(statutoryProfiles).omit({ id: true, createdAt: true });
+export const insertPayrollCycleSchema = createInsertSchema(payrollCycles).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPayrollInputSchema = createInsertSchema(payrollInputs).omit({ id: true, createdAt: true });
+export const insertItDeclarationSchema = createInsertSchema(itDeclarations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFbpDeclarationSchema = createInsertSchema(fbpDeclarations).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type SalaryComponentRow = typeof salaryComponents.$inferSelect;
+export type EmployeeSalaryStructureRow = typeof employeeSalaryStructures.$inferSelect;
+export type StatutoryProfileRow = typeof statutoryProfiles.$inferSelect;
+export type PayrollSettingsRow = typeof payrollSettings.$inferSelect;
+export type PayrollCycleRow = typeof payrollCycles.$inferSelect;
+export type PayrollPayslipRow = typeof payrollPayslips.$inferSelect;
+export type PayrollInputRow = typeof payrollInputs.$inferSelect;
+export type PayrollExceptionRow = typeof payrollExceptions.$inferSelect;
+export type ItDeclarationRow = typeof itDeclarations.$inferSelect;
+export type FbpDeclarationRow = typeof fbpDeclarations.$inferSelect;

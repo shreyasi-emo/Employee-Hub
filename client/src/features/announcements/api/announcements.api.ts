@@ -20,3 +20,24 @@ export function useDeleteAnnouncement(opts: { onSuccess?: () => void } = {}) {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/announcements"] }); opts.onSuccess?.(); },
   });
 }
+
+// Toggle a basic reaction on a community post.
+export function useReactToPost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, emoji }: { id: string; emoji: string }) => apiRequest("POST", `/api/announcements/${id}/react`, { emoji }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/announcements"] }),
+  });
+}
+
+// Community posting permission — HR/Admin manage who else may post.
+export const useCommunityContributors = (enabled: boolean) =>
+  useQuery<any[]>({ queryKey: ["/api/community/contributors"], enabled });
+
+export function useSetContributor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, canPost }: { userId: string; canPost: boolean }) => apiRequest("PATCH", `/api/community/contributors/${userId}`, { canPost }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/community/contributors"] }),
+  });
+}

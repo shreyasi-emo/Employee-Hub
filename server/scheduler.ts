@@ -62,6 +62,13 @@ export async function dailyPeopleNotifications() {
             });
             count++;
           }
+          // Nudge HR to publish a Community post for the occasion.
+          await storage.notifyByRole(["super_admin", "hr_admin", "hr_executive"], {
+            type: "community_prompt",
+            title: "Post to Community?",
+            body: `It's (${name})'s birthday today — share it in Community.`,
+            link: "/announcements",
+          });
         }
       }
       if (emp.joinDate) {
@@ -78,6 +85,12 @@ export async function dailyPeopleNotifications() {
             });
             count++;
           }
+          await storage.notifyByRole(["super_admin", "hr_admin", "hr_executive"], {
+            type: "community_prompt",
+            title: "Post to Community?",
+            body: `(${name}) completes ${years} year${years !== 1 ? "s" : ""} today — share it in Community.`,
+            link: "/announcements",
+          });
         }
       }
     }
@@ -89,24 +102,25 @@ export async function dailyPeopleNotifications() {
   }
 }
 
-// Auto-approve requests the manager hasn't actioned by 24h before the date (mirrors the
-// employee-facing rule). Runs on a short interval so approvals never sit stale.
+// WFH auto-approve + the 7-day-post-leave leave auto-approval. Runs on a short interval so nothing sits stale.
 export async function autoApproveOverdue() {
   const now = new Date();
-  const cutoff = now.getTime() + 24 * 60 * 60 * 1000; // "within 24h of the date"
-  // ---- Leaves: pending → approved (deduct balance) ----
+  // ---- Leaves: auto-approve 7 DAYS AFTER the leave date has passed, if the manager never actioned it.
+  // Keyed off the leave END date (not the request date), so a pending leave stays pending through the
+  // leave and the following week, then the system approves it. Replaces the old 24h rule entirely.
   try {
     const pending = await storage.getLeaveRequests(undefined, "pending");
     for (const lr of pending as any[]) {
-      const startMs = new Date(`${lr.startDate}T00:00:00`).getTime();
-      if (startMs > cutoff) continue; // still more than 24h away
+      const endMs = new Date(`${lr.endDate}T00:00:00`).getTime();
+      const autoApproveAt = endMs + 7 * 24 * 60 * 60 * 1000;
+      if (now.getTime() < autoApproveAt) continue; // still within the 7-day manager window
       if (!(await storage.isLeaveBalanceSufficient(lr))) continue; // never auto-approve into a negative paid balance
-      await storage.updateLeaveRequest(lr.id, { status: "approved" as any, approvalNotes: "Auto-approved (no manager action within 24h)" });
+      await storage.updateLeaveRequest(lr.id, { status: "approved" as any, autoApproved: true, approvalNotes: "Auto-approved by the system (no manager action within 7 days of the leave)." });
       await storage.deductLeaveOnApproval(lr);
       try {
         const emp = await storage.getEmployee(lr.employeeId);
         const u = emp ? (await storage.getAllUsers()).find((x: any) => x.employeeId === emp.id) : null;
-        if (u) await storage.createNotification({ userId: u.id, type: "leave_approved", title: "Leave auto-approved", body: `Your leave from ${lr.startDate} to ${lr.endDate} was auto-approved (no manager action within 24h).`, link: "/leave" });
+        if (u) await storage.createNotification({ userId: u.id, type: "leave_approved", title: "Leave auto-approved", body: `Your leave from ${lr.startDate} to ${lr.endDate} was auto-approved (no manager action within 7 days of the leave).`, link: "/leave" });
       } catch { /* best-effort */ }
     }
   } catch (err) { console.error("[Scheduler] Leave auto-approve error:", err); }
@@ -131,10 +145,50 @@ export async function autoApproveOverdue() {
   } catch (err) { console.error("[Scheduler] WFH auto-approve error:", err); }
 }
 
+// Daily: nudge managers about team leaves still PENDING 3–7 days after the leave date (before the
+// 7-day auto-approval fires). One reminder per manager per day — deduped against today's notifications.
+export async function remindManagersOfPendingLeaves() {
+  try {
+    const now = new Date();
+    const pending = await storage.getLeaveRequests(undefined, "pending");
+    const byManager = new Map<string, any[]>();
+    for (const lr of pending as any[]) {
+      const endMs = new Date(`${lr.endDate}T00:00:00`).getTime();
+      const daysSince = (now.getTime() - endMs) / (24 * 60 * 60 * 1000);
+      if (daysSince < 3 || daysSince >= 7) continue; // reminder window: from 3 days after the leave date up to auto-approval
+      const emp = await storage.getEmployee(lr.employeeId);
+      if (!emp?.managerId) continue;
+      const arr = byManager.get(emp.managerId) || []; arr.push(lr); byManager.set(emp.managerId, arr);
+    }
+    if (byManager.size === 0) return;
+    const users = await storage.getAllUsers();
+    const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+    let sent = 0;
+    for (const [managerEmpId, list] of byManager) {
+      const mgrUser = users.find((u: any) => u.employeeId === managerEmpId && u.isActive);
+      if (!mgrUser) continue;
+      if (await storage.hasNotificationSince(mgrUser.id, "leave_pending_reminder", startOfDay)) continue; // already reminded today
+      const n = list.length;
+      await storage.notifyUser(mgrUser.id, {
+        type: "leave_pending_reminder",
+        title: `${n} leave request${n !== 1 ? "s" : ""} awaiting your approval`,
+        body: `${n} team leave request${n !== 1 ? "s have" : " has"} been pending past the leave date. If not actioned, they auto-approve 7 days after the leave date.`,
+        link: "/leave?tab=team-leaves",
+      });
+      sent++;
+    }
+    console.log(`[Scheduler] Manager leave reminders sent (${sent})`);
+  } catch (err) { console.error("[Scheduler] Leave reminder error:", err); }
+}
+
 export function startScheduler() {
   // Auto-approve overdue WFH/Leave — every 15 minutes (IST, matching the rest of the schedule).
   cron.schedule("*/15 * * * *", async () => { try { await autoApproveOverdue(); } catch (e) { console.error("[Scheduler] auto-approve error:", e); } }, { timezone: "Asia/Kolkata" });
-  console.log("[Scheduler] Auto-approve (WFH/Leave 24h) cron registered (every 15 min)");
+  console.log("[Scheduler] Auto-approve (WFH + 7-day leave) cron registered (every 15 min)");
+
+  // Manager pending-leave reminders — daily at 09:00 IST (once the leave date is 3+ days past).
+  cron.schedule("0 9 * * *", remindManagersOfPendingLeaves, { timezone: "Asia/Kolkata" });
+  console.log("[Scheduler] Manager pending-leave reminder cron registered (09:00 IST)");
 
   // Birthdays & anniversaries — every day at 8:00 AM IST
   cron.schedule("0 8 * * *", dailyPeopleNotifications, { timezone: "Asia/Kolkata" });

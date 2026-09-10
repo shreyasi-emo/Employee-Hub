@@ -11,9 +11,17 @@ export const statusConfig: Record<string, { label: string; bg: string; text: str
   approved: { label: "Approved", bg: "bg-[#4BDCD9]/25", text: "text-[#0E7C7B]" },
   rejected: { label: "Rejected", bg: "bg-[#FF6F62]/20", text: "text-[#C4402F]" },
   cancelled: { label: "Cancelled", bg: "bg-[#64748B]/15", text: "text-[#64748B]" },
+  // System auto-approved (7-day window elapsed) — distinct label, same teal as a normal approval.
+  auto_approved: { label: "Auto-Approved", bg: "bg-[#4BDCD9]/25", text: "text-[#0E7C7B]" },
+  // A manager's concern raised on an already-approved leave (shown alongside the status).
+  flagged: { label: "Flagged", bg: "bg-[#FF6F62]/20", text: "text-[#C4402F]" },
 };
 
 export const statusOf = (status?: string) => statusConfig[status || ""] || statusConfig.pending;
+
+/** Badge for a leave row that distinguishes a SYSTEM auto-approval from a manager approval. */
+export const leaveBadge = (r: any) =>
+  r?.autoApproved && r?.status === "approved" ? statusConfig.auto_approved : statusOf(r?.status);
 
 // ===== Brand-safe leave-type colour =====
 // Leave-type `color` comes from the DB and has historically held banned hues (orange, pink,

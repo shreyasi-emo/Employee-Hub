@@ -4,12 +4,13 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Home, Route, UserCheck, CircleCheck, Briefcase, CalendarDays, MoreVertical } from "lucide-react";
+import { Home, Route, UserCheck, CircleCheck, Briefcase, CalendarDays, MoreVertical, CalendarClock } from "lucide-react";
 import { StatCard } from "./attendance-ui";
 
-export function MyAttendanceHeader({ onApplyWfh, onMarkOnDuty }: {
+export function MyAttendanceHeader({ onApplyWfh, onMarkOnDuty, onRequestOverride }: {
   onApplyWfh: () => void;
   onMarkOnDuty: () => void;
+  onRequestOverride: () => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -21,12 +22,20 @@ export function MyAttendanceHeader({ onApplyWfh, onMarkOnDuty }: {
         </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-        {/* Desktop: both actions inline (unchanged). */}
+        {/* Desktop: On Duty inline (primary); WFH + Override in a kebab to keep the row tidy. */}
         <div className="hidden sm:flex items-center gap-2 flex-wrap">
           <Button variant="outline" className="h-10 text-[12px]" onClick={onApplyWfh} data-testid="apply-wfh"><Home className="h-4 w-4 mr-1.5" /> Apply Work from Home</Button>
           <Button className="btn-primary-gradient h-10 text-[12px]" onClick={onMarkOnDuty} data-testid="mark-on-duty"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-10 w-10" aria-label="More attendance actions" data-testid="my-attendance-more"><MoreVertical className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onRequestOverride} data-testid="menu-request-override"><CalendarClock className="h-4 w-4 mr-2" /> Request Attendance Override</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        {/* Mobile: Mark On Duty visible; Apply WFH folds into a kebab. */}
+        {/* Mobile: Mark On Duty visible; WFH + Override fold into a kebab. */}
         <div className="flex sm:hidden items-center gap-2 w-full">
           <Button className="btn-primary-gradient h-10 text-[12px]" onClick={onMarkOnDuty} data-testid="mark-on-duty-mobile"><Route className="h-4 w-4 mr-1.5" /> Mark On Duty</Button>
           <DropdownMenu>
@@ -35,6 +44,7 @@ export function MyAttendanceHeader({ onApplyWfh, onMarkOnDuty }: {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onApplyWfh} data-testid="menu-apply-wfh"><Home className="h-4 w-4 mr-2" /> Apply Work from Home</DropdownMenuItem>
+              <DropdownMenuItem onClick={onRequestOverride} data-testid="menu-request-override-mobile"><CalendarClock className="h-4 w-4 mr-2" /> Request Attendance Override</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

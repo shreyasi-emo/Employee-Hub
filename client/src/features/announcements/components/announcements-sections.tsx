@@ -10,8 +10,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose, 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Megaphone, Plus, ArrowDownUp, List, LayoutGrid, SlidersHorizontal, X } from "lucide-react";
 import { catMeta } from "../lib/categories";
+import { prettyLabel } from "@/lib/format";
 
-const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const cap = prettyLabel;   // acronym-aware (HR / IT), not just first-letter
 
 function FilterField({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -22,18 +23,23 @@ function FilterField({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-export function AnnouncementsHeader({ canManage, onNew }: { canManage: boolean; onNew: () => void }) {
+export function AnnouncementsHeader({ title = "Announcements", subtitle = "Stay informed with the latest updates and important notifications.", canManage, onNew, newLabel = "New Announcement", extra }: {
+  title?: string; subtitle?: string; canManage: boolean; onNew: () => void; newLabel?: string; extra?: ReactNode;
+}) {
   return (
     <div className="flex items-start justify-between gap-4 flex-wrap">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Announcements</h1>
-        <p className="text-sm text-muted-foreground mt-1">Stay informed with the latest updates and important notifications.</p>
+        <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
       </div>
-      {canManage && (
-        <Button onClick={onNew} className="btn-primary-gradient" data-testid="button-new-announcement">
-          <Plus className="h-4 w-4 mr-2" /> New Announcement
-        </Button>
-      )}
+      <div className="flex items-center gap-2 flex-wrap">
+        {extra}
+        {canManage && (
+          <Button onClick={onNew} className="btn-primary-gradient" data-testid="button-new-announcement">
+            <Plus className="h-4 w-4 mr-2" /> {newLabel}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -41,7 +47,7 @@ export function AnnouncementsHeader({ canManage, onNew }: { canManage: boolean; 
 export function AnnouncementStats({ announcements, categories }: { announcements: any[]; categories: string[] }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard title="Total" value={announcements.length} subtitle="All announcements" icon={Megaphone} color="bg-[#206295]/15 text-[#206295]" />
+      <StatCard title="Total" value={announcements.length} subtitle="In this view" icon={Megaphone} color="bg-[#206295]/15 text-[#206295]" />
       {categories.map((cat) => {
         const meta = catMeta(cat);
         return (

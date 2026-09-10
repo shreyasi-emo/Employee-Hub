@@ -65,10 +65,10 @@ export function EmployeesStats({ totalEmployees, departmentCount, locationCount,
 }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard title="Total Employees" value={totalEmployees} subtitle="All records" icon={Users} color="bg-[#206295]/15 text-[#206295]" />
-      <StatCard title="Departments" value={departmentCount} subtitle="Across the org" icon={Building2} color="bg-[#4BDCD9]/25 text-[#206295]" />
-      <StatCard title="Locations" value={locationCount} subtitle="Work locations" icon={MapPin} color="bg-[#206295]/15 text-[#206295]" />
-      <StatCard title="New Joiners" value={newJoiners} subtitle={format(new Date(), "MMMM yyyy")} icon={ClipboardCheck} color="bg-[#4BDCD9]/25 text-[#206295]" />
+      <StatCard title="Total Employees" value={totalEmployees} icon={Users} color="bg-[#206295]/15 text-[#206295]" />
+      <StatCard title="Departments" value={departmentCount} icon={Building2} color="bg-[#4BDCD9]/25 text-[#206295]" />
+      <StatCard title="Work Locations" value={locationCount} icon={MapPin} color="bg-[#206295]/15 text-[#206295]" />
+      <StatCard title={`New Joiners | ${format(new Date(), "MMM yyyy")}`} value={newJoiners} icon={ClipboardCheck} color="bg-[#4BDCD9]/25 text-[#206295]" />
     </div>
   );
 }

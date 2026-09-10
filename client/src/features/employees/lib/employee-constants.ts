@@ -5,6 +5,7 @@ export const EMP_TYPES = [
   { value: "part_time", label: "Part Time" },
   { value: "intern", label: "Intern" },
   { value: "contract", label: "Contract" },
+  { value: "consultant", label: "Consultant" },
 ];
 
 export const EMP_STATUSES = [
@@ -30,6 +31,12 @@ export const EMPLOYEE_DOC_GROUPS: { group: string; docs: { key: string; label: s
   {
     group: "Bank",
     docs: [{ key: "bankProof", label: "Passbook / Cancelled Cheque" }],
+  },
+  {
+    // HR-only, post-onboarding. NOT part of the candidate onboarding doc collection (that form
+    // hardcodes its own list), and the Docs card is HR-managed, so employees can't upload/edit it.
+    group: "Medical",
+    docs: [{ key: "healthCard", label: "Health Card" }],
   },
   {
     group: "Previous Employment",

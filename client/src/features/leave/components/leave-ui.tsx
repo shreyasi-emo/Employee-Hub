@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
-import { statusOf, avatarColor, leaveTypeColor } from "../lib/leave-model";
+import { statusOf, leaveBadge, avatarColor, leaveTypeColor } from "../lib/leave-model";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -20,11 +20,13 @@ function leaveRange(r: any) {
 }
 
 /** Neat, house-styled table for leave requests (Team Requests / All Requests). */
-export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove, onReject, onCancel, canApprove, myEmpId, emptyText }: any) {
+export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove, onReject, onCancel, onFlag, canApprove, myEmpId, emptyText }: any) {
   const isMobile = useIsMobile();
   const ltById = new Map<string, any>((leaveTypes || []).map((l: any) => [l.id, l]));
   const empById = new Map<string, any>((employees || []).map((e: any) => [e.id, e]));
-  const showActions = requests.some((r: any) => r.status === "pending" && (canApprove || (myEmpId && r.employeeId === myEmpId)));
+  // A manager can Raise Flag on an already-approved auto-approved leave that isn't flagged yet.
+  const canFlagRow = (r: any) => !!onFlag && canApprove && r.autoApproved && r.status === "approved" && !r.flagged;
+  const showActions = requests.some((r: any) => (r.status === "pending" && (canApprove || (myEmpId && r.employeeId === myEmpId))) || canFlagRow(r));
 
   // Mobile: a compact card per request instead of a sideways-scrolling table (desktop keeps the table).
   if (isMobile) {
@@ -34,14 +36,16 @@ export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove,
           <div className="card-surface rounded-2xl py-12 text-center"><p className="text-sm text-muted-foreground">{emptyText || "No leave requests"}</p></div>
         ) : requests.map((r: any) => {
           const emp = empById.get(r.employeeId); const c = avatarColor(r.employeeId);
-          const lt = ltById.get(r.leaveTypeId); const sc = statusOf(r.status);
+          const lt = ltById.get(r.leaveTypeId); const sc = leaveBadge(r);
           const canAct = r.status === "pending" && canApprove;
           const canCancelOwn = r.status === "pending" && !canApprove && myEmpId && r.employeeId === myEmpId;
+          const flagHere = canFlagRow(r);
           return (
             <div key={r.id} className="card-surface rounded-xl p-3" data-testid={`leave-request-card-${r.id}`}>
               <div className="flex items-center gap-2.5">
                 <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="text-[11px] font-semibold" style={{ backgroundColor: `${c}26`, color: c }}>{emp ? `${emp.firstName[0]}${emp.lastName[0]}` : "?"}</AvatarFallback></Avatar>
                 <span className="font-medium text-foreground truncate flex-1 text-sm">{emp ? `${emp.firstName} ${emp.lastName}` : "—"}</span>
+                {r.flagged && <Badge className="text-[10px] flex-shrink-0 bg-[#FF6F62]/20 text-[#C4402F]">Flagged</Badge>}
                 <Badge className={`text-[10px] flex-shrink-0 ${sc.bg} ${sc.text}`}>{sc.label}</Badge>
               </div>
               <p className="text-sm mt-1.5 truncate">
@@ -51,7 +55,7 @@ export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove,
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">{leaveRange(r)}</p>
               {r.reason && <p className="text-[11px] text-muted-foreground/70 mt-0.5 line-clamp-1" title={r.reason}>{r.reason}</p>}
-              {(canAct || canCancelOwn) && (
+              {(canAct || canCancelOwn || flagHere) && (
                 <div className="flex items-center gap-2 mt-2.5">
                   {canAct && (
                     <>
@@ -59,6 +63,7 @@ export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove,
                       <Button size="sm" className="h-8 flex-1 text-xs" onClick={() => onApprove(r.id)} data-testid={`button-approve-leave-${r.id}`}>Approve</Button>
                     </>
                   )}
+                  {flagHere && <Button size="sm" variant="outline" className="h-8 flex-1 text-[#C4402F] border-[#C4402F]/30 text-xs" onClick={() => onFlag(r.id)} data-testid={`button-flag-leave-${r.id}`}>Raise Flag</Button>}
                   {canCancelOwn && <Button size="sm" variant="ghost" className="h-8 ml-auto text-xs text-muted-foreground" onClick={() => onCancel(r.id)} data-testid={`button-cancel-leave-${r.id}`}>Cancel</Button>}
                 </div>
               )}
@@ -92,21 +97,26 @@ export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove,
       key: "reason", header: "Reason", cellClassName: "max-w-[18rem]",
       render: (r) => r.reason ? <span className="text-muted-foreground line-clamp-1" title={r.reason}>{r.reason}</span> : <span className="text-muted-foreground/40">—</span>,
     },
-    { key: "status", header: "Status", render: (r) => { const sc = statusOf(r.status); return <Badge className={`${sc.bg} ${sc.text}`}>{sc.label}</Badge>; } },
+    { key: "status", header: "Status", render: (r) => { const sc = leaveBadge(r); return <span className="inline-flex items-center gap-1.5">{r.flagged && <Badge className="bg-[#FF6F62]/20 text-[#C4402F]">Flagged</Badge>}<Badge className={`${sc.bg} ${sc.text}`}>{sc.label}</Badge></span>; } },
     ...(showActions ? [{
       key: "actions", header: "", align: "right" as const,
       render: (r: any) => {
-        if (r.status !== "pending") return null;
-        if (canApprove) {
-          return (
-            <div className="flex items-center gap-1.5 justify-end">
-              <Button size="sm" variant="outline" className="h-7 text-[#C4402F] border-[#C4402F]/30 text-xs px-2.5" onClick={(e) => { e.stopPropagation(); onReject(r.id); }} data-testid={`button-reject-leave-${r.id}`}>Reject</Button>
-              <Button size="sm" className="h-7 text-xs px-3" onClick={(e) => { e.stopPropagation(); onApprove(r.id); }} data-testid={`button-approve-leave-${r.id}`}>Approve</Button>
-            </div>
-          );
+        if (r.status === "pending") {
+          if (canApprove) {
+            return (
+              <div className="flex items-center gap-1.5 justify-end">
+                <Button size="sm" variant="outline" className="h-7 text-[#C4402F] border-[#C4402F]/30 text-xs px-2.5" onClick={(e) => { e.stopPropagation(); onReject(r.id); }} data-testid={`button-reject-leave-${r.id}`}>Reject</Button>
+                <Button size="sm" className="h-7 text-xs px-3" onClick={(e) => { e.stopPropagation(); onApprove(r.id); }} data-testid={`button-approve-leave-${r.id}`}>Approve</Button>
+              </div>
+            );
+          }
+          if (myEmpId && r.employeeId === myEmpId) {
+            return <div className="flex justify-end"><Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); onCancel(r.id); }}>Cancel</Button></div>;
+          }
+          return null;
         }
-        if (myEmpId && r.employeeId === myEmpId) {
-          return <div className="flex justify-end"><Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); onCancel(r.id); }}>Cancel</Button></div>;
+        if (canFlagRow(r)) {
+          return <div className="flex justify-end"><Button size="sm" variant="outline" className="h-7 text-[#C4402F] border-[#C4402F]/30 text-xs px-2.5" onClick={(e) => { e.stopPropagation(); onFlag(r.id); }} data-testid={`button-flag-leave-${r.id}`}>Raise Flag</Button></div>;
         }
         return null;
       },
@@ -117,10 +127,11 @@ export function LeaveRequestsTable({ requests, leaveTypes, employees, onApprove,
 }
 
 /** One request row, used by the Team Requests and All Requests lists. */
-export function LeaveRequestRow({ request, leaveTypes, employees, onApprove, onReject, onCancel, canApprove, isMine }: any) {
+export function LeaveRequestRow({ request, leaveTypes, employees, onApprove, onReject, onCancel, onFlag, canApprove, isMine }: any) {
   const lt = leaveTypes.find((l: any) => l.id === request.leaveTypeId);
   const emp = employees.find((e: any) => e.id === request.employeeId);
-  const sc = statusOf(request.status);
+  const sc = leaveBadge(request);
+  const flagHere = !!onFlag && canApprove && request.autoApproved && request.status === "approved" && !request.flagged;
   const c = avatarColor(request.employeeId);
   return (
     <div className="flex items-start gap-3 py-3" data-testid={`leave-request-${request.id}`}>
@@ -141,6 +152,7 @@ export function LeaveRequestRow({ request, leaveTypes, employees, onApprove, onR
             {request.reason && <p className="text-xs text-muted-foreground mt-1 line-clamp-1">"{request.reason}"</p>}
           </div>
           <div className="flex items-center gap-2">
+            {request.flagged && <Badge className="text-xs bg-[#FF6F62]/20 text-[#C4402F]">Flagged</Badge>}
             <Badge className={`text-xs ${sc.bg} ${sc.text}`}>{sc.label}</Badge>
             {canApprove && request.status === "pending" && (
               <div className="flex gap-1">
@@ -148,6 +160,7 @@ export function LeaveRequestRow({ request, leaveTypes, employees, onApprove, onR
                 <Button size="sm" className="h-7 text-xs px-2" onClick={() => onApprove(request.id)} data-testid={`button-approve-leave-${request.id}`}>Approve</Button>
               </div>
             )}
+            {flagHere && <Button size="sm" variant="outline" className="h-7 text-[#C4402F] border-[#C4402F]/30 text-xs px-2" onClick={() => onFlag(request.id)} data-testid={`button-flag-leave-${request.id}`}>Raise Flag</Button>}
             {isMine && request.status === "pending" && (
               <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => onCancel(request.id)}>Cancel</Button>
             )}
