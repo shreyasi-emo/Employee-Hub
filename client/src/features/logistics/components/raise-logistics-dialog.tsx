@@ -214,7 +214,7 @@ export function RaiseLogisticsDialog({ open, onClose, locations = [] }: { open: 
                   </DropdownMenu>
                 </div>
               </div>
-              <div className="space-y-1"><Label className="text-[11px]">Description / special instructions</Label><Textarea rows={2} className="resize-none" value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder="Anything the logistics team should know…" /></div>
+              <div className="space-y-1"><Label className="text-[11px]">Description / special instructions</Label><Textarea rows={2} className="resize-none" value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder="Special instructions" /></div>
               <div className="space-y-1.5">
                 <Label className="text-[11px]">Priority</Label>
                 <div className="segmented-toggle inline-flex p-0.5 h-9">

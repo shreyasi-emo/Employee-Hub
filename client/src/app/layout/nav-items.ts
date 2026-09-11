@@ -31,8 +31,9 @@ export const navItems: NavItem[] = [
   { title: "Leave", href: "/leave", icon: Plane },
   { title: "Holidays", href: "/holidays", icon: Calendar },
   { title: "Announcements", href: "/announcements", icon: Megaphone },
+  // Shifts = the Ops shift roster. Employees see their own ("My Shifts"); the incharge/admin manage it.
   { title: "My Shifts", href: "/my-shifts", icon: Clock, roles: ["ops_employee"] },
-  { title: "Shift Management", href: "/shift-management", icon: Clock, roles: ["super_admin", "ops_shift_incharge"] },
+  { title: "Shifts", href: "/shift-management", icon: Clock, roles: ["super_admin", "ops_shift_incharge"] },
 ];
 
 // The Company Workspace hub tab + its personal sub-pages. The sidebar renders these as a

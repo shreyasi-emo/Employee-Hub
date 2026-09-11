@@ -7,7 +7,6 @@ import {
   requireWorkspace, requireCEO, requireLogistics, requireTeamHandler, hasRole,
 } from "../../shared/auth";
 import { log } from "../../shared/audit";
-import { enqueueZohoPush } from "../../zoho";
 import { getTrackingProvider, DEFAULT_TRACKING_PROVIDER } from "./tracking-provider";
 import { z } from "zod";
 
@@ -226,12 +225,13 @@ export function registerLogisticsRoutes(app: Express) {
   app.post("/api/logistics/requests/:id/complete", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
     const r = await storage.getLogisticsRequest(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    // POD is the ONLY completion gate — allowed from any active processing stage.
-    if (!["in_progress", "in_transit", "delivered"].includes(r.status)) return res.status(400).json({ error: `Cannot complete a request that is ${r.status}. Start processing it first.` });
+    // POD is collected at delivery only — never before dispatch. Uploading it + marking delivered closes the request.
+    if (!["in_transit", "delivered"].includes(r.status)) return res.status(400).json({ error: `Cannot mark delivered from ${r.status}. Dispatch it first.` });
     const proof = req.body?.proof;
-    if (!proof || !proof.fileData) return res.status(400).json({ error: "Proof of delivery / document is required to complete." });
-    const updated = await storage.updateLogisticsRequest(req.params.id, { status: "completed", completedById: req.currentUser!.id, completedAt: new Date(), proof });
-    try { await storage.notifyUser(r.requesterId, { type: "logistics_completed", title: "Logistics Request Completed", body: `${r.reference} has been completed.`, link: "/logistics" }); } catch {}
+    if (!proof || !proof.fileData) return res.status(400).json({ error: "Proof of delivery is required to mark delivered." });
+    const now = new Date();
+    const updated = await storage.updateLogisticsRequest(req.params.id, { status: "completed", completedById: req.currentUser!.id, completedAt: now, deliveredAt: r.deliveredAt || now, proof });
+    try { await storage.notifyUser(r.requesterId, { type: "logistics_completed", title: "Logistics Request Delivered", body: `${r.reference} has been delivered.`, link: "/logistics" }); } catch {}
     res.json(updated);
   });
 
@@ -300,19 +300,10 @@ export function registerLogisticsRoutes(app: Express) {
     try { trackingEvents = await provider.fetchEvents({ trackingId: r.trackingId, carrier: r.carrier, dispatchedAt, from: r.fromLocationText, to: r.toLocationText }); } catch {}
     const updated = await storage.updateLogisticsRequest(req.params.id, { status: "in_transit", dispatchedAt, trackingProvider: r.trackingProvider || DEFAULT_TRACKING_PROVIDER, trackingEvents } as any);
     try {
-      await storage.notifyUser(r.requesterId, { type: "logistics_in_transit", title: "Shipment dispatched", body: `${r.reference} is in transit${r.trackingId ? ` (tracking ${r.trackingId})` : ""}.`, link: "/logistics" });
+      const docket = r.docketNo || r.trackingId;
+      await storage.notifyUser(r.requesterId, { type: "logistics_in_transit", title: "Shipment dispatched", body: `${r.reference} is in transit${docket ? ` (docket ${docket})` : ""}.`, link: "/logistics" });
       await storage.notifyByRole(["finance", "super_admin"], { type: "logistics_in_transit", title: "Shipment dispatched", body: `${r.reference} dispatched via ${r.carrier}.`, link: "/logistics" });
     } catch {}
-    res.json(updated);
-  });
-
-  // ---- Transition: mark delivered (→ delivered). POD still needed to close. ----
-  app.post("/api/logistics/requests/:id/deliver", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
-    const r = await storage.getLogisticsRequest(req.params.id);
-    if (!r) return res.status(404).json({ error: "Not found" });
-    if (!["in_transit", "in_progress"].includes(r.status)) return res.status(400).json({ error: `Cannot mark delivered from ${r.status}.` });
-    const updated = await storage.updateLogisticsRequest(req.params.id, { status: "delivered", deliveredAt: new Date() } as any);
-    try { await storage.notifyUser(r.requesterId, { type: "logistics_delivered", title: "Shipment delivered", body: `${r.reference} was delivered — awaiting POD to close.`, link: "/logistics" }); } catch {}
     res.json(updated);
   });
 

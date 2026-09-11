@@ -29,7 +29,7 @@ export function useCreateLogisticsRequest(opts: { onSuccess?: () => void; onErro
 }
 
 /** Handler/finance transitions along the flow. The op string is the server's route segment. */
-export type LogisticsOp = "start" | "dispatch" | "deliver" | "complete" | "cancel" | "plant-verify" | "finance-verify" | "refresh-tracking";
+export type LogisticsOp = "start" | "dispatch" | "complete" | "cancel" | "plant-verify" | "finance-verify" | "refresh-tracking";
 export function useLogisticsRequestAction(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
   const qc = useQueryClient();
   return useMutation({
