@@ -16,7 +16,7 @@ export function sanitizeEmployeeForRole(
 
   // A manager sees a fuller — but still non-sensitive — view of their OWN direct reports (phone +
   // basic personal, for the My Team drawer). Never salary / PAN / Aadhaar / bank.
-  if (viewerRole === "manager" && emp.managerId && emp.managerId === viewerEmployeeId) {
+  if ((viewerRole === "manager" || viewerRole === "ops_shift_incharge") && emp.managerId && emp.managerId === viewerEmployeeId) {
     return {
       id: emp.id, employeeCode: emp.employeeCode, firstName: emp.firstName, lastName: emp.lastName,
       email: emp.email, phone: emp.phone, designationId: emp.designationId, departmentId: emp.departmentId,

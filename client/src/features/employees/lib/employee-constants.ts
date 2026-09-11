@@ -61,6 +61,8 @@ export const SYSTEM_ROLES = [
   { value: "ceo_approver", label: "CEO Approver" },
   { value: "cto", label: "CTO" },
   { value: "logistics", label: "Logistics" },
+  { value: "ops_employee", label: "Ops Employee" },
+  { value: "ops_shift_incharge", label: "Ops Shift Incharge" },
   { value: "super_admin", label: "Super Admin" },
 ];
 

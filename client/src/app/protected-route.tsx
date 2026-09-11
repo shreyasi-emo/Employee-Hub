@@ -10,9 +10,10 @@ import { AppLayout } from "./layout/app-layout";
 // backend is the real boundary; this is defence-in-depth + UX.
 const ROUTE_ROLES: Record<string, string[]> = {
   "/employees": ["super_admin", "hr_admin", "hr_executive"],
-  "/my-team": ["manager"],
+  "/my-team": ["manager", "ops_shift_incharge"],
+  "/shift-management": ["super_admin", "ops_shift_incharge"],
   "/admin": ["super_admin", "hr_admin", "hr_executive", "finance"],
-  "/team-requests": ["super_admin", "hr_admin", "hr_executive", "manager", "hr_ops", "ceo_approver"],
+  "/team-requests": ["super_admin", "hr_admin", "hr_executive", "manager", "ops_shift_incharge", "hr_ops", "ceo_approver"],
   "/workspace/approvals": ["super_admin"],
 };
 

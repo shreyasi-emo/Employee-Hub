@@ -8,11 +8,17 @@ import {
 } from "../../shared/auth";
 import { log } from "../../shared/audit";
 import { enqueueZohoPush } from "../../zoho";
+import { getTrackingProvider, DEFAULT_TRACKING_PROVIDER } from "./tracking-provider";
 import { z } from "zod";
+
+// Document types a logistics request can carry. `ewayBill` / `deliveryChallan` are finance-only (hidden from the requester).
+const LOGI_DOC_TYPES = ["packList", "pdir", "invoice", "logisticsReport", "dc", "debitNote", "ewayBill", "deliveryChallan", "customerDoc", "other"] as const;
 
 // Whitelist + validate the client-settable fields of a logistics request (server owns status/requester/reference/proof).
 const createLogisticsRequestSchema = z.object({
   requestType: z.enum(["inboard", "outboard"]),
+  cargoType: z.enum(["pack", "material"]).default("material"),
+  customerName: z.string().trim().min(1).nullish(),
   fromLocationId: z.string().trim().min(1).nullish(),
   fromLocationText: z.string().trim().min(1).nullish(),
   toLocationId: z.string().trim().min(1).nullish(),
@@ -158,20 +164,29 @@ export function registerLogisticsRoutes(app: Express) {
   // LOGISTICS REQUESTS (employee Inboard / Outboard)
   // =========================================================================
   const canManageLogistics = (req: Request) => hasRole(req, "super_admin", "logistics");
+  // Finance monitors read-only (from arrangement onward) and verifies customer docs — sees all, can't process.
+  const canViewAllLogistics = (req: Request) => hasRole(req, "super_admin", "logistics", "finance");
+  // The plain requester never sees finance-only documents (e-Way bill, delivery challan).
+  const redactLogistics = (r: any, req: Request) => {
+    if (!r || canViewAllLogistics(req)) return r;
+    const documents = Array.isArray(r.documents) ? r.documents.filter((d: any) => !d?.financeOnly) : r.documents;
+    return { ...r, documents };
+  };
 
   app.get("/api/logistics/requests", requireAuth, async (req, res) => {
-    // Employees see only their own; logistics + super_admin see all.
+    // Employees see only their own; logistics + super_admin process; finance monitors read-only.
     const filters: any = {};
-    if (!canManageLogistics(req)) filters.requesterId = req.currentUser!.id;
+    if (!canViewAllLogistics(req)) filters.requesterId = req.currentUser!.id;
     if (req.query.status) filters.status = req.query.status as string;
-    res.json(await storage.listLogisticsRequests(filters));
+    const list = await storage.listLogisticsRequests(filters);
+    res.json((list as any[]).map((r) => redactLogistics(r, req)));
   });
 
   app.get("/api/logistics/requests/:id", requireAuth, async (req, res) => {
     const r = await storage.getLogisticsRequest(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    if (r.requesterId !== req.currentUser!.id && !canManageLogistics(req)) return res.status(403).json({ error: "Forbidden" });
-    res.json(r);
+    if (r.requesterId !== req.currentUser!.id && !canViewAllLogistics(req)) return res.status(403).json({ error: "Forbidden" });
+    res.json(redactLogistics(r, req));
   });
 
   app.post("/api/logistics/requests", requireAuth, async (req, res) => {
@@ -211,7 +226,8 @@ export function registerLogisticsRoutes(app: Express) {
   app.post("/api/logistics/requests/:id/complete", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
     const r = await storage.getLogisticsRequest(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    if (r.status !== "in_progress") return res.status(400).json({ error: `Cannot complete a request that is ${r.status}. Start processing it first.` });
+    // POD is the ONLY completion gate — allowed from any active processing stage.
+    if (!["in_progress", "in_transit", "delivered"].includes(r.status)) return res.status(400).json({ error: `Cannot complete a request that is ${r.status}. Start processing it first.` });
     const proof = req.body?.proof;
     if (!proof || !proof.fileData) return res.status(400).json({ error: "Proof of delivery / document is required to complete." });
     const updated = await storage.updateLogisticsRequest(req.params.id, { status: "completed", completedById: req.currentUser!.id, completedAt: new Date(), proof });
@@ -219,7 +235,131 @@ export function registerLogisticsRoutes(app: Express) {
     res.json(updated);
   });
 
+  // ---- Processing data-entry: vehicle/partner arranged, tracking no., customer, verification flag ----
+  const patchLogisticsSchema = z.object({
+    carrier: z.string().trim().max(200).nullish(),
+    vehicleNo: z.string().trim().max(60).nullish(),
+    trackingId: z.string().trim().max(120).nullish(),
+    docketNo: z.string().trim().max(120).nullish(),
+    customerName: z.string().trim().max(200).nullish(),
+    cargoType: z.enum(["pack", "material"]).optional(),
+    qtyVerified: z.boolean().optional(),
+    discrepancyNote: z.string().trim().max(2000).nullish(),
+  });
+  app.patch("/api/logistics/requests/:id", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (["completed", "cancelled"].includes(r.status)) return res.status(400).json({ error: "This request is closed." });
+    const parsed = patchLogisticsSchema.safeParse(req.body || {});
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid update" });
+    const updated = await storage.updateLogisticsRequest(req.params.id, parsed.data as any);
+    // "Vehicle arranged" — first time a carrier is set, notify Finance (they monitor from here).
+    if (parsed.data.carrier && !r.carrier) {
+      try { await storage.notifyByRole(["finance", "super_admin"], { type: "logistics_arranged", title: "Vehicle arranged", body: `${r.reference} — ${parsed.data.carrier} arranged for ${r.customerName || (r.requestType === "inboard" ? "inbound pickup" : "dispatch")}.`, link: "/logistics" }); } catch {}
+    }
+    res.json(updated);
+  });
+
+  // ---- Documents: append a typed document (logistics). `financeOnly` hides it from the requester. ----
+  const uploadDocSchema = z.object({
+    type: z.enum(LOGI_DOC_TYPES),
+    financeOnly: z.boolean().optional(),
+    file: z.object({ fileName: z.string(), fileType: z.string().nullish(), fileData: z.string().min(1) }),
+  });
+  app.post("/api/logistics/requests/:id/documents", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (["completed", "cancelled"].includes(r.status)) return res.status(400).json({ error: "This request is closed." });
+    const parsed = uploadDocSchema.safeParse(req.body || {});
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid document" });
+    // e-Way bill & delivery challan are always finance-only regardless of the flag sent.
+    const financeOnly = parsed.data.financeOnly || ["ewayBill", "deliveryChallan"].includes(parsed.data.type);
+    const doc = { type: parsed.data.type, ...parsed.data.file, financeOnly, uploadedById: req.currentUser!.id, uploadedAt: new Date().toISOString() };
+    const documents = [...(Array.isArray(r.documents) ? r.documents : []), doc];
+    res.json(await storage.updateLogisticsRequest(req.params.id, { documents } as any));
+  });
+  app.delete("/api/logistics/requests/:id/documents/:index", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    const docs = Array.isArray(r.documents) ? [...r.documents] : [];
+    const i = parseInt(String(req.params.index), 10);
+    if (isNaN(i) || i < 0 || i >= docs.length) return res.status(400).json({ error: "No such document" });
+    docs.splice(i, 1);
+    res.json(await storage.updateLogisticsRequest(req.params.id, { documents: docs } as any));
+  });
+
+  // ---- Transition: dispatch (→ in_transit). Requires an arranged carrier; seeds mock tracking. ----
+  app.post("/api/logistics/requests/:id/dispatch", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.status !== "in_progress") return res.status(400).json({ error: `Cannot dispatch from ${r.status}.` });
+    if (!r.carrier) return res.status(400).json({ error: "Arrange a vehicle / logistics partner first." });
+    const dispatchedAt = new Date();
+    const provider = getTrackingProvider(r.trackingProvider || DEFAULT_TRACKING_PROVIDER);
+    let trackingEvents: any[] = [];
+    try { trackingEvents = await provider.fetchEvents({ trackingId: r.trackingId, carrier: r.carrier, dispatchedAt, from: r.fromLocationText, to: r.toLocationText }); } catch {}
+    const updated = await storage.updateLogisticsRequest(req.params.id, { status: "in_transit", dispatchedAt, trackingProvider: r.trackingProvider || DEFAULT_TRACKING_PROVIDER, trackingEvents } as any);
+    try {
+      await storage.notifyUser(r.requesterId, { type: "logistics_in_transit", title: "Shipment dispatched", body: `${r.reference} is in transit${r.trackingId ? ` (tracking ${r.trackingId})` : ""}.`, link: "/logistics" });
+      await storage.notifyByRole(["finance", "super_admin"], { type: "logistics_in_transit", title: "Shipment dispatched", body: `${r.reference} dispatched via ${r.carrier}.`, link: "/logistics" });
+    } catch {}
+    res.json(updated);
+  });
+
+  // ---- Transition: mark delivered (→ delivered). POD still needed to close. ----
+  app.post("/api/logistics/requests/:id/deliver", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (!["in_transit", "in_progress"].includes(r.status)) return res.status(400).json({ error: `Cannot mark delivered from ${r.status}.` });
+    const updated = await storage.updateLogisticsRequest(req.params.id, { status: "delivered", deliveredAt: new Date() } as any);
+    try { await storage.notifyUser(r.requesterId, { type: "logistics_delivered", title: "Shipment delivered", body: `${r.reference} was delivered — awaiting POD to close.`, link: "/logistics" }); } catch {}
+    res.json(updated);
+  });
+
+  // ---- Inward: logistics records the plant's "packs OK" confirmation; Finance is notified. ----
+  app.post("/api/logistics/requests/:id/plant-verify", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.requestType !== "inboard") return res.status(400).json({ error: "Plant verification applies to inbound pickups only." });
+    const updated = await storage.updateLogisticsRequest(req.params.id, { plantVerifiedAt: new Date(), plantVerifiedById: req.currentUser!.id } as any);
+    try { await storage.notifyByRole(["finance", "super_admin"], { type: "logistics_plant_ok", title: "Plant verified packs", body: `${r.reference} — plant confirmed packs received & OK.`, link: "/logistics" }); } catch {}
+    res.json(updated);
+  });
+
+  // ---- Finance verifies the customer document (co-sign for inbound battery packs). ----
+  app.post("/api/logistics/requests/:id/finance-verify", requireAuth, requireRole("super_admin", "finance"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    const updated = await storage.updateLogisticsRequest(req.params.id, { financeVerifiedAt: new Date(), financeVerifiedById: req.currentUser!.id } as any);
+    try { await storage.notifyByRole(["super_admin", "logistics"], { type: "logistics_finance_ok", title: "Finance verified document", body: `${r.reference} — Finance verified the customer document.`, link: "/logistics" }); } catch {}
+    res.json(updated);
+  });
+
+  // ---- Pull fresh tracking events from the (mock) provider. ----
+  app.post("/api/logistics/requests/:id/refresh-tracking", requireAuth, requireRole("super_admin", "logistics"), async (req, res) => {
+    const r = await storage.getLogisticsRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (!["in_transit", "delivered"].includes(r.status)) return res.status(400).json({ error: "Tracking is only available once dispatched." });
+    const provider = getTrackingProvider(r.trackingProvider || DEFAULT_TRACKING_PROVIDER);
+    const trackingEvents = await provider.fetchEvents({ trackingId: r.trackingId, carrier: r.carrier, dispatchedAt: r.dispatchedAt, from: r.fromLocationText, to: r.toLocationText });
+    res.json(await storage.updateLogisticsRequest(req.params.id, { trackingEvents } as any));
+  });
+
   // =========================================================================
   // COMPANY VEHICLES
   // =========================================================================
+}
+
+// Scheduler hook: refresh tracking for all in-transit logistics requests via their provider (mock now).
+// Wired into the 6-hourly cron in server/scheduler.ts.
+export async function refreshLogisticsTracking() {
+  const { storage } = await import("../../storage");
+  const inTransit = await storage.listLogisticsRequests({ status: "in_transit" });
+  for (const r of inTransit as any[]) {
+    try {
+      const provider = getTrackingProvider(r.trackingProvider || DEFAULT_TRACKING_PROVIDER);
+      const trackingEvents = await provider.fetchEvents({ trackingId: r.trackingId, carrier: r.carrier, dispatchedAt: r.dispatchedAt, from: r.fromLocationText, to: r.toLocationText });
+      await storage.updateLogisticsRequest(r.id, { trackingEvents } as any);
+    } catch { /* best-effort per request */ }
+  }
 }

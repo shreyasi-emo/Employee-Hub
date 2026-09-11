@@ -15,6 +15,7 @@ import { registerAuditRoutes } from "../modules/audit/audit.routes";
 import { registerDashboardRoutes } from "../modules/dashboard/dashboard.routes";
 import { registerUserRoutes } from "../modules/users/users.routes";
 import { registerNotificationRoutes } from "../modules/notifications/notifications.routes";
+import { registerOpsShiftRoutes } from "../modules/ops-shifts/ops-shifts.routes";
 import { registerWorkspaceRoutes } from "../modules/workspace";
 import { registerMyRequestsRoutes } from "../modules/my-requests/my-requests.routes";
 import { registerTeamRequestsRoutes } from "../modules/team-requests/team-requests.routes";
@@ -43,6 +44,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   registerDashboardRoutes(app);
   registerUserRoutes(app);
   registerNotificationRoutes(app);
+  registerOpsShiftRoutes(app);
 
   // HR/Admin Workspace + company requests
   registerWorkspaceRoutes(app);

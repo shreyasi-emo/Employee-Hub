@@ -20,7 +20,7 @@ export function registerTeamRequestsRoutes(app: Express) {
     const emp = await storage.getEmployeeByUserId(user.id);
     if (!emp) return res.status(404).json({ error: "Employee profile not found" });
 
-    const MANAGER_ROLES = ["super_admin", "hr_admin", "manager", "hr_executive", "hr_ops"];
+    const MANAGER_ROLES = ["super_admin", "hr_admin", "manager", "ops_shift_incharge", "hr_executive", "hr_ops"];
     if (!MANAGER_ROLES.includes(user.role)) return res.status(403).json({ error: "Manager access required" });
 
     const teamEmps = await storage.getEmployeesByManager(emp.id);

@@ -4,24 +4,42 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileUpload, type UploadedFile } from "@/components/shared/file-upload";
 import { statusClass, statusLabel } from "@/lib/status";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { useLogisticsRequestAction } from "../api/logistics.api";
-import { Truck, MapPin, ArrowRight, Package, PackageCheck, PackageOpen, Boxes, User, FileText, Copy, Check, Play, X, CheckCircle2, CircleDot, CircleDashed, XCircle } from "lucide-react";
-
-const Bar = () => <span className="w-px h-3 bg-border shrink-0" />;
+import { useLogisticsRequest, useLogisticsRequestAction, useUpdateLogisticsRequest, useLogisticsDoc } from "../api/logistics.api";
+import { Truck, MapPin, ArrowRight, Package, PackageCheck, PackageOpen, Boxes, User, FileText, Copy, Check, Play, X, CheckCircle2, CircleDot, CircleDashed, XCircle, Send, Navigation, ShieldCheck, Trash2, RefreshCw, Lock } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 
-const LABEL = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium"; // one label size everywhere
+const Bar = () => <span className="w-px h-3 bg-border shrink-0" />;
+const LABEL = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium";
+
 const fmtDate = (d: any) => {
   if (!d) return null;
   const s = String(d);
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); // date-only columns: parse local, not UTC
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return format(m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(s), "d MMM yyyy");
 };
+const fmtStamp = (d: any) => { if (!d) return null; const t = new Date(d); return isNaN(t.getTime()) ? null : format(t, "d MMM, h:mm a"); };
 const flatLoc = (s: any) => String(s || "—").split(/\s*—\s*/).filter(Boolean).join(", ") || "—";
+
+// Document type → human label. e-Way bill & delivery challan are finance-only (server-enforced).
+const DOC_LABELS: Record<string, string> = {
+  packList: "Pack ID list", pdir: "PDIR", invoice: "Invoice", logisticsReport: "Logistics report",
+  dc: "Delivery challan (DC)", debitNote: "Debit note", ewayBill: "e-Way bill",
+  deliveryChallan: "Delivery challan", customerDoc: "Customer document", other: "Document",
+};
+// Which doc types are offered depends on cargo + direction; keep it short and relevant.
+function docOptions(r: any): string[] {
+  const pack = r.cargoType === "pack";
+  const base = pack ? ["packList", "pdir", "invoice", "logisticsReport"] : ["dc", "invoice", "debitNote"];
+  return [...base, "ewayBill", "deliveryChallan", "customerDoc", "other"];
+}
 
 const NODE: Record<string, { Icon: ComponentType<any>; cls: string }> = {
   done: { Icon: CheckCircle2, cls: "text-[#0E7C7B]" },
@@ -29,24 +47,18 @@ const NODE: Record<string, { Icon: ComponentType<any>; cls: string }> = {
   upcoming: { Icon: CircleDashed, cls: "text-muted-foreground/40" },
   rejected: { Icon: XCircle, cls: "text-[#FF6F62]" },
 };
-
-// Raised → In Transit → Delivered (or Raised → Cancelled). No "in progress" text — status lives in the header.
+const ORDER = ["pending", "in_progress", "in_transit", "delivered", "completed"];
 function buildSteps(r: any) {
-  if (r.status === "cancelled") {
-    return [
-      { label: "Raised", state: "done", date: fmtDate(r.createdAt) },
-      { label: "Cancelled", state: "rejected", date: null },
-    ];
-  }
-  const started = r.status === "in_progress" || r.status === "completed";
-  const done = r.status === "completed";
+  if (r.status === "cancelled") return [{ label: "Raised", state: "done", date: fmtDate(r.createdAt) }, { label: "Cancelled", state: "rejected", date: null }];
+  const i = ORDER.indexOf(r.status);
+  const at = (n: number): string => (i > n ? "done" : i === n ? "current" : "upcoming");
   return [
     { label: "Raised", state: "done", date: fmtDate(r.createdAt) },
-    { label: "In Transit", state: done ? "done" : started ? "current" : "upcoming", date: null },
-    { label: "Delivered", state: done ? "done" : "upcoming", date: done ? fmtDate(r.completedAt) : null },
+    { label: "Processing", state: at(1), date: null },
+    { label: "In transit", state: i > 2 ? "done" : at(2), date: fmtDate(r.dispatchedAt) },
+    { label: "Delivered", state: i >= 3 ? "done" : "upcoming", date: fmtDate(r.deliveredAt || r.completedAt) },
   ];
 }
-
 function MiniTimeline({ steps }: { steps: any[] }) {
   return (
     <div className="flex items-start">
@@ -59,15 +71,14 @@ function MiniTimeline({ steps }: { steps: any[] }) {
               <n.Icon className={`h-[18px] w-[18px] flex-shrink-0 ${n.cls}`} />
               <span className={`h-0.5 flex-1 ${i === steps.length - 1 ? "opacity-0" : steps[i + 1].state === "upcoming" ? "bg-border" : "bg-[#0E7C7B]"}`} />
             </div>
-            <p className={`text-[13px] font-medium mt-2 leading-tight ${s.state === "upcoming" ? "text-muted-foreground" : "text-foreground"}`}>{s.label}</p>
-            {s.date && <p className="text-[11px] text-muted-foreground mt-0.5">{s.date}</p>}
+            <p className={`text-[12px] font-medium mt-2 leading-tight ${s.state === "upcoming" ? "text-muted-foreground" : "text-foreground"}`}>{s.label}</p>
+            {s.date && <p className="text-[10px] text-muted-foreground mt-0.5">{s.date}</p>}
           </div>
         );
       })}
     </div>
   );
 }
-
 function Endpoint({ pinColor, label, loc, date }: { pinColor: string; label: string; loc: string; date: ReactNode }) {
   return (
     <div className="min-w-0">
@@ -78,7 +89,6 @@ function Endpoint({ pinColor, label, loc, date }: { pinColor: string; label: str
     </div>
   );
 }
-
 function FieldCell({ icon: I, color, label, value, className = "" }: { icon: ComponentType<any>; color: string; label: string; value: ReactNode; className?: string }) {
   return (
     <div className={`px-4 py-3 min-w-0 ${className}`}>
@@ -87,35 +97,75 @@ function FieldCell({ icon: I, color, label, value, className = "" }: { icon: Com
     </div>
   );
 }
+// A boxed section with a small header — used for the processing/docs/tracking panels.
+function Panel({ title, children, tint = "#206295" }: { title: ReactNode; children: ReactNode; tint?: string }) {
+  return (
+    <div className="rounded-[16px] border border-border p-3.5 space-y-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: tint }}>{title}</p>
+      {children}
+    </div>
+  );
+}
 
-export function LogisticsDetailDialog({ request: r, isHandler, isOwner, locName, onClose }: {
-  request: any; isHandler: boolean; isOwner: boolean; locName: (id: string) => string | undefined; onClose: () => void;
+export function LogisticsDetailDialog({ request, isHandler, isOwner, isFinance = false, processView = false, locName, onClose }: {
+  request: any; isHandler: boolean; isOwner: boolean; isFinance?: boolean; processView?: boolean; locName: (id: string) => string | undefined; onClose: () => void;
 }) {
   const { toast } = useToast();
+  const { data: live } = useLogisticsRequest(request?.id);
+  const r = live || request;
+
   const [proof, setProof] = useState<UploadedFile | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [note, setNote] = useState("");
-  const action = useLogisticsRequestAction({
-    onSuccess: () => { toast({ title: "Updated" }); onClose(); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  // Processing fields (logistics) — seeded from the record, PATCHed on Save.
+  const [edit, setEdit] = useState({
+    carrier: request?.carrier || "", vehicleNo: request?.vehicleNo || "", customerName: request?.customerName || "",
+    trackingId: request?.trackingId || "", docketNo: request?.docketNo || "", discrepancyNote: request?.discrepancyNote || "",
   });
+  const setE = (patch: any) => setEdit((p) => ({ ...p, ...patch }));
+  const [docType, setDocType] = useState("");
+  const [docFinanceOnly, setDocFinanceOnly] = useState(false);
+  const [docFile, setDocFile] = useState<UploadedFile | null>(null);
+
+  const onErr = (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" });
+  const action = useLogisticsRequestAction({ onSuccess: () => toast({ title: "Updated" }), onError: onErr });
+  const patch = useUpdateLogisticsRequest({ onSuccess: () => toast({ title: "Saved" }), onError: onErr });
+  const docs = useLogisticsDoc({ onSuccess: () => toast({ title: "Document updated" }), onError: onErr });
   if (!r) return null;
 
   const isInboard = r.requestType === "inboard";
+  const isPack = r.cargoType === "pack";
   const from = flatLoc(r.fromLocationText || locName(r.fromLocationId));
   const to = flatLoc(r.toLocationText || locName(r.toLocationId));
   const qty = Number(r.quantity) || 0;
-  const busy = action.isPending;
-  const canCancel = (isHandler && (r.status === "pending" || r.status === "in_progress")) || (isOwner && r.status === "pending");
-  const canStart = isHandler && r.status === "pending";
-  const canComplete = isHandler && r.status === "in_progress";
-  const hasFooter = canCancel || canStart || canComplete;
+  const busy = action.isPending || patch.isPending || docs.isPending;
+  // Processing actions belong ONLY to the "To Process" tab — never from "My Requests", even for a
+  // handler who happens to have raised the request (they act as requester there, not processor).
+  const canManage = isHandler && processView;           // logistics / super_admin, in the process queue
+  const canFinanceVerify = isFinance && processView;    // finance verifies from the monitoring queue only
+  const active = ["pending", "in_progress", "in_transit", "delivered"].includes(r.status);
   const copyRef = () => { navigator.clipboard?.writeText(r.reference); toast({ title: "Reference copied" }); };
+
+  const docList: any[] = Array.isArray(r.documents) ? r.documents : [];
+  const editDirty = ["carrier", "vehicleNo", "customerName", "trackingId", "docketNo", "discrepancyNote"].some((k) => (edit as any)[k] !== (request?.[k] || "") && !((edit as any)[k] === "" && !request?.[k]));
+  const saveEdit = () => patch.mutate({ id: r.id, data: {
+    carrier: edit.carrier.trim() || null, vehicleNo: edit.vehicleNo.trim() || null, customerName: edit.customerName.trim() || null,
+    trackingId: edit.trackingId.trim() || null, docketNo: edit.docketNo.trim() || null, discrepancyNote: edit.discrepancyNote.trim() || null,
+  } });
+  const addDoc = () => { if (!docType || !docFile) return; docs.mutate({ id: r.id, add: { type: docType, financeOnly: docFinanceOnly, file: docFile } }, { onSuccess: () => { setDocType(""); setDocFile(null); setDocFinanceOnly(false); } }); };
+
+  // Footer transition buttons per stage.
+  const canStart = canManage && r.status === "pending";
+  const canDispatch = canManage && r.status === "in_progress";
+  const canDeliver = canManage && r.status === "in_transit";
+  const canComplete = canManage && ["in_progress", "in_transit", "delivered"].includes(r.status);
+  const canCancel = (canManage && active) || (isOwner && r.status === "pending");
+  const hasFooter = !cancelling ? (canStart || canDispatch || canDeliver || canComplete || canCancel) : true;
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[88vh] p-0 gap-0 overflow-hidden flex flex-col rounded-[16px]">
-        {/* Header — requester is the hero; the reference is a small, copyable line */}
+        {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b border-border space-y-0">
           <div className="flex gap-3 pr-8">
             <span className="h-10 w-10 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Truck className="h-5 w-5" /></span>
@@ -134,13 +184,14 @@ export function LogisticsDetailDialog({ request: r, isHandler, isOwner, locName,
           </div>
         </DialogHeader>
 
-        {/* Body — only this scrolls */}
+        {/* Body */}
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
-          {/* Route — pickup/delivery dates sit with their endpoints */}
+          {/* Route */}
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="h-6 w-6 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0">{isInboard ? <PackageCheck className="h-3.5 w-3.5" /> : <PackageOpen className="h-3.5 w-3.5" />}</span>
-              <span className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">{isInboard ? "Inboard" : "Outboard"} movement</span>
+              <span className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">{isInboard ? "Inbound" : "Outbound"} · {isPack ? "Battery pack" : "Material"}</span>
+              {r.customerName && <><Bar /><span className="text-[11.5px] text-muted-foreground">{r.customerName}</span></>}
             </div>
             <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3 mt-2.5">
               <Endpoint pinColor="#206295" label="From (Pickup)" loc={from} date={fmtDate(r.pickupDate)} />
@@ -153,11 +204,10 @@ export function LogisticsDetailDialog({ request: r, isHandler, isOwner, locName,
           <div className="grid grid-cols-2 rounded-[16px] border border-border overflow-hidden">
             <FieldCell icon={Package} color="#206295" label="Goods / category" value={r.goodsCategory ? <span className="capitalize">{r.goodsCategory}</span> : null} className="border-b border-r border-border" />
             <FieldCell icon={Boxes} color="#0E7C7B" label="Quantity / weight" value={<span className="inline-flex items-center gap-2">{qty} unit{qty === 1 ? "" : "s"}{r.weightKg ? <><Bar />{Number(r.weightKg)} kg</> : null}</span>} className="border-b border-border" />
-            <FieldCell icon={User} color="#206295" label="Point of contact" className="col-span-2"
-              value={r.pocName ? <span className="inline-flex items-center gap-2 flex-wrap">{r.pocName}{r.pocPhone && <><Bar /><span className="font-normal text-muted-foreground">{r.pocPhone}</span></>}</span> : null} />
+            <FieldCell icon={Truck} color="#206295" label="Vehicle / partner" value={r.carrier ? <span>{r.carrier}{r.vehicleNo ? <> · <span className="font-normal text-muted-foreground">{r.vehicleNo}</span></> : null}</span> : null} className="border-r border-border" />
+            <FieldCell icon={User} color="#0E7C7B" label="Point of contact" value={r.pocName ? <span className="inline-flex items-center gap-2 flex-wrap">{r.pocName}{r.pocPhone && <><Bar /><span className="font-normal text-muted-foreground">{r.pocPhone}</span></>}</span> : null} />
           </div>
 
-          {/* Description */}
           {r.description && (
             <div className="rounded-[16px] bg-muted/40 border border-border p-3.5">
               <p className={`${LABEL} inline-flex items-center gap-1.5`}><FileText className="h-3.5 w-3.5 text-muted-foreground" /> Description / instructions</p>
@@ -167,26 +217,116 @@ export function LogisticsDetailDialog({ request: r, isHandler, isOwner, locName,
 
           {/* Timeline */}
           <Separator />
-          <div>
-            <p className={`${LABEL} mb-3`}>Timeline</p>
-            <MiniTimeline steps={buildSteps(r)} />
-          </div>
+          <div><p className={`${LABEL} mb-3`}>Timeline</p><MiniTimeline steps={buildSteps(r)} /></div>
 
-          {/* Proof — existing doc, or the action zone for completing */}
+          {/* Processing — logistics data entry (vehicle/partner, tracking no., customer, verification) */}
+          {canManage && active && (
+            <Panel title="Processing details">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1"><Label className="text-[11px]">Vehicle / logistics partner</Label><Input className="h-9" value={edit.carrier} onChange={(e) => setE({ carrier: e.target.value })} placeholder="Transporter / company" data-testid="logi-carrier" /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Vehicle no.</Label><Input className="h-9" value={edit.vehicleNo} onChange={(e) => setE({ vehicleNo: e.target.value })} placeholder="e.g. KA01AB1234" /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Tracking / docket no.</Label><Input className="h-9" value={edit.trackingId} onChange={(e) => setE({ trackingId: e.target.value })} placeholder="AWB / LR / tracking" data-testid="logi-tracking" /></div>
+                <div className="space-y-1"><Label className="text-[11px]">Docket no.</Label><Input className="h-9" value={edit.docketNo} onChange={(e) => setE({ docketNo: e.target.value })} placeholder="Docket / LR no." /></div>
+                <div className="space-y-1 sm:col-span-2"><Label className="text-[11px]">Customer / party</Label><Input className="h-9" value={edit.customerName} onChange={(e) => setE({ customerName: e.target.value })} placeholder="Customer or location" /></div>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+                <Checkbox checked={!!(live?.qtyVerified ?? request?.qtyVerified)} onCheckedChange={(v: any) => patch.mutate({ id: r.id, data: { qtyVerified: !!v } })} data-testid="logi-qty-verified" />
+                Pack IDs / quantity / condition verified at {isInboard ? "pickup" : "loading"}
+              </label>
+              <div className="space-y-1"><Label className="text-[11px]">Discrepancy / issue <span className="normal-case font-normal text-muted-foreground">(damage, shortage — optional)</span></Label><Textarea rows={2} className="text-sm resize-none" value={edit.discrepancyNote} onChange={(e) => setE({ discrepancyNote: e.target.value })} placeholder="Note any issue for the concerned team…" /></div>
+              {editDirty && <Button size="sm" variant="secondaryB" className="h-8" disabled={busy} onClick={saveEdit} data-testid="logi-save-details"><Check className="h-3.5 w-3.5 mr-1.5" /> Save details</Button>}
+            </Panel>
+          )}
+
+          {/* Documents */}
+          {(docList.length > 0 || (canManage && active)) && (
+            <Panel title="Documents" tint="#0E7C7B">
+              {docList.length > 0 ? (
+                <div className="space-y-1.5">
+                  {docList.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-2.5 py-1.5">
+                      <FileText className="h-4 w-4 text-[#206295] flex-shrink-0" />
+                      <a href={d.fileData} target="_blank" rel="noreferrer" className="text-sm text-foreground hover:text-[#206295] hover:underline truncate flex-1 min-w-0">{DOC_LABELS[d.type] || "Document"}<span className="text-muted-foreground font-normal"> · {d.fileName}</span></a>
+                      {d.financeOnly && <Badge className="text-[9px] px-1.5 py-0 flex-shrink-0 bg-[#64748B]/15 text-[#64748B] gap-1"><Lock className="h-2.5 w-2.5" /> Finance</Badge>}
+                      {canManage && active && <button onClick={() => docs.mutate({ id: r.id, removeIndex: i })} aria-label="Remove" className="h-6 w-6 rounded inline-flex items-center justify-center text-muted-foreground hover:text-[#FF6F62] flex-shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>}
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="text-xs text-muted-foreground">No documents yet.</p>}
+
+              {canManage && active && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Select value={docType} onValueChange={setDocType}>
+                      <SelectTrigger className="h-9 flex-1" data-testid="logi-doc-type"><SelectValue placeholder="Document type" /></SelectTrigger>
+                      <SelectContent>{docOptions(r).map((t) => <SelectItem key={t} value={t}>{DOC_LABELS[t]}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer sm:px-1">
+                      <Checkbox checked={docFinanceOnly || ["ewayBill", "deliveryChallan"].includes(docType)} disabled={["ewayBill", "deliveryChallan"].includes(docType)} onCheckedChange={(v: any) => setDocFinanceOnly(!!v)} /> Finance-only
+                    </label>
+                  </div>
+                  <FileUpload value={docFile} onChange={setDocFile} label="Attach document" />
+                  <Button size="sm" variant="secondaryB" className="h-8" disabled={busy || !docType || !docFile} onClick={addDoc} data-testid="logi-add-doc"><Check className="h-3.5 w-3.5 mr-1.5" /> Add document</Button>
+                </div>
+              )}
+            </Panel>
+          )}
+
+          {/* Tracking — once dispatched */}
+          {["in_transit", "delivered", "completed"].includes(r.status) && (r.trackingId || (r.trackingEvents?.length ?? 0) > 0) && (
+            <Panel title={<span className="inline-flex items-center gap-1.5"><Navigation className="h-3.5 w-3.5" /> Tracking</span>}>
+              <div className="flex items-center gap-2 text-xs flex-wrap">
+                {r.trackingId && <span className="text-foreground font-medium">{r.trackingId}</span>}
+                {r.carrier && <><Bar /><span className="text-muted-foreground">{r.carrier}</span></>}
+                {canManage && ["in_transit", "delivered"].includes(r.status) && (
+                  <button onClick={() => action.mutate({ id: r.id, op: "refresh-tracking" })} disabled={busy} className="ml-auto inline-flex items-center gap-1 text-[#206295] hover:underline" data-testid="logi-refresh-tracking"><RefreshCw className="h-3 w-3" /> Refresh</button>
+                )}
+              </div>
+              {(r.trackingEvents?.length ?? 0) > 0 ? (
+                <div className="space-y-2.5 pt-1">
+                  {[...r.trackingEvents].reverse().map((ev: any, i: number) => (
+                    <div key={i} className="flex gap-2.5">
+                      <div className="flex flex-col items-center pt-0.5"><span className={`h-2 w-2 rounded-full ${i === 0 ? "bg-[#206295]" : "bg-border"}`} />{i < r.trackingEvents.length - 1 && <span className="w-px flex-1 bg-border mt-0.5" />}</div>
+                      <div className="min-w-0 pb-0.5"><p className="text-[13px] text-foreground leading-tight">{ev.note}</p><p className="text-[10px] text-muted-foreground mt-0.5">{[ev.location, fmtStamp(ev.at)].filter(Boolean).join(" · ")}</p></div>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="text-xs text-muted-foreground">Awaiting first tracking update.</p>}
+            </Panel>
+          )}
+
+          {/* Inbound verifications — plant OK (logistics records) + finance verify */}
+          {isInboard && ["in_transit", "delivered", "completed"].includes(r.status) && (
+            <Panel title="Receipt verification" tint="#0E7C7B">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-foreground inline-flex items-center gap-2"><PackageCheck className="h-4 w-4 text-[#0E7C7B]" /> Plant confirmed packs OK</span>
+                {r.plantVerifiedAt ? <Badge className="text-[10px] bg-[#4BDCD9]/25 text-[#0E7C7B]">{fmtStamp(r.plantVerifiedAt)}</Badge>
+                  : canManage ? <Button size="sm" variant="secondaryB" className="h-8" disabled={busy} onClick={() => action.mutate({ id: r.id, op: "plant-verify" })} data-testid="logi-plant-verify">Record</Button>
+                  : <span className="text-xs text-muted-foreground">Pending</span>}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-foreground inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#206295]" /> Finance verified customer doc</span>
+                {r.financeVerifiedAt ? <Badge className="text-[10px] bg-[#4BDCD9]/25 text-[#0E7C7B]">{fmtStamp(r.financeVerifiedAt)}</Badge>
+                  : canFinanceVerify ? <Button size="sm" variant="secondaryB" className="h-8" disabled={busy} onClick={() => action.mutate({ id: r.id, op: "finance-verify" })} data-testid="logi-finance-verify">Verify</Button>
+                  : <span className="text-xs text-muted-foreground">Pending finance</span>}
+              </div>
+            </Panel>
+          )}
+
+          {/* POD — existing doc, or the completion upload zone */}
           {r.proof?.fileData ? (
             <div className="rounded-[16px] border border-border bg-muted/30 p-3.5">
-              <p className={`${LABEL} mb-1.5`}>Proof of delivery / document</p>
+              <p className={`${LABEL} mb-1.5`}>Proof of delivery / received copy</p>
               <a href={r.proof.fileData} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-[#206295] hover:underline"><FileText className="h-4 w-4" /> {r.proof.fileName || "View document"}</a>
             </div>
           ) : canComplete ? (
             <div className="rounded-[16px] border border-border bg-muted/30 p-3.5">
-              <p className={LABEL}>Proof of delivery / document <span className="text-[#FF6F62]">*</span></p>
-              <div className="mt-2"><FileUpload value={proof} onChange={setProof} label="Upload POD / delivery doc / invoice" /></div>
-              <p className="text-[11px] text-muted-foreground mt-2">{proof ? "Attached — ready to complete." : "Required to mark this request complete. PDF, JPG, PNG up to 10 MB."}</p>
+              <p className={LABEL}>Proof of delivery / received copy <span className="text-[#FF6F62]">*</span></p>
+              <div className="mt-2"><FileUpload value={proof} onChange={setProof} label="Upload POD / received copy" /></div>
+              <p className="text-[11px] text-muted-foreground mt-2">{proof ? "Attached — ready to close." : "Required to close the request. PDF, JPG, PNG up to 10 MB."}</p>
             </div>
           ) : null}
 
-          {/* Cancel reason */}
           {cancelling && (
             <div className="space-y-1.5">
               <p className={LABEL}>Reason for cancellation <span className="normal-case font-normal">(optional)</span></p>
@@ -197,17 +337,19 @@ export function LogisticsDetailDialog({ request: r, isHandler, isOwner, locName,
 
         {/* Footer */}
         {hasFooter && (
-          <div className="flex-shrink-0 border-t border-border bg-background px-6 py-4 flex items-center justify-end gap-2">
+          <div className="flex-shrink-0 border-t border-border bg-background px-6 py-4 flex items-center justify-end gap-2 flex-wrap">
             {cancelling ? (
               <>
                 <Button variant="ghost" size="sm" onClick={() => setCancelling(false)}>Back</Button>
-                <Button size="sm" variant="outline" className="border-[#FF6F62]/60 text-[#FF6F62] hover:bg-[#FF6F62]/10 hover:text-[#FF6F62]" disabled={busy} onClick={() => action.mutate({ id: r.id, op: "cancel", body: { note } })}><X className="h-4 w-4 mr-1.5" /> Confirm cancel</Button>
+                <Button size="sm" variant="outline" className="border-[#FF6F62]/60 text-[#FF6F62] hover:bg-[#FF6F62]/10 hover:text-[#FF6F62]" disabled={busy} onClick={() => action.mutate({ id: r.id, op: "cancel", body: { note } }, { onSuccess: onClose })}><X className="h-4 w-4 mr-1.5" /> Confirm cancel</Button>
               </>
             ) : (
               <>
                 {canCancel && <Button variant="outline" size="sm" onClick={() => setCancelling(true)}><X className="h-4 w-4 mr-1.5" /> Cancel</Button>}
                 {canStart && <Button size="sm" className="btn-primary-gradient" disabled={busy} onClick={() => action.mutate({ id: r.id, op: "start" })}><Play className="h-4 w-4 mr-1.5" /> Start processing</Button>}
-                {canComplete && <Button size="sm" className="btn-primary-gradient" disabled={busy || !proof} onClick={() => action.mutate({ id: r.id, op: "complete", body: { proof } })}><Check className="h-4 w-4 mr-1.5" /> Complete</Button>}
+                {canDispatch && <Button size="sm" className="btn-primary-gradient" disabled={busy || !(live?.carrier ?? request?.carrier)} title={!(live?.carrier ?? request?.carrier) ? "Arrange a vehicle first" : undefined} onClick={() => action.mutate({ id: r.id, op: "dispatch" })}><Send className="h-4 w-4 mr-1.5" /> Dispatch</Button>}
+                {canDeliver && <Button size="sm" className="btn-primary-gradient" disabled={busy} onClick={() => action.mutate({ id: r.id, op: "deliver" })}><PackageCheck className="h-4 w-4 mr-1.5" /> Mark delivered</Button>}
+                {canComplete && <Button size="sm" className="btn-primary-gradient" disabled={busy || !proof} title={!proof ? "Upload the POD to close" : undefined} onClick={() => action.mutate({ id: r.id, op: "complete", body: { proof } }, { onSuccess: onClose })}><Check className="h-4 w-4 mr-1.5" /> Close (POD)</Button>}
               </>
             )}
           </div>

@@ -3,7 +3,8 @@ import { apiRequest, getQueryFn } from "./queryClient";
 
 export type UserRole =
   | "super_admin" | "hr_admin" | "hr_executive" | "finance" | "manager" | "employee"
-  | "recruiter" | "hr_ops" | "office_admin" | "ceo_approver" | "cto" | "interviewer" | "logistics";
+  | "recruiter" | "hr_ops" | "office_admin" | "ceo_approver" | "cto" | "interviewer" | "logistics"
+  | "ops_employee" | "ops_shift_incharge";
 
 export interface CurrentUser {
   id: string;
@@ -42,7 +43,7 @@ export interface AuthState {
 //    super_admin / hr_admin / hr_executive / hr_ops through the ATS.
 export const ALL_ROLES: UserRole[] = [
   "super_admin", "hr_admin", "hr_executive", "finance", "manager", "employee",
-  "hr_ops", "ceo_approver", "cto", "logistics",
+  "hr_ops", "ceo_approver", "cto", "logistics", "ops_employee", "ops_shift_incharge",
 ];
 
 export function useAuth() {
@@ -92,7 +93,13 @@ export function isFinance(user: CurrentUser | null): boolean {
 }
 
 export function isManager(user: CurrentUser | null): boolean {
-  return hasRole(user, "super_admin", "hr_admin", "hr_executive", "manager");
+  // ops_shift_incharge has manager-level access (plus Ops shift management).
+  return hasRole(user, "super_admin", "hr_admin", "hr_executive", "manager", "ops_shift_incharge");
+}
+
+/** Ops Shift Management: the incharge (manager-level) + super_admin. */
+export function isOpsShiftIncharge(user: CurrentUser | null): boolean {
+  return hasRole(user, "super_admin", "ops_shift_incharge");
 }
 
 export function hasWorkspaceAccess(user: CurrentUser | null): boolean {
@@ -134,6 +141,8 @@ export function getRoleBadgeColor(role: UserRole): string {
     recruiter: GREY,
     interviewer: GREY,
     logistics: GREY,
+    ops_shift_incharge: BLUE,
+    ops_employee: GREY,
     employee: GREY,
   };
   return colors[role] || GREY;
@@ -153,6 +162,8 @@ export function getRoleLabel(role: UserRole): string {
     cto: "CTO",
     interviewer: "Interviewer",
     logistics: "Logistics",
+    ops_employee: "Ops Employee",
+    ops_shift_incharge: "Ops Shift Incharge",
     employee: "Employee",
   };
   return labels[role] || role;

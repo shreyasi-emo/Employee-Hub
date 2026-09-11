@@ -36,7 +36,8 @@ const TYPES = [
 ];
 
 const BLANK = {
-  requestType: "", fromLocationId: "", fromLocationText: "", toLocationId: "", toLocationText: "",
+  requestType: "", cargoType: "material", customerName: "",
+  fromLocationId: "", fromLocationText: "", toLocationId: "", toLocationText: "",
   pickupDate: "", deliveryDate: "", pocName: "", pocPhone: "", quantity: 1, weightKg: "",
   goodsCategory: "", description: "", priority: "regular",
 };
@@ -116,6 +117,7 @@ export function RaiseLogisticsDialog({ open, onClose, locations = [] }: { open: 
 
   const submit = () => create.mutate({
     requestType: f.requestType,
+    cargoType: f.cargoType, customerName: f.customerName.trim() || null,
     fromLocationId: f.fromLocationId || null, fromLocationText: f.fromLocationText.trim() || null,
     toLocationId: f.toLocationId || null, toLocationText: f.toLocationText.trim() || null,
     pickupDate: f.pickupDate || null, deliveryDate: f.deliveryDate || null,
@@ -179,6 +181,17 @@ export function RaiseLogisticsDialog({ open, onClose, locations = [] }: { open: 
             <Separator />
 
             <Section icon={Package} title="Shipment details">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px]">Cargo type</Label>
+                  <div className="segmented-toggle flex p-0.5 h-9 w-full">
+                    {[{ v: "material", l: "Material" }, { v: "pack", l: "Battery Pack" }].map((c) => (
+                      <button key={c.v} type="button" onClick={() => set({ cargoType: c.v })} className={`flex-1 h-full rounded-[10px] text-xs font-medium ${f.cargoType === c.v ? "btn-primary-gradient text-white" : "text-muted-foreground"}`} data-testid={`logistics-cargo-${c.v}`}>{c.l}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1"><Label className="text-[11px]">Customer / party <span className="text-muted-foreground">optional</span></Label><Input className="h-9" value={f.customerName} onChange={(e) => set({ customerName: e.target.value })} placeholder="Customer or location" data-testid="logistics-customer" /></div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1"><Label className="text-[11px]">Quantity <span className="text-[#FF6F62]">*</span></Label><Input className="h-9" type="number" min="1" step="1" value={f.quantity} onChange={(e) => set({ quantity: e.target.value })} /></div>
                 <div className="space-y-1"><Label className="text-[11px]">Weight (kg) <span className="text-muted-foreground">optional</span></Label><Input className="h-9" type="number" min="0" step="0.001" value={f.weightKg} onChange={(e) => set({ weightKg: e.target.value })} placeholder="—" /></div>

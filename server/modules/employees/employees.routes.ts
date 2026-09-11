@@ -134,7 +134,7 @@ export function registerEmployeeRoutes(app: Express) {
     if (!emp) return res.status(404).json({ error: "Employee not found" });
     const viewer = req.currentUser!;
     // Profile is sanitized per role, so a manager can open any coworker's (directory-level) profile.
-    const privilegedRoles = ["super_admin", "hr_admin", "hr_executive", "finance", "manager"];
+    const privilegedRoles = ["super_admin", "hr_admin", "hr_executive", "finance", "manager", "ops_shift_incharge"];
     if (!privilegedRoles.includes(viewer.role) && viewer.employeeId !== emp.id) {
       return res.status(403).json({ error: "Access denied" });
     }
@@ -271,7 +271,7 @@ export function registerEmployeeRoutes(app: Express) {
 
   // ===== ATTENDANCE =====
   app.get("/api/employees/:id/history", requireAuth, async (req, res) => {
-    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
+    const allowedRoles = ["super_admin", "hr_admin", "hr_executive", "manager", "ops_shift_incharge", "ceo_approver"];
     if (!allowedRoles.includes(req.currentUser!.role) && req.currentUser!.employeeId !== req.params.id) {
       return res.status(403).json({ error: "Access denied" });
     }

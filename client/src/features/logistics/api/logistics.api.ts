@@ -11,6 +11,14 @@ export const useLogisticsLocations = () =>
 export const useLogisticsRequests = () =>
   useQuery<any[]>({ queryKey: ["/api/logistics/requests"] });
 
+// Live single request — keeps the detail dialog in sync as logistics works through the stages.
+export const useLogisticsRequest = (id?: string) =>
+  useQuery<any>({ queryKey: [`/api/logistics/requests/${id}`], enabled: !!id });
+
+// Invalidate both the list and any open single-request view.
+const invalidateLogistics = (qc: ReturnType<typeof useQueryClient>) =>
+  qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/logistics/requests") });
+
 export function useCreateLogisticsRequest(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
   const qc = useQueryClient();
   return useMutation({
@@ -20,13 +28,37 @@ export function useCreateLogisticsRequest(opts: { onSuccess?: () => void; onErro
   });
 }
 
-/** Handler transitions: start | complete (needs proof) | cancel. */
+/** Handler/finance transitions along the flow. The op string is the server's route segment. */
+export type LogisticsOp = "start" | "dispatch" | "deliver" | "complete" | "cancel" | "plant-verify" | "finance-verify" | "refresh-tracking";
 export function useLogisticsRequestAction(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, op, body }: { id: string; op: "start" | "complete" | "cancel"; body?: any }) =>
+    mutationFn: ({ id, op, body }: { id: string; op: LogisticsOp; body?: any }) =>
       apiRequest("POST", `/api/logistics/requests/${id}/${op}`, body || {}),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/logistics/requests"] }); opts.onSuccess?.(); },
+    onSuccess: () => { invalidateLogistics(qc); opts.onSuccess?.(); },
+    onError: opts.onError,
+  });
+}
+
+/** Logistics edits the processing fields (carrier, vehicle, tracking no., customer, verification, discrepancy). */
+export function useUpdateLogisticsRequest(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => apiRequest("PATCH", `/api/logistics/requests/${id}`, data),
+    onSuccess: () => { invalidateLogistics(qc); opts.onSuccess?.(); },
+    onError: opts.onError,
+  });
+}
+
+/** Upload / remove a typed logistics document. */
+export function useLogisticsDoc(opts: { onSuccess?: () => void; onError?: (e: any) => void } = {}) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; add: { type: string; financeOnly?: boolean; file: any } } | { id: string; removeIndex: number }) =>
+      "removeIndex" in v
+        ? apiRequest("DELETE", `/api/logistics/requests/${v.id}/documents/${v.removeIndex}`, {})
+        : apiRequest("POST", `/api/logistics/requests/${v.id}/documents`, v.add),
+    onSuccess: () => { invalidateLogistics(qc); opts.onSuccess?.(); },
     onError: opts.onError,
   });
 }

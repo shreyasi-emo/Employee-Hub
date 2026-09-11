@@ -358,6 +358,12 @@ export async function seed() {
   const opsDeptForRoles = (await storage.getDepartments());
   const extraRoleProfiles = [
     { code: "EMO0O1", role: "hr_ops", first: "Sameer", last: "Joshi", username: "hrops@emoenergy.in", dept: "Human Resources" },
+    { code: "EMO0L1", role: "logistics", first: "Manoj", last: "Kumar", username: "logistics@emoenergy.in", dept: "Operations" },
+    { code: "EMO0S1", role: "ops_shift_incharge", first: "Vikas", last: "Rao", username: "opsincharge@emoenergy.in", dept: "Operations" },
+    { code: "EMO0P1", role: "ops_employee", first: "Deepak", last: "Nair", username: "ops1@emoenergy.in", dept: "Operations" },
+    { code: "EMO0P2", role: "ops_employee", first: "Farhan", last: "Shaikh", username: "ops2@emoenergy.in", dept: "Operations" },
+    { code: "EMO0P3", role: "ops_employee", first: "Geeta", last: "Iyer", username: "ops3@emoenergy.in", dept: "Operations" },
+    { code: "EMO0P4", role: "ops_employee", first: "Harish", last: "Kulkarni", username: "ops4@emoenergy.in", dept: "Operations" },
   ];
   const extraEmps: any[] = [];
   for (const p of extraRoleProfiles) {

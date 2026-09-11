@@ -42,7 +42,7 @@ export function registerLeaveRoutes(app: Express) {
     const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive");
     let empId = viewer.employeeId || "";
     if (privileged && employeeId) empId = employeeId as string;
-    else if (viewer.role === "manager" && employeeId) {
+    else if ((viewer.role === "manager" || viewer.role === "ops_shift_incharge") && employeeId) {
       const target = await storage.getEmployee(employeeId as string);
       if (target && target.managerId === viewer.employeeId) empId = employeeId as string; // else falls back to own
     }
@@ -84,7 +84,7 @@ export function registerLeaveRoutes(app: Express) {
     const hrRoles = ["super_admin", "hr_admin", "hr_executive"];
     // Managers AND executives (CEO/CTO) see the leave of their direct reports. For a manager the
     // reports are employees; for an exec they're the managers reporting to them — same mechanism.
-    const managerRoles = ["manager", "cto", "ceo_approver"];
+    const managerRoles = ["manager", "ops_shift_incharge", "cto", "ceo_approver"];
 
     if (hrRoles.includes(req.currentUser!.role)) {
       res.json(await storage.getLeaveRequests(employeeId as string, status as string));
@@ -154,7 +154,7 @@ export function registerLeaveRoutes(app: Express) {
     // approve their reporting managers' leave), or a Super Admin. HR is notified and can view only.
     if (["approved", "rejected"].includes(status)) {
       let canDecide = viewer.role === "super_admin";
-      if (!canDecide && ["manager", "cto", "ceo_approver"].includes(viewer.role) && viewer.employeeId) {
+      if (!canDecide && ["manager", "ops_shift_incharge", "cto", "ceo_approver"].includes(viewer.role) && viewer.employeeId) {
         const directReports = await storage.getEmployeesByManager(viewer.employeeId);
         canDecide = directReports.some(e => e.id === leaveReq.employeeId);
       }
@@ -251,7 +251,7 @@ export function registerLeaveRoutes(app: Express) {
     if (lr.status !== "approved") return res.status(400).json({ error: "Only an approved leave can be flagged." });
     const viewer = req.currentUser!;
     let canFlag = viewer.role === "super_admin";
-    if (!canFlag && ["manager", "cto", "ceo_approver"].includes(viewer.role) && viewer.employeeId) {
+    if (!canFlag && ["manager", "ops_shift_incharge", "cto", "ceo_approver"].includes(viewer.role) && viewer.employeeId) {
       const reports = await storage.getEmployeesByManager(viewer.employeeId);
       canFlag = reports.some((e) => e.id === lr.employeeId);
     }
@@ -274,7 +274,7 @@ export function registerLeaveRoutes(app: Express) {
     const privileged = hasRole(req, "super_admin", "hr_admin", "hr_executive");
     let empId = viewer.employeeId || "";
     if (privileged && employeeId) empId = employeeId as string;
-    else if (viewer.role === "manager" && employeeId) {
+    else if ((viewer.role === "manager" || viewer.role === "ops_shift_incharge") && employeeId) {
       const target = await storage.getEmployee(employeeId as string);
       if (target && target.managerId === viewer.employeeId) empId = employeeId as string; // else falls back to own
     }
