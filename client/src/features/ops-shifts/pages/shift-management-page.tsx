@@ -78,7 +78,7 @@ export default function ShiftManagementPage() {
         <div className="flex items-center gap-3">
           <span className="h-10 w-10 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Clock className="h-5 w-5" /></span>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Shift Management</h1>
+            <h1 className="text-2xl font-bold text-foreground">Shifts</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Assign & manage Ops shifts</p>
           </div>
         </div>

@@ -31,9 +31,9 @@ export const navItems: NavItem[] = [
   { title: "Performance", href: "/performance", icon: Target },
   { title: "Announcements", href: "/announcements", icon: Megaphone },
   { title: "Assets", href: "/assets", icon: Package, roles: ["super_admin", "hr_admin", "hr_executive"] },
-  { title: "Shifts", href: "/shifts", icon: Clock, roles: ["super_admin", "hr_admin", "hr_executive", "hr_ops"] },
+  // Shifts = the Ops shift roster. Employees see their own ("My Shifts"); the incharge/admin manage it.
   { title: "My Shifts", href: "/my-shifts", icon: Clock, roles: ["ops_employee"] },
-  { title: "Shift Management", href: "/shift-management", icon: Clock, roles: ["super_admin", "ops_shift_incharge"] },
+  { title: "Shifts", href: "/shift-management", icon: Clock, roles: ["super_admin", "ops_shift_incharge"] },
   { title: "Onboarding", href: "/onboarding", icon: ClipboardList, roles: ["super_admin", "hr_admin", "hr_executive", "hr_ops"] },
 ];
 
