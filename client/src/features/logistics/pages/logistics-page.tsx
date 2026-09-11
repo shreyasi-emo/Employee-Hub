@@ -18,7 +18,7 @@ import { LogisticsDetailDialog } from "../components/logistics-detail-dialog";
 import { SplitTabs } from "@/components/shared/split-tabs";
 
 const HANDLER_ROLES = ["super_admin", "logistics"];
-const ACTIVE = ["pending", "in_progress"];
+const ACTIVE = ["pending", "in_progress", "in_transit", "delivered"];
 // Labels for the mobile Filters sheet's active chips (Type + Sort).
 const TYPE_CHIP_LABELS: Record<string, string> = { inboard: "Inboard", outboard: "Outboard" };
 const SORT_CHIP_LABELS: Record<string, string> = { updated: "Latest Update", newest: "Newest", oldest: "Oldest" };
@@ -29,6 +29,8 @@ export default function LogisticsPage() {
   const { data: auth } = useAuth();
   const role = auth?.user?.role || "";
   const isHandler = HANDLER_ROLES.includes(role);
+  const isFinance = role === "finance";
+  const canSeeAll = isHandler || isFinance;  // finance monitors read-only; handlers process
   const [raise, setRaise] = useState(false);
   const [detail, setDetail] = useState<any>(null);
 
@@ -51,8 +53,8 @@ export default function LogisticsPage() {
   // on the row — because there may be only one logistics handler, and excluding them left a
   // request they raised with nobody able to process it.
   const mineAll = requests.filter((r) => r.requesterId === me);
-  const processAll = isHandler ? requests : [];
-  const activeTab = isHandler ? tab : "mine";
+  const processAll = canSeeAll ? requests : [];
+  const activeTab = canSeeAll ? tab : "mine";
   const base = activeTab === "process" ? processAll : mineAll;
   const activeCount = base.filter((r) => ACTIVE.includes(r.status)).length;
   const doneCount = base.length - activeCount;
@@ -88,6 +90,64 @@ export default function LogisticsPage() {
   if (sortBy !== "updated") logisticsFilterChips.push({ key: "sort", label: SORT_CHIP_LABELS[sortBy] ?? sortBy, onClear: () => { setSortBy("updated"); paged.setPage(1); } });
   const resetLogisticsFilters = () => { setTypeFilter("all"); setSortBy("updated"); paged.setPage(1); };
 
+  // Urgent / Standard section header — shared by the card and table views so both segregate identically.
+  const sectionHead = (urgent: boolean, count: number) => (
+    <div className="flex items-center gap-2 px-1">
+      {urgent ? <AlertTriangle className="h-3.5 w-3.5 text-[#C4402F] flex-shrink-0" /> : <Package className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+      <span className={`text-xs font-semibold uppercase tracking-wide ${urgent ? "text-[#C4402F]" : "text-muted-foreground"}`}>{urgent ? "Urgent" : "Standard Requests"}</span>
+      <span className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${urgent ? "bg-[#FF6F62]/20 text-[#C4402F]" : "bg-muted text-muted-foreground"}`}>{count}</span>
+    </div>
+  );
+
+  // Table columns — reused by the flat (Closed) and Urgent/Standard-grouped (Active) table renders.
+  const logiCols = [
+    { key: "reference", header: "Order ID", cellClassName: "", render: (r: any) => (
+      <div className="flex items-center gap-2">
+        <span className="h-7 w-7 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Truck className="h-3.5 w-3.5" /></span>
+        <div className="min-w-0">
+          <span className="font-semibold text-[#206295] whitespace-nowrap">{r.reference}</span>
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+            <span>{r.requestType === "inboard" ? "Inboard" : "Outboard"}</span>
+            {r.priority === "urgent" && <span className="font-semibold text-[#C4402F]">| Urgent</span>}
+          </div>
+        </div>
+      </div>
+    ) },
+    { key: "requester", header: "Requester", cellClassName: "", render: (r: any) => (
+      <div className="min-w-0 max-w-[12rem]">
+        <p className="font-medium text-foreground truncate inline-flex items-center gap-1.5">
+          {r.requesterName || "Unassigned"}
+          {activeTab === "process" && r.requesterId === me && (
+            <Badge className="text-[10px] px-1.5 py-0 flex-shrink-0 bg-[#206295]/12 text-[#206295]">Yours</Badge>
+          )}
+        </p>
+        {r.requesterDept && <p className="text-xs text-muted-foreground truncate">{r.requesterDept}</p>}
+      </div>
+    ) },
+    { key: "route", header: "Route", render: (r: any) => (
+      <div className="min-w-0 max-w-[16rem]">
+        <div className="flex items-center gap-2 min-w-0"><span className="h-2 w-2 rounded-full border border-muted-foreground flex-shrink-0" /><span className="truncate text-foreground">{flatLoc(r.fromLocationText || locName(r.fromLocationId))}</span></div>
+        <div className="ml-[3px] h-3 w-px bg-muted-foreground/40" />
+        <div className="flex items-center gap-2 min-w-0"><span className="h-2 w-2 rounded-full bg-[#206295] flex-shrink-0" /><span className="truncate text-foreground">{flatLoc(r.toLocationText || locName(r.toLocationId))}</span></div>
+      </div>
+    ) },
+    { key: "cargo", header: "Cargo", cellClassName: "", render: (r: any) => (
+      <div className="min-w-0 max-w-[10rem]">
+        <p className="text-foreground whitespace-nowrap">{Number(r.quantity) || 0} unit{Number(r.quantity) === 1 ? "" : "s"}</p>
+        {r.goodsCategory && <p className="text-xs text-muted-foreground truncate capitalize">{r.goodsCategory}</p>}
+      </div>
+    ) },
+    { key: "weight", header: "Weight", align: "right" as const, cellClassName: "whitespace-nowrap", render: (r: any) => (r.weightKg ? `${Number(r.weightKg)} kg` : "—") },
+    { key: "pickup", header: "Pickup", cellClassName: "text-muted-foreground whitespace-nowrap", render: (r: any) => fmtDate(r.pickupDate) },
+    { key: "eta", header: "ETA", cellClassName: "text-muted-foreground whitespace-nowrap", render: (r: any) => fmtDate(r.deliveryDate) },
+    { key: "status", header: "Status", cellClassName: "", render: (r: any) => <Badge className={`gap-1.5 text-xs ${statusClass(r.status)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" /> {statusLabel(r.status)}</Badge> },
+  ];
+  const logiTable = (data: any[]) => (
+    <Card className="border-0"><CardContent className="p-0">
+      <DataTable columns={logiCols} rows={data} getRowKey={(r: any) => r.id} onRowClick={(r: any) => setDetail(r)} testIdPrefix="logistics-row" />
+    </CardContent></Card>
+  );
+
   return (
     <div className="p-6 space-y-6 max-w-[92rem] mx-auto">
       {/* Header */}
@@ -96,20 +156,20 @@ export default function LogisticsPage() {
           <span className="h-10 w-10 rounded-xl bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Truck className="h-5 w-5" /></span>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Logistics</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{isHandler ? "Process inward & outward movement requests" : "Raise and track your movement requests"}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">{isHandler ? "Process inward & outward movement requests" : isFinance ? "Monitor movement requests & verify documents" : "Raise and track your movement requests"}</p>
           </div>
         </div>
         {activeTab === "mine" && <Button className="btn-primary-gradient" onClick={() => setRaise(true)} data-testid="logistics-raise"><Plus className="h-4 w-4 mr-1.5" /> Raise Request</Button>}
       </div>
 
       {/* My Requests vs handler To-Process queue */}
-      {isHandler && (
+      {canSeeAll && (
         <SplitTabs
           value={tab}
           onValueChange={(v) => { setTab(v as "mine" | "process"); setPhase("active"); paged.setPage(1); }}
           tabs={[
             { value: "mine", label: "My Requests", count: mineActive },
-            { value: "process", label: "To Process", count: processActive },
+            { value: "process", label: isHandler ? "To Process" : "All Shipments", count: processActive },
           ]}
         />
       )}
@@ -227,56 +287,19 @@ export default function LogisticsPage() {
       {rows.length === 0 ? (
         <div className="card-surface rounded-2xl py-16 text-center"><Truck className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" /><p className="text-sm text-muted-foreground">No logistics requests here.</p></div>
       ) : view === "table" ? (
-        <Card className="border-0"><CardContent className="p-0">
-          <DataTable
-            columns={[
-              { key: "reference", header: "Order ID", cellClassName: "", render: (r: any) => (
-                <div className="flex items-center gap-2">
-                  <span className="h-7 w-7 rounded-lg bg-[#206295]/10 text-[#206295] flex items-center justify-center flex-shrink-0"><Truck className="h-3.5 w-3.5" /></span>
-                  <div className="min-w-0">
-                    <span className="font-semibold text-[#206295] whitespace-nowrap">{r.reference}</span>
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
-                      <span>{r.requestType === "inboard" ? "Inboard" : "Outboard"}</span>
-                      {r.priority === "urgent" && <span className="font-semibold text-[#C4402F]">| Urgent</span>}
-                    </div>
-                  </div>
+        phase === "active" ? (
+          // Active: same Urgent / Standard segregation as the cards — a section header over each group's table.
+          <div className="space-y-5">
+            {[{ urgent: true, items: rows.filter((r) => r.priority === "urgent") }, { urgent: false, items: rows.filter((r) => r.priority !== "urgent") }]
+              .filter((g) => g.items.length > 0)
+              .map((g) => (
+                <div key={g.urgent ? "urgent" : "standard"} className="space-y-2">
+                  {sectionHead(g.urgent, g.items.length)}
+                  {logiTable(g.items)}
                 </div>
-              ) },
-              { key: "requester", header: "Requester", cellClassName: "", render: (r: any) => (
-                <div className="min-w-0 max-w-[12rem]">
-                  <p className="font-medium text-foreground truncate inline-flex items-center gap-1.5">
-                    {r.requesterName || "Unassigned"}
-                    {activeTab === "process" && r.requesterId === me && (
-                      <Badge className="text-[10px] px-1.5 py-0 flex-shrink-0 bg-[#206295]/12 text-[#206295]">Yours</Badge>
-                    )}
-                  </p>
-                  {r.requesterDept && <p className="text-xs text-muted-foreground truncate">{r.requesterDept}</p>}
-                </div>
-              ) },
-              { key: "route", header: "Route", render: (r: any) => (
-                <div className="min-w-0 max-w-[16rem]">
-                  <div className="flex items-center gap-2 min-w-0"><span className="h-2 w-2 rounded-full border border-muted-foreground flex-shrink-0" /><span className="truncate text-foreground">{flatLoc(r.fromLocationText || locName(r.fromLocationId))}</span></div>
-                  <div className="ml-[3px] h-3 w-px bg-muted-foreground/40" />
-                  <div className="flex items-center gap-2 min-w-0"><span className="h-2 w-2 rounded-full bg-[#206295] flex-shrink-0" /><span className="truncate text-foreground">{flatLoc(r.toLocationText || locName(r.toLocationId))}</span></div>
-                </div>
-              ) },
-              { key: "cargo", header: "Cargo", cellClassName: "", render: (r: any) => (
-                <div className="min-w-0 max-w-[10rem]">
-                  <p className="text-foreground whitespace-nowrap">{Number(r.quantity) || 0} unit{Number(r.quantity) === 1 ? "" : "s"}</p>
-                  {r.goodsCategory && <p className="text-xs text-muted-foreground truncate capitalize">{r.goodsCategory}</p>}
-                </div>
-              ) },
-              { key: "weight", header: "Weight", align: "right", cellClassName: "whitespace-nowrap", render: (r: any) => (r.weightKg ? `${Number(r.weightKg)} kg` : "—") },
-              { key: "pickup", header: "Pickup", cellClassName: "text-muted-foreground whitespace-nowrap", render: (r: any) => fmtDate(r.pickupDate) },
-              { key: "eta", header: "ETA", cellClassName: "text-muted-foreground whitespace-nowrap", render: (r: any) => fmtDate(r.deliveryDate) },
-              { key: "status", header: "Status", cellClassName: "", render: (r: any) => <Badge className={`gap-1.5 text-xs ${statusClass(r.status)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" /> {statusLabel(r.status)}</Badge> },
-            ]}
-            rows={rows}
-            getRowKey={(r: any) => r.id}
-            onRowClick={(r: any) => setDetail(r)}
-            testIdPrefix="logistics-row"
-          />
-        </CardContent></Card>
+              ))}
+          </div>
+        ) : logiTable(rows)
       ) : (
         <div className="space-y-3">
           {(() => {
@@ -308,7 +331,7 @@ export default function LogisticsPage() {
       )}
 
       <RaiseLogisticsDialog open={raise} onClose={() => setRaise(false)} locations={locations} />
-      {detail && <LogisticsDetailDialog request={detail} isHandler={isHandler} isOwner={detail.requesterId === auth?.user?.id} locName={locName} onClose={() => setDetail(null)} />}
+      {detail && <LogisticsDetailDialog request={detail} isHandler={isHandler} isFinance={isFinance} processView={activeTab === "process"} isOwner={detail.requesterId === auth?.user?.id} locName={locName} onClose={() => setDetail(null)} />}
     </div>
   );
 }

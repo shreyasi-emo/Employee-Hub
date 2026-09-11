@@ -19,6 +19,7 @@ import { registerUserRoutes } from "../modules/users/users.routes";
 import { registerPerformanceRoutes } from "../modules/performance/performance.routes";
 import { registerNotificationRoutes } from "../modules/notifications/notifications.routes";
 import { registerShiftRoutes } from "../modules/shifts/shifts.routes";
+import { registerOpsShiftRoutes } from "../modules/ops-shifts/ops-shifts.routes";
 import { registerOnboardingRoutes } from "../modules/onboarding/onboarding.routes";
 import { registerWorkspaceRoutes } from "../modules/workspace";
 import { registerMyRequestsRoutes } from "../modules/my-requests/my-requests.routes";
@@ -54,6 +55,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   registerPerformanceRoutes(app);
   registerNotificationRoutes(app);
   registerShiftRoutes(app);
+  registerOpsShiftRoutes(app);
   registerOnboardingRoutes(app);
 
   // HR/Admin Workspace + company requests

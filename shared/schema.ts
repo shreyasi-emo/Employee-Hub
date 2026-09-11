@@ -46,6 +46,8 @@ export const roleEnum = pgEnum("role", [
   "cto",
   "interviewer",
   "logistics",
+  "ops_employee",        // Operations-side employee: views & self-selects shifts
+  "ops_shift_incharge",  // manages Ops shifts (manager-level access + shift assignment)
 ]);
 
 export const employmentTypeEnum = pgEnum("employment_type", [
@@ -651,6 +653,35 @@ export const shiftAssignments = pgTable("shift_assignments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ----- Ops Shift Management (day-based slots with capacity, for Ops Employees) -----
+// A slot = a named shift on a specific date with N seats. Distinct from `shifts` above (which are
+// effective-dated shift *patterns*). Referenced by employeeId so Attendance can read it later.
+export const opsShiftSlots = pgTable("ops_shift_slots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),                              // shift name, e.g. "Morning"
+  date: date("date").notNull(),                              // the day this slot is for
+  startTime: text("start_time").notNull(),                   // "HH:MM"
+  endTime: text("end_time").notNull(),                       // "HH:MM"
+  capacity: integer("capacity").notNull().default(1),        // seats
+  openForSelection: boolean("open_for_selection").notNull().default(false), // employees may self-pick
+  notes: text("notes"),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const opsShiftAssignments = pgTable("ops_shift_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slotId: varchar("slot_id").notNull(),
+  employeeId: varchar("employee_id").notNull(),
+  // "assigned" = explicitly set by the incharge (LOCKED — employee can't change);
+  // "self" = employee self-selected an open slot; "auto" = system auto-assigned.
+  assignmentType: text("assignment_type").notNull().default("assigned"),
+  assignedById: varchar("assigned_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Employment History
 export const employmentHistory = pgTable("employment_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1114,6 +1145,8 @@ export const insertLeaveLedgerSchema = createInsertSchema(leaveLedger).omit({ id
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, readAt: true });
 export const insertShiftSchema = createInsertSchema(shifts).omit({ id: true, createdAt: true });
 export const insertShiftAssignmentSchema = createInsertSchema(shiftAssignments).omit({ id: true, createdAt: true });
+export const insertOpsShiftSlotSchema = createInsertSchema(opsShiftSlots).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOpsShiftAssignmentSchema = createInsertSchema(opsShiftAssignments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEmploymentHistorySchema = createInsertSchema(employmentHistory).omit({ id: true, createdAt: true });
 export const insertOnboardingTemplateSchema = createInsertSchema(onboardingTemplates).omit({ id: true, createdAt: true });
 export const insertOnboardingTaskSchema = createInsertSchema(onboardingTasks).omit({ id: true, createdAt: true });
@@ -1231,6 +1264,10 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 export type Shift = typeof shifts.$inferSelect;
 export type InsertShift = z.infer<typeof insertShiftSchema>;
+export type OpsShiftSlot = typeof opsShiftSlots.$inferSelect;
+export type InsertOpsShiftSlot = z.infer<typeof insertOpsShiftSlotSchema>;
+export type OpsShiftAssignment = typeof opsShiftAssignments.$inferSelect;
+export type InsertOpsShiftAssignment = z.infer<typeof insertOpsShiftAssignmentSchema>;
 
 export type ShiftAssignment = typeof shiftAssignments.$inferSelect;
 export type InsertShiftAssignment = z.infer<typeof insertShiftAssignmentSchema>;
@@ -1374,7 +1411,30 @@ export const logisticsRequests = pgTable("logistics_requests", {
   goodsCategory: text("goods_category"),
   description: text("description"),
   priority: text("priority").notNull().default("regular"),  // "regular" | "urgent"
-  status: text("status").notNull().default("pending"),      // pending | in_progress | completed | cancelled
+  // pending → in_progress (processing) → in_transit → delivered → completed  (+ cancelled). Free text, no enum.
+  status: text("status").notNull().default("pending"),
+  cargoType: text("cargo_type").notNull().default("material"),  // "pack" (battery packs, Pack IDs) | "material"
+  customerName: text("customer_name"),                    // customer / party the dispatch or pickup is for
+  // ----- Processing: the vehicle / logistics partner the team arranged -----
+  carrier: text("carrier"),                               // logistics partner / transporter
+  vehicleNo: text("vehicle_no"),
+  qtyVerified: boolean("qty_verified").notNull().default(false),  // Pack IDs / qty / condition checked at load/pickup
+  // ----- Transit tracking -----
+  trackingId: text("tracking_id"),                        // courier / AWB / LR tracking number
+  docketNo: text("docket_no"),
+  trackingProvider: text("tracking_provider"),            // pluggable provider key (mock for now)
+  trackingEvents: jsonb("tracking_events").notNull().default([]),  // [{at, status, note, location}]
+  dispatchedAt: timestamp("dispatched_at"),
+  deliveredAt: timestamp("delivered_at"),
+  // ----- Documents: [{type, fileName, fileType, fileData, uploadedById, uploadedAt, financeOnly}] -----
+  // types: packList | pdir | invoice | logisticsReport | dc | debitNote | ewayBill | deliveryChallan | customerDoc | other
+  documents: jsonb("documents").notNull().default([]),
+  // ----- Inward verification -----
+  plantVerifiedAt: timestamp("plant_verified_at"),        // plant confirmed "packs OK" (recorded by logistics)
+  plantVerifiedById: varchar("plant_verified_by_id"),
+  financeVerifiedAt: timestamp("finance_verified_at"),    // finance verified the customer document
+  financeVerifiedById: varchar("finance_verified_by_id"),
+  discrepancyNote: text("discrepancy_note"),              // damage / shortage / doc issue
   proof: jsonb("proof"),                                    // {fileName, fileType, fileData} — POD / delivery doc at completion
   processedById: varchar("processed_by_id"),
   completedById: varchar("completed_by_id"),

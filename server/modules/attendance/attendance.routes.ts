@@ -298,7 +298,7 @@ export function registerAttendanceRoutes(app: Express) {
   app.get("/api/approvals/feed", requireAuth, async (req, res) => {
     const viewer = req.currentUser!;
     const privileged = ["super_admin", "hr_admin", "hr_executive", "ceo_approver", "cto"].includes(viewer.role);
-    const asManager = viewer.role === "manager" && !!viewer.employeeId;
+    const asManager = (viewer.role === "manager" || viewer.role === "ops_shift_incharge") && !!viewer.employeeId;
     let teamIds: Set<string> | null = null;
     if (asManager) teamIds = new Set((await storage.getEmployeesByManager(viewer.employeeId!)).map((e) => e.id));
 
@@ -544,7 +544,7 @@ export function registerAttendanceRoutes(app: Express) {
     const viewer = req.currentUser!;
     // Only the employee's direct manager or a Super Admin can decide. HR/CEO are view-only.
     let canDecide = viewer.role === "super_admin";
-    if (!canDecide && viewer.role === "manager" && viewer.employeeId) {
+    if (!canDecide && (viewer.role === "manager" || viewer.role === "ops_shift_incharge") && viewer.employeeId) {
       const reports = await storage.getEmployeesByManager(viewer.employeeId);
       canDecide = reports.some((e) => e.id === employeeId);
     }
@@ -569,14 +569,14 @@ export function registerAttendanceRoutes(app: Express) {
   app.get("/api/attendance/wfh-pending", requireAuth, async (req, res) => {
     const viewer = req.currentUser!;
     // Only actionable roles get the queue: Super Admin (all) or a manager (their reports).
-    if (!(viewer.role === "super_admin" || viewer.role === "manager")) return res.json([]);
+    if (!(viewer.role === "super_admin" || (viewer.role === "manager" || viewer.role === "ops_shift_incharge"))) return res.json([]);
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const from = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     const toD = new Date(today); toD.setDate(toD.getDate() + 6);
     const to = `${toD.getFullYear()}-${String(toD.getMonth() + 1).padStart(2, "0")}-${String(toD.getDate()).padStart(2, "0")}`;
     const recs = await storage.getWfhInRange(from, to);
     let allowIds: Set<string> | null = null;
-    if (viewer.role === "manager" && viewer.employeeId) {
+    if ((viewer.role === "manager" || viewer.role === "ops_shift_incharge") && viewer.employeeId) {
       allowIds = new Set((await storage.getEmployeesByManager(viewer.employeeId)).map((e) => e.id));
     }
     const now = new Date();
@@ -600,7 +600,7 @@ export function registerAttendanceRoutes(app: Express) {
 
     if (hrRoles.includes(viewer.role)) {
       res.json(await storage.getRegularizationRequests(undefined, status as string));
-    } else if (viewer.role === "manager" && viewer.employeeId) {
+    } else if ((viewer.role === "manager" || viewer.role === "ops_shift_incharge") && viewer.employeeId) {
       const directReports = await storage.getEmployeesByManager(viewer.employeeId);
       const directReportIds = new Set(directReports.map(e => e.id));
       const all = await storage.getRegularizationRequests(undefined, status as string);
@@ -632,7 +632,7 @@ export function registerAttendanceRoutes(app: Express) {
   app.put("/api/regularizations/:id", requireAuth, async (req, res) => {
     const { status, approvalNotes } = req.body;
     const viewer = req.currentUser!;
-    const managerAndAbove = ["super_admin", "hr_admin", "hr_executive", "manager", "ceo_approver"];
+    const managerAndAbove = ["super_admin", "hr_admin", "hr_executive", "manager", "ops_shift_incharge", "ceo_approver"];
     if (!managerAndAbove.includes(viewer.role)) {
       return res.status(403).json({ error: "Access denied" });
     }
@@ -640,7 +640,7 @@ export function registerAttendanceRoutes(app: Express) {
     const reg = allRegs.find(r => r.id === req.params.id);
     if (!reg) return res.status(404).json({ error: "Request not found" });
 
-    if (viewer.role === "manager" && viewer.employeeId) {
+    if ((viewer.role === "manager" || viewer.role === "ops_shift_incharge") && viewer.employeeId) {
       const directReports = await storage.getEmployeesByManager(viewer.employeeId);
       const isDirectReport = directReports.some(e => e.id === reg.employeeId);
       if (!isDirectReport) {

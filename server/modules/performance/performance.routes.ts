@@ -29,7 +29,7 @@ export function registerPerformanceRoutes(app: Express) {
     const isHr = ["super_admin", "hr_admin", "hr_executive"].includes(user.role);
     const isSelf = !!user.employeeId && user.employeeId === employeeId;
     let isManager = false;
-    if (!isHr && !isSelf && user.role === "manager" && user.employeeId) {
+    if (!isHr && !isSelf && (user.role === "manager" || user.role === "ops_shift_incharge") && user.employeeId) {
       const reports = await storage.getEmployeesByManager(user.employeeId);
       isManager = reports.some((e: any) => e.id === employeeId);
     }
@@ -90,7 +90,7 @@ export function registerPerformanceRoutes(app: Express) {
       return res.json(await storage.getGoals(cycleId as string, user.employeeId));
     }
 
-    if (user.role === "manager") {
+    if ((user.role === "manager" || user.role === "ops_shift_incharge")) {
       // Managers are scoped to their own direct reports — never the whole company.
       const teamIds = new Set((await storage.getEmployeesByManager(user.employeeId || "")).map((e: any) => e.id));
       if (empId && !teamIds.has(empId)) empId = undefined; // ignore out-of-team requests
@@ -106,7 +106,7 @@ export function registerPerformanceRoutes(app: Express) {
   app.post("/api/performance/goals", requireAuth, async (req, res) => {
     const user = req.currentUser!;
     // Goals for another employee only by HR / their manager; otherwise for yourself.
-    const employeeId = (["super_admin", "hr_admin", "hr_executive", "manager"].includes(user.role) && req.body.employeeId) ? req.body.employeeId : user.employeeId;
+    const employeeId = (["super_admin", "hr_admin", "hr_executive", "manager", "ops_shift_incharge"].includes(user.role) && req.body.employeeId) ? req.body.employeeId : user.employeeId;
     if (!employeeId) return res.status(400).json({ error: "Employee ID required" });
     if (!(await empAccess(user, employeeId)).allowed) return res.status(403).json({ error: "Forbidden" });
 

@@ -19,6 +19,8 @@ import AuditPage from "@/features/audit/pages/audit-page";
 import PerformancePage from "@/features/performance/pages/performance-page";
 import InviteAcceptPage from "@/features/auth/pages/invite-accept-page";
 import ShiftsPage from "@/features/shifts/pages/shifts-page";
+import MyShiftsPage from "@/features/ops-shifts/pages/my-shifts-page";
+import ShiftManagementPage from "@/features/ops-shifts/pages/shift-management-page";
 import OnboardingPage from "@/features/onboarding/pages/onboarding-page";
 import CandidateDocForm from "@/features/onboarding/pages/candidate-doc-form";
 import ATSPage from "@/features/hr-workspace/pages/ats-page";
@@ -80,6 +82,8 @@ export function AppRoutes() {
       <Route path="/audit" component={() => <ProtectedRoute component={AuditPage} />} />
       <Route path="/performance" component={() => <ProtectedRoute component={PerformancePage} />} />
       <Route path="/shifts" component={() => <ProtectedRoute component={ShiftsPage} />} />
+      <Route path="/my-shifts" component={() => <ProtectedRoute component={MyShiftsPage} />} />
+      <Route path="/shift-management" component={() => <ProtectedRoute component={ShiftManagementPage} />} />
       <Route path="/onboarding" component={() => <ProtectedRoute component={OnboardingPage} />} />
       <Route path="/workspace/ats" component={() => <ProtectedRoute component={ATSPage} />} />
       <Route path="/workspace/hr-ops" component={() => <ProtectedRoute component={HROpsPage} />} />

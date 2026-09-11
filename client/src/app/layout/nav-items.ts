@@ -22,8 +22,8 @@ export const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "hr_admin", "hr_executive"] },
   // A manager is scoped to their own team — direct reports only, no org-wide directory or dept filter.
-  { title: "My Team", href: "/my-team", icon: Users, roles: ["manager"] },
-  { title: "My Profile", href: "/employees/me", icon: Users, roles: ["employee"] },
+  { title: "My Team", href: "/my-team", icon: Users, roles: ["manager", "ops_shift_incharge"] },
+  { title: "My Profile", href: "/employees/me", icon: Users, roles: ["employee", "ops_employee"] },
   { title: "Attendance", href: "/attendance", icon: Clock },
   { title: "Leave", href: "/leave", icon: Plane },
   { title: "Holidays", href: "/holidays", icon: Calendar },
@@ -32,6 +32,8 @@ export const navItems: NavItem[] = [
   { title: "Announcements", href: "/announcements", icon: Megaphone },
   { title: "Assets", href: "/assets", icon: Package, roles: ["super_admin", "hr_admin", "hr_executive"] },
   { title: "Shifts", href: "/shifts", icon: Clock, roles: ["super_admin", "hr_admin", "hr_executive", "hr_ops"] },
+  { title: "My Shifts", href: "/my-shifts", icon: Clock, roles: ["ops_employee"] },
+  { title: "Shift Management", href: "/shift-management", icon: Clock, roles: ["super_admin", "ops_shift_incharge"] },
   { title: "Onboarding", href: "/onboarding", icon: ClipboardList, roles: ["super_admin", "hr_admin", "hr_executive", "hr_ops"] },
 ];
 
@@ -42,7 +44,7 @@ export const navItems: NavItem[] = [
 export const companyWorkspaceHub: NavItem = { title: "Company Workspace", href: "/company-workspace", icon: Store };
 export const companyWorkspaceChildren: NavItem[] = [
   { title: "My Requests", href: "/my-requests", icon: ClipboardList },
-  { title: "Team Requests", href: "/team-requests", icon: Users, roles: ["super_admin", "hr_admin", "hr_executive", "manager", "hr_ops", "ceo_approver"] },
+  { title: "Team Requests", href: "/team-requests", icon: Users, roles: ["super_admin", "hr_admin", "hr_executive", "manager", "ops_shift_incharge", "hr_ops", "ceo_approver"] },
   { title: "My Approvals", href: "/my-approvals", icon: CheckSquare, roles: ["super_admin", "ceo_approver", "hr_admin", "hr_executive", "hr_ops", "finance"] },
 ];
 

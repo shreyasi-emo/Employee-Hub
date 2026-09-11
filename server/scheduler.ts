@@ -202,4 +202,11 @@ export function startScheduler() {
     try { await processZohoSyncJobs(); } catch (e) { console.error("[Scheduler] Zoho drain error:", e); }
   });
   console.log("[Scheduler] Zoho sync cron registered (every 2 minutes)");
+
+  // Logistics shipment tracking — refresh in-transit shipments from their provider (mock) every 6 hours.
+  cron.schedule("0 */6 * * *", async () => {
+    try { const { refreshLogisticsTracking } = await import("./modules/logistics/logistics.routes"); await refreshLogisticsTracking(); }
+    catch (e) { console.error("[Scheduler] Logistics tracking refresh error:", e); }
+  }, { timezone: "Asia/Kolkata" });
+  console.log("[Scheduler] Logistics tracking refresh cron registered (every 6h)");
 }
